@@ -53,7 +53,9 @@ export function Ribbon({ groups, trailing }: RibbonProps) {
               </button>
             ))}
           </div>
-          <div className="vd-ribbon__caption">{group.label}</div>
+          {group.label ? (
+            <div className="vd-ribbon__caption">{group.label}</div>
+          ) : null}
         </div>
       ))}
       {trailing ? <div className="vd-ribbon__trailing">{trailing}</div> : null}

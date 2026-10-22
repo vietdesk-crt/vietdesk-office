@@ -79,8 +79,11 @@ describe("vỏ ứng dụng", () => {
     await flush();
 
     expect(container.querySelector(".vd-writer__surface")).not.toBeNull();
-    expect(container.querySelector(".vd-docbar__title")).not.toBeNull();
-    expect(container.textContent).toContain("Văn bản chưa đặt tên");
+    const tabName = container.querySelector<HTMLInputElement>(
+      ".vd-tab.is-active .vd-tab__name",
+    );
+    expect(tabName).not.toBeNull();
+    expect(tabName?.value).toBe("Văn bản chưa đặt tên");
   });
 
   it("chuyển sang Sheets bằng rail và hiển thị lưới", async () => {
@@ -103,9 +106,10 @@ describe("vỏ ứng dụng", () => {
     });
     await flush();
 
-    const homeItem = buttonByText(".vd-rail__item", "Trang chủ");
+    // Rail ẩn khi đang ở trình soạn — về trang chủ bằng nút trên header.
+    const homeButton = container.querySelector<HTMLButtonElement>(".vd-app__crumb");
     await act(async () => {
-      homeItem?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      homeButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     await flush();
 
@@ -123,8 +127,10 @@ describe("vỏ ứng dụng", () => {
     });
     await flush();
 
-    const toolsButton = buttonByText(".vd-ribbon__item", "Công cụ");
-    expect(toolsButton).toBeDefined();
+    const toolsButton = container.querySelector<HTMLButtonElement>(
+      '.vd-actions__btn[aria-label="Công cụ tiếng Việt"]',
+    );
+    expect(toolsButton).not.toBeNull();
 
     await act(async () => {
       toolsButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -146,11 +152,15 @@ describe("vỏ ứng dụng", () => {
     expect(container.querySelector(".vd-settings")).not.toBeNull();
     expect(container.textContent).toContain("Giao diện");
     expect(container.textContent).toContain("Tệp gần đây");
-    expect(container.textContent).toContain("Lõi xử lý");
+    expect(container.textContent).toContain("Tiếng Việt");
 
     const darkButton = Array.from(
-      container.querySelectorAll<HTMLButtonElement>(".vd-segmented__item"),
-    ).find((button) => button.textContent?.trim() === "Tối");
+      container.querySelectorAll<HTMLButtonElement>(".vd-theme-option"),
+    ).find(
+      (button) =>
+        button.querySelector(".vd-theme-option__label")?.textContent?.trim() ===
+        "Tối",
+    );
     expect(darkButton).toBeDefined();
 
     await act(async () => {
@@ -190,18 +200,19 @@ describe("vỏ ứng dụng", () => {
     });
     await flush();
 
-    const saveButton = Array.from(
-      container.querySelectorAll<HTMLButtonElement>(".vd-ribbon__item"),
-    ).find(
-      (button) =>
-        button.querySelector(".vd-ribbon__label")?.textContent === "Lưu",
+    expect(container.querySelector(".vd-ribbon")).toBeNull();
+
+    const saveButton = container.querySelector<HTMLButtonElement>(
+      '.vd-actions__btn[aria-label="Lưu tài liệu"]',
     );
-    expect(saveButton).toBeDefined();
+    expect(saveButton).not.toBeNull();
     expect(saveButton?.disabled).toBe(false);
 
-    const title = container.querySelector<HTMLInputElement>(".vd-docbar__title");
+    const title = container.querySelector<HTMLInputElement>(
+      ".vd-tab.is-active .vd-tab__name",
+    );
     expect(title).not.toBeNull();
-    expect(container.querySelector(".vd-docbar__dirty")).toBeNull();
+    expect(container.querySelector(".vd-tab__dirty")).toBeNull();
 
     const setValue = Object.getOwnPropertyDescriptor(
       HTMLInputElement.prototype,
@@ -214,7 +225,7 @@ describe("vỏ ứng dụng", () => {
     });
     await flush();
 
-    expect(container.querySelector(".vd-docbar__dirty")).not.toBeNull();
+    expect(container.querySelector(".vd-tab__dirty")).not.toBeNull();
   });
 
   it("mở tệp OOXML thì không cho chỉnh sửa và giải thích rõ", async () => {
@@ -236,7 +247,7 @@ describe("vỏ ứng dụng", () => {
     await flush();
 
     expect(container.querySelector(".vd-unavailable")).not.toBeNull();
-    expect(container.textContent).toContain("Tệp này chưa đọc được");
+    expect(container.textContent).toContain("Định dạng này chưa đọc được");
     expect(container.textContent).toContain("Tệp gốc trên đĩa không bị thay đổi");
   });
 
@@ -280,11 +291,13 @@ describe("vỏ ứng dụng", () => {
     });
     await flush();
 
-    const title = container.querySelector<HTMLInputElement>(".vd-docbar__title");
+    const title = container.querySelector<HTMLInputElement>(
+      ".vd-tab.is-active .vd-tab__name",
+    );
     expect(title?.value).toBe("Bản nháp cũ");
     expect(
       container.querySelector(".vd-writer__surface .ProseMirror")?.textContent,
     ).toContain("Nội dung nháp");
-    expect(container.querySelector(".vd-docbar__dirty")).not.toBeNull();
+    expect(container.querySelector(".vd-tab__dirty")).not.toBeNull();
   });
 });

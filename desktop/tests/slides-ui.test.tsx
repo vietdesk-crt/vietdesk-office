@@ -161,4 +161,28 @@ describe("trình soạn slide", () => {
 
     expect(document.body.querySelector(".vd-present")).toBeNull();
   });
+
+  it("bật/tắt ghi chú diễn giả khi trình chiếu bằng phím S", () => {
+    click(
+      Array.from(container.querySelectorAll("button")).find((button) =>
+        button.textContent?.includes("Trình chiếu"),
+      ),
+    );
+    expect(document.body.querySelector(".vd-present__notes")).toBeNull();
+
+    pressKey("s");
+
+    const notes = document.body.querySelector(".vd-present__notes");
+    expect(notes).not.toBeNull();
+    expect(notes?.textContent).toContain("Chào mừng");
+
+    pressKey("Escape");
+    expect(document.body.querySelector(".vd-present")).toBeNull();
+  });
+
+  it("khung xem dùng class theo layout của slide đang chọn", () => {
+    const canvas = container.querySelector(".vd-slides__canvas");
+    // Slide đầu tiên mặc định là layout "title".
+    expect(canvas?.className).toContain("vd-slide--title");
+  });
 });

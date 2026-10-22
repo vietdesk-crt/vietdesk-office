@@ -38,7 +38,9 @@ export function appDisplay(kind: DocumentKind): {
   label: string;
   glyph: string;
 } {
-  return isAppId(kind) ? APPS[kind] : UNKNOWN_DISPLAY;
+  return isAppId(kind)
+    ? { label: APPS[kind].label, glyph: APPS[kind].glyph }
+    : UNKNOWN_DISPLAY;
 }
 
 export type { AppDescriptor, AppDocument, AppId, HomeCard } from "./types";

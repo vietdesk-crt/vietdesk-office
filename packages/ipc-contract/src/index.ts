@@ -38,8 +38,14 @@ export type {
   DocumentMeta,
   DocumentType,
 } from "./document";
-export { MAX_DOCUMENT_BYTES, readDocumentFile, writeDocumentFile } from "./files";
-export { pickDocument, pickSavePath } from "./dialog";
+export {
+  MAX_DOCUMENT_BYTES,
+  readDocumentBinary,
+  readDocumentFile,
+  writeDocumentBinary,
+  writeDocumentFile,
+} from "./files";
+export { pickDocument, pickExportPath, pickSavePath } from "./dialog";
 export {
   assetUrl,
   documentFolder,

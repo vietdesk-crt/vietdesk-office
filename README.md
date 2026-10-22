@@ -28,7 +28,7 @@ vietdesk-office/
 │   └── src-tauri/        # Rust: Tauri command, đọc/ghi tệp, lưu recents
 ├── packages/             # Thư viện TypeScript dùng chung
 │   ├── ipc-contract/     # Hợp đồng IPC — nguồn sự thật duy nhất
-│   ├── ui/               # Ribbon, rail, design token
+│   ├── ui/               # Rail, design token
 │   └── vietnamese/       # Tiện ích tiếng Việt chạy trên trình duyệt
 ├── native/               # Mã gốc, không phụ thuộc UI
 │   ├── core/             # LÕI C++17 (C ABI)

@@ -48,6 +48,8 @@ export async function pickDocument(): Promise<string | null> {
 
 /**
  * Hộp thoại “Lưu thành…”. Chỉ trả đường dẫn, không tự ghi tệp.
+ * Mặc định đề nghị định dạng Word (.docx) để tệp mở được trong MS Word và
+ * Google Docs; vẫn cho phép chọn .vdx (định dạng gốc đầy đủ của VietDesk).
  * Trả null khi huỷ hoặc khi chạy ngoài Tauri (UI chuyển sang tải tệp).
  */
 export async function pickSavePath(
@@ -56,13 +58,46 @@ export async function pickSavePath(
   if (!hasNativeCore()) {
     return null;
   }
+  const base = defaultName.replace(/\.(vdx|docx?|odt|odp|xlsx)$/i, "");
   const selected = await save({
     title: "Lưu tài liệu",
-    defaultPath: defaultName,
-    filters: [{ name: "Tài liệu VietDesk", extensions: ["vdx"] }],
+    defaultPath: `${base}.docx`,
+    filters: [
+      { name: "Word (.docx)", extensions: ["docx"] },
+      { name: "Tài liệu VietDesk (.vdx)", extensions: ["vdx"] },
+    ],
   });
-  if (typeof selected === "string") {
-    return /\.vdx$/i.test(selected) ? selected : `${selected}.vdx`;
+  if (typeof selected !== "string") {
+    return null;
   }
-  return null;
+  if (/\.(vdx|docx|doc)$/i.test(selected)) {
+    return selected;
+  }
+  return `${selected}.docx`;
+}
+
+/**
+ * Hộp thoại chọn nơi lưu tệp xuất (PDF, v.v.) — định dạng tuỳ ý gọi.
+ * Trả null khi huỷ hoặc khi chạy ngoài Tauri (UI chuyển sang tải tệp).
+ */
+export async function pickExportPath(
+  defaultName: string,
+  title: string,
+  filter: { name: string; extensions: string[] },
+): Promise<string | null> {
+  if (!hasNativeCore()) {
+    return null;
+  }
+  const selected = await save({
+    title,
+    defaultPath: defaultName,
+    filters: [filter],
+  });
+  if (typeof selected !== "string") {
+    return null;
+  }
+  const suffix = `.${filter.extensions[0]}`;
+  return selected.toLowerCase().endsWith(suffix.toLowerCase())
+    ? selected
+    : `${selected}${suffix}`;
 }

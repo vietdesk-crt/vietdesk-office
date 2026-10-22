@@ -45,3 +45,29 @@ export function systemPrefersDark(): boolean {
     window.matchMedia("(prefers-color-scheme: dark)").matches
   );
 }
+
+const AUTOSAVE_KEY = "vietdesk-autosave";
+
+/** Đọc lựa chọn tự lưu; mặc định bật khi chưa có dữ liệu. */
+export function readAutosaveEnabled(): boolean {
+  if (typeof localStorage === "undefined") {
+    return true;
+  }
+  try {
+    return localStorage.getItem(AUTOSAVE_KEY) !== "off";
+  } catch {
+    // localStorage bị chặn — giữ mặc định là bật.
+  }
+  return true;
+}
+
+export function writeAutosaveEnabled(enabled: boolean): void {
+  if (typeof localStorage === "undefined") {
+    return;
+  }
+  try {
+    localStorage.setItem(AUTOSAVE_KEY, enabled ? "on" : "off");
+  } catch {
+    // Không lưu được thì vẫn giữ lựa chọn trong phiên hiện tại.
+  }
+}

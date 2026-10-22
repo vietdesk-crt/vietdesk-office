@@ -5,6 +5,7 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MAX_ASSET_BYTES } from "@vietdesk/ipc-contract";
 import { WriterEditor } from "../src/editors/writer";
 
 declare global {
@@ -94,8 +95,182 @@ describe("WriterEditor", () => {
     expect(
       container.querySelector('button[aria-label="Xóa định dạng"]'),
     ).not.toBeNull();
+    expect(
+      container.querySelector('button[aria-label="Dán (Ctrl+V)"]'),
+    ).not.toBeNull();
+    expect(
+      container.querySelector('button[aria-label="Cắt (Ctrl+X)"]'),
+    ).not.toBeNull();
+    expect(
+      container.querySelector('button[aria-label="Chép (Ctrl+C)"]'),
+    ).not.toBeNull();
+    expect(
+      container.querySelector('button[aria-label="Hiện/ẩn dấu đoạn ¶"]'),
+    ).not.toBeNull();
+    expect(
+      container.querySelector(
+        'button[aria-label="Sắp xếp đoạn văn A→Z (chọn từ hai đoạn trở lên)"]',
+      ),
+    ).not.toBeNull();
+    expect(
+      container.querySelector('select[aria-label="Đổi chữ hoa/thường"]'),
+    ).not.toBeNull();
+    expect(
+      container.querySelector('button[aria-label="Tìm và thay thế (Ctrl+H)"]'),
+    ).not.toBeNull();
+    expect(
+      container.querySelector('button[aria-label="Chọn tất cả (Ctrl+A)"]'),
+    ).not.toBeNull();
+    expect(
+      container.querySelector(
+        'button[aria-label="Dán không định dạng (Ctrl+Shift+V)"]',
+      ),
+    ).not.toBeNull();
+    expect(
+      container.querySelector('button[aria-label="Chép toàn bộ văn bản"]'),
+    ).not.toBeNull();
+    expect(
+      container.querySelector('button[aria-label="Đoạn văn thường"]'),
+    ).not.toBeNull();
+    expect(
+      container.querySelector('button[aria-label="Chèn ngày tháng"]'),
+    ).not.toBeNull();
+    expect(
+      container.querySelector('button[aria-label="Chèn ký hiệu"]'),
+    ).not.toBeNull();
+    expect(
+      container.querySelector('button[aria-label="Xuất Word (.docx)"]'),
+    ).not.toBeNull();
+    expect(
+      container.querySelector('button[aria-label="Xuất văn bản (.txt)"]'),
+    ).not.toBeNull();
     expect(container.textContent).toContain("2 từ");
     expect(container.textContent).toContain("9 ký tự");
+  });
+
+  it("đổi nhanh đoạn văn thành tiêu đề bằng nút H1–H3", async () => {
+    const h1 = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Tiêu đề 1"]',
+    );
+    expect(h1).not.toBeNull();
+
+    await act(async () => {
+      h1?.click();
+    });
+    await flush();
+
+    expect(container.querySelector(".ProseMirror h1")?.textContent).toBe(
+      "chào chào",
+    );
+    expect(h1?.getAttribute("aria-pressed")).toBe("true");
+
+    const h2 = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Tiêu đề 2"]',
+    );
+    await act(async () => {
+      h2?.click();
+    });
+    await flush();
+
+    expect(container.querySelector(".ProseMirror h1")).toBeNull();
+    expect(container.querySelector(".ProseMirror h2")?.textContent).toBe(
+      "chào chào",
+    );
+  });
+
+  it("chèn ngày tháng và ký hiệu tại con trỏ", async () => {
+    const dateButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Chèn ngày tháng"]',
+    );
+    await act(async () => {
+      dateButton?.click();
+    });
+    await flush();
+
+    const dateChoice = Array.from(
+      container.querySelectorAll<HTMLButtonElement>(
+        ".vd-writer__panel-action",
+      ),
+    ).find((button) => /^\d{2}\/\d{2}\/\d{4}$/.test(button.textContent ?? ""));
+    expect(dateChoice).toBeDefined();
+
+    await act(async () => {
+      dateChoice?.click();
+    });
+    await flush();
+
+    expect(container.querySelector(".ProseMirror")?.textContent).toMatch(
+      /\d{2}\/\d{2}\/\d{4}/,
+    );
+
+    const symbolButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Chèn ký hiệu"]',
+    );
+    await act(async () => {
+      symbolButton?.click();
+    });
+    await flush();
+
+    const symbol = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Chèn ký hiệu ₫"]',
+    );
+    expect(symbol).not.toBeNull();
+    await act(async () => {
+      symbol?.click();
+    });
+    await flush();
+
+    expect(container.querySelector(".ProseMirror")?.textContent).toContain("₫");
+  });
+
+  it("bật/tắt số trang và mở bảng thống kê tài liệu", async () => {
+    const pageToggle = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Hiện/ẩn số trang"]',
+    );
+    expect(pageToggle?.getAttribute("aria-pressed")).toBe("true");
+
+    await act(async () => {
+      pageToggle?.click();
+    });
+    await flush();
+
+    expect(pageToggle?.getAttribute("aria-pressed")).toBe("false");
+    expect(container.querySelector(".vd-writer__page-number")).toBeNull();
+
+    const statsToggle = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Thống kê tài liệu"]',
+    );
+    await act(async () => {
+      statsToggle?.click();
+    });
+    await flush();
+
+    const panel = container.querySelector(".vd-writer__stats");
+    expect(panel).not.toBeNull();
+    expect(panel?.textContent).toContain("Số từ2");
+    expect(panel?.textContent).toContain("Ký tự (có dấu cách)9");
+    expect(panel?.textContent).toContain("Ký tự (không dấu cách)8");
+    expect(panel?.textContent).toContain("Đoạn văn1");
+    expect(panel?.textContent).toContain("Thời gian đọc1 phút");
+  });
+
+  it("bật lớp hiển thị dấu đoạn ¶ trên trang", async () => {
+    const marksButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Hiện/ẩn dấu đoạn ¶"]',
+    );
+    expect(marksButton).not.toBeNull();
+    expect(container.querySelector(".vd-writer")?.className).not.toContain(
+      "is-show-marks",
+    );
+
+    await act(async () => {
+      marksButton?.click();
+    });
+    await flush();
+
+    expect(container.querySelector(".vd-writer")?.className).toContain(
+      "is-show-marks",
+    );
   });
 
   it("tìm và thay thế tất cả trong văn bản", async () => {
@@ -364,7 +539,7 @@ describe("WriterEditor", () => {
   it("dựng bản in rồi gọi hộp thoại in của hệ điều hành", async () => {
     const print = vi.spyOn(window, "print").mockImplementation(() => {});
     const button = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="In / xuất PDF (Ctrl+P)"]',
+      'button[aria-label="In (Ctrl+P)"]',
     );
     expect(button).not.toBeNull();
 
@@ -634,5 +809,74 @@ describe("WriterEditor", () => {
       commentRoot.unmount();
     });
     commentContainer.remove();
+  });
+
+  it("chèn ảnh qua hộp thoại tệp của trình duyệt", async () => {
+    const imageButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Chèn ảnh"]',
+    );
+    expect(imageButton).not.toBeNull();
+
+    // Trình duyệt (không phải Tauri): nút mở hộp thoại tệp ẩn.
+    const input = container.querySelector<HTMLInputElement>(
+      'input[aria-label="Chọn tệp ảnh"]',
+    );
+    expect(input).not.toBeNull();
+
+    // Giả lập người dùng chọn tệp — ảnh được nhúng thành data URL.
+    const file = new File([new Uint8Array([137, 80, 78, 71])], "bieu-do.png", {
+      type: "image/png",
+    });
+    Object.defineProperty(input, "files", {
+      value: [file],
+      configurable: true,
+    });
+
+    await act(async () => {
+      input?.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    // FileReader là async task thật (không phải microtask) — chờ tới khi ảnh
+    // được chèn thay vì chỉ giải một lượt microtask.
+    let image: HTMLImageElement | null = null;
+    for (let attempt = 0; attempt < 50 && !image; attempt += 1) {
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      });
+      image = container.querySelector<HTMLImageElement>(
+        ".ProseMirror .vd-writer__image-img",
+      );
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    expect(image).not.toBeNull();
+    expect(image?.getAttribute("src")).toContain("data:image/png;base64,");
+    expect(image?.getAttribute("alt")).toBe("bieu-do.png");
+  });
+
+  it("từ chối ảnh vượt quá 16 MB và hiện cảnh báo", async () => {
+    const input = container.querySelector<HTMLInputElement>(
+      'input[aria-label="Chọn tệp ảnh"]',
+    );
+    expect(input).not.toBeNull();
+
+    const big = new File([new Uint8Array(1)], "anh-to.png", {
+      type: "image/png",
+    });
+    Object.defineProperty(big, "size", { value: MAX_ASSET_BYTES + 1 });
+    Object.defineProperty(input, "files", {
+      value: [big],
+      configurable: true,
+    });
+
+    await act(async () => {
+      input?.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await flush();
+
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+      "16 MB",
+    );
+    expect(container.querySelector(".ProseMirror .vd-writer__image")).toBeNull();
   });
 });

@@ -1,11 +1,16 @@
 import { EditorState, TextSelection } from "prosemirror-state";
 import type { Command } from "prosemirror-state";
+import type { Mark } from "prosemirror-model";
 import { describe, expect, it } from "vitest";
 import {
+  applyFormatting,
+  changeCase,
   changeIndent,
   clearFormatting,
+  formattingMarksAtSelection,
   inTable,
   insertHorizontalRule,
+  insertImage,
   insertPageBreak,
   insertTable,
   markValue,
@@ -15,13 +20,16 @@ import {
   setLineHeight,
   setLink,
   setMarkAttr,
+  sortSelectedBlocks,
   tableCommands,
   toggleList,
   toggleTaskChecked,
   toggleTaskList,
+  transformCaseText,
 } from "../src/editors/writer/commands";
 import {
   normalizeHref,
+  normalizeImageSize,
   normalizeIndent,
   writerSchema,
 } from "../src/editors/writer/schema";
@@ -39,7 +47,7 @@ import {
   readPageSetup,
 } from "../src/editors/writer/page";
 
-function paragraph(text: string, marks = []) {
+function paragraph(text: string, marks: readonly Mark[] = []) {
   return writerSchema.node(
     "paragraph",
     null,
@@ -770,5 +778,195 @@ describe("bảng, liên kết và ngắt trang trong Writer", () => {
       ...unknown[],
     ];
     expect(tableSpec[0]).toBe("table");
+  });
+});
+
+describe("chèn ảnh trong Writer", () => {
+  it("chèn ảnh vào vị trí con trỏ trong đoạn văn", () => {
+    const document = doc(paragraph("Trước sau"));
+    const state = EditorState.create({
+      schema: writerSchema,
+      doc: document,
+      selection: TextSelection.create(document, 6),
+    });
+
+    const next = applyCommand(
+      state,
+      insertImage({ src: "assets/anh.png", alt: "Ảnh minh hoạ" }),
+    );
+    const block = next.doc.firstChild;
+    expect(block?.childCount).toBe(3);
+    const image = block?.child(1);
+    expect(image?.type.name).toBe("image");
+    expect(image?.attrs.src).toBe("assets/anh.png");
+    expect(image?.attrs.alt).toBe("Ảnh minh hoạ");
+    expect(block?.textContent).toBe("Trước sau");
+  });
+
+  it("round-trip được ảnh với kích thước đã chuẩn hoá", () => {
+    const document = writerSchema.node("doc", null, [
+      writerSchema.node("paragraph", null, [
+        writerSchema.nodes.image.create({
+          src: "assets/bieu-do.png",
+          alt: "Biểu đồ",
+          width: 420,
+          height: null,
+        }),
+      ]),
+    ]);
+
+    const restored = writerSchema.nodeFromJSON(document.toJSON());
+    expect(restored.eq(document)).toBe(true);
+    const image = restored.firstChild?.firstChild;
+    expect(image?.attrs.width).toBe(420);
+    expect(image?.attrs.height).toBeNull();
+  });
+
+  it("từ chối ảnh không có đường dẫn", () => {
+    const document = doc(paragraph("Xin chào"));
+    const state = EditorState.create({
+      schema: writerSchema,
+      doc: document,
+      selection: TextSelection.create(document, 2),
+    });
+
+    const next = applyCommand(state, insertImage({ src: "" }));
+    expect(next.doc.eq(document)).toBe(true);
+  });
+
+  it("chuẩn hoá kích thước ảnh trong biên 16..4000", () => {
+    expect(normalizeImageSize(420)).toBe(420);
+    expect(normalizeImageSize(5)).toBeNull();
+    expect(normalizeImageSize(99999)).toBeNull();
+    expect(normalizeImageSize("320")).toBe(320);
+    expect(normalizeImageSize(null)).toBeNull();
+    expect(normalizeImageSize(undefined)).toBeNull();
+  });
+});
+
+describe("đổi chữ hoa/thường trong Writer", () => {
+  it("biến đổi chuỗi theo từng kiểu chữ", () => {
+    expect(transformCaseText("xin chào việt nam", "upper")).toBe(
+      "XIN CHÀO VIỆT NAM",
+    );
+    expect(transformCaseText("XIN Chào Việt Nam", "lower")).toBe(
+      "xin chào việt nam",
+    );
+    expect(transformCaseText("xin chào. thế giới! ổn", "sentence")).toBe(
+      "Xin chào. Thế giới! Ổn",
+    );
+    expect(transformCaseText("xin chào việt nam", "capitalize")).toBe(
+      "Xin Chào Việt Nam",
+    );
+    expect(transformCaseText("Xin Chào", "toggle")).toBe("xIN cHÀO");
+  });
+
+  it("đổi chữ hoa cho đúng vùng chọn và giữ mark", () => {
+    const strong = writerSchema.marks.strong.create();
+    const document = doc(paragraph("chào thế giới", [strong]));
+    const state = EditorState.create({
+      schema: writerSchema,
+      doc: document,
+      selection: TextSelection.create(document, 1, 5),
+    });
+
+    const next = applyCommand(state, changeCase("upper"));
+    expect(next.doc.textContent).toBe("CHÀO thế giới");
+    expect(next.doc.firstChild?.firstChild?.marks).toContainEqual(strong);
+  });
+
+  it("viết hoa đầu câu xuyên qua các đoạn chữ khác định dạng", () => {
+    const strong = writerSchema.marks.strong.create();
+    const document = doc(
+      writerSchema.node("paragraph", null, [
+        writerSchema.text("xin "),
+        writerSchema.text("chào", [strong]),
+        writerSchema.text(" thế giới"),
+      ]),
+    );
+    const state = EditorState.create({
+      schema: writerSchema,
+      doc: document,
+      selection: TextSelection.create(document, 1, document.content.size - 1),
+    });
+
+    const next = applyCommand(state, changeCase("sentence"));
+    expect(next.doc.textContent).toBe("Xin chào thế giới");
+    expect(next.doc.firstChild?.child(1)?.marks).toContainEqual(strong);
+  });
+
+  it("không làm gì khi vùng chọn rỗng", () => {
+    const document = doc(paragraph("chào"));
+    const state = EditorState.create({
+      schema: writerSchema,
+      doc: document,
+      selection: TextSelection.create(document, 1),
+    });
+
+    const next = applyCommand(state, changeCase("upper"));
+    expect(next.doc.eq(document)).toBe(true);
+  });
+});
+
+describe("chép định dạng trong Writer", () => {
+  it("lấy mark định dạng tại vùng chọn và dán sang đoạn khác", () => {
+    const strong = writerSchema.marks.strong.create();
+    const document = doc(paragraph("đậm", [strong]), paragraph("nhạt"));
+    const state = EditorState.create({
+      schema: writerSchema,
+      doc: document,
+      selection: TextSelection.create(document, 1, 4),
+    });
+
+    const marks = formattingMarksAtSelection(state);
+    expect(marks.map((mark) => mark.type.name)).toEqual(["strong"]);
+
+    const target = TextSelection.create(document, 6, 10);
+    const next = applyCommand(
+      state.apply(state.tr.setSelection(target)),
+      applyFormatting(marks),
+    );
+    const second = next.doc.lastChild?.firstChild;
+    expect(second?.textContent).toBe("nhạt");
+    expect(second?.marks).toContainEqual(strong);
+  });
+});
+
+describe("sắp xếp đoạn văn trong Writer", () => {
+  it("sắp xếp các đoạn cấp cao nhất theo ABC tiếng Việt", () => {
+    const document = doc(
+      paragraph("Cam"),
+      paragraph("An"),
+      paragraph("Bưởi"),
+    );
+    const state = EditorState.create({
+      schema: writerSchema,
+      doc: document,
+      selection: TextSelection.create(document, 1, document.content.size - 1),
+    });
+
+    const next = applyCommand(state, sortSelectedBlocks());
+    expect(next.doc.textContent).toBe("AnBưởiCam");
+  });
+
+  it("từ chối khi vùng chọn chứa danh sách", () => {
+    const list = writerSchema.nodes.bullet_list.create(null, [
+      writerSchema.nodes.list_item.create(
+        null,
+        writerSchema.nodes.paragraph.create(
+          null,
+          writerSchema.text("Mục"),
+        ),
+      ),
+    ]);
+    const document = doc(paragraph("Cam"), list, paragraph("An"));
+    const state = EditorState.create({
+      schema: writerSchema,
+      doc: document,
+      selection: TextSelection.create(document, 1, document.content.size - 1),
+    });
+
+    const next = applyCommand(state, sortSelectedBlocks());
+    expect(next.doc.eq(document)).toBe(true);
   });
 });

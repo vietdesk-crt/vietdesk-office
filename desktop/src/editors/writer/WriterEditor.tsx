@@ -1,15 +1,41 @@
 import { countWords } from "@vietdesk/vietnamese";
 import {
+  hasNativeCore,
+  IMAGE_EXTENSIONS,
+  MAX_ASSET_BYTES,
+  pickExportPath,
+  pickImageFile,
+  readFileAsDataUrl,
+  readImageBase64,
+  writeDocumentBinary,
+  writeImageAsset,
+} from "@vietdesk/ipc-contract";
+import {
   AlignCenter,
   AlignJustify,
   AlignLeft,
   AlignRight,
+  ArrowDownAZ,
   Bold,
+  CalendarDays,
+  ChartColumn,
   Check,
   CheckCheck,
   ChevronDown,
   ChevronUp,
+  ClipboardPaste,
+  ClipboardType,
+  ClipboardCopy,
+  Copy,
+  Eraser,
+  FileText,
+  FileType,
   GitCompareArrows,
+  Hash,
+  Heading1,
+  Heading2,
+  Heading3,
+  Image,
   IndentDecrease,
   IndentIncrease,
   Italic,
@@ -18,27 +44,42 @@ import {
   ListChecks,
   ListOrdered,
   ListTree,
+  MessageSquare,
   MessageSquarePlus,
   Minus,
+  Paintbrush,
   PanelTop,
+  Pilcrow,
   Printer,
   Redo2,
   RemoveFormatting,
   Replace,
+  Scissors,
   Search,
   SeparatorHorizontal,
+  Sigma,
+  SquareDashed,
   Strikethrough,
   Subscript,
   Superscript,
   Table,
+  Type,
   Underline,
   Undo2,
+  FileDown,
+  AArrowUp,
+  AArrowDown,
   X,
 } from "lucide-react";
-import { baseKeymap, toggleMark } from "prosemirror-commands";
+import {
+  baseKeymap,
+  deleteSelection,
+  selectAll,
+  toggleMark,
+} from "prosemirror-commands";
 import { history, redo, undo } from "prosemirror-history";
 import { keymap } from "prosemirror-keymap";
-import type { Node as PMNode } from "prosemirror-model";
+import type { Mark, Node as PMNode } from "prosemirror-model";
 import { EditorState, TextSelection } from "prosemirror-state";
 import type { Command } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
@@ -46,10 +87,14 @@ import { tableEditing } from "prosemirror-tables";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
+  applyFormatting,
+  changeCase,
   changeIndent,
   clearFormatting,
+  formattingMarksAtSelection,
   inTable,
   insertHorizontalRule,
+  insertImage,
   insertPageBreak,
   insertTable,
   listActive,
@@ -61,12 +106,14 @@ import {
   setLineHeight,
   setLink,
   setMarkAttr,
+  sortSelectedBlocks,
   tableCommands,
   tableKeymap,
   toggleList,
   toggleTaskList,
   writerKeymap,
 } from "./commands";
+import type { CaseMode } from "./commands";
 import { searchHighlightKey, searchHighlightPlugin } from "./highlight";
 import {
   DEFAULT_CHANGE_AUTHOR,
@@ -109,7 +156,18 @@ import {
 } from "./page";
 import type { PageSetup } from "./page";
 import { printDocument } from "./print";
+import { ImageView } from "./image-view";
 import { TaskItemView } from "./task-view";
+import { exportWriterPdf } from "../../export/pdf";
+import { writerDocxBytes } from "../../export/docx";
+import { bytesToBase64 } from "../../export/binary";
+import { downloadBinaryFile } from "../../download";
+import { fileNameFromPath } from "../../format";
+
+/** Tên tệp an toàn cho Windows/macOS (bỏ ký tự cấm). */
+function sanitizeFileName(name: string): string {
+  return name.replace(/[\\/:*?"<>|]+/g, "-").trim() || "tai-lieu";
+}
 
 export interface WriterEditorProps {
   /** Nội dung ban đầu (văn bản thuần), dùng khi không có `initialContent`. */
@@ -120,8 +178,8 @@ export interface WriterEditorProps {
   onChange?: (payload: { text: string; doc: unknown }) => void;
   /** Tên tài liệu — dùng làm tên tệp khi xuất PDF. */
   title?: string;
-  /** Tăng lên để yêu cầu in (ribbon “Xuất bản → PDF”). */
-  printSignal?: number;
+  /** Đường dẫn tệp `.vdx` trên đĩa — để giải đường dẫn ảnh `assets/...`. */
+  documentPath?: string | null;
 }
 
 function buildDoc(text: string): PMNode {
@@ -224,6 +282,130 @@ const DEFAULT_HIGHLIGHT_COLOR = "#fff0a8";
 const TABLE_GRID_ROWS = 8;
 const TABLE_GRID_COLS = 10;
 
+/** MIME theo phần mở rộng — dùng khi nhúng ảnh thành data URL. */
+const IMAGE_MIME_TYPES: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  bmp: "image/bmp",
+  svg: "image/svg+xml",
+};
+
+function imageMimeType(fileName: string): string {
+  const extension = fileName.split(".").pop()?.toLowerCase() ?? "";
+  return IMAGE_MIME_TYPES[extension] ?? "image/png";
+}
+
+/** Đếm số đoạn văn (khối văn bản) trong tài liệu, kể cả trong bảng. */
+function countParagraphs(root: PMNode): number {
+  let count = 0;
+  root.descendants((node) => {
+    if (node.isTextblock) {
+      count += 1;
+    }
+    return true;
+  });
+  return count;
+}
+
+const VIETNAMESE_WEEKDAYS = [
+  "Chủ nhật",
+  "Thứ Hai",
+  "Thứ Ba",
+  "Thứ Tư",
+  "Thứ Năm",
+  "Thứ Sáu",
+  "Thứ Bảy",
+];
+
+/** Các kiểu chèn ngày tháng thường dùng trong văn bản hành chính. */
+const DATE_FORMAT_OPTIONS: {
+  label: string;
+  render: (date: Date) => string;
+}[] = [
+  {
+    label: "Ngày/tháng/năm",
+    render: (date) =>
+      `${String(date.getDate()).padStart(2, "0")}/${String(
+        date.getMonth() + 1,
+      ).padStart(2, "0")}/${date.getFullYear()}`,
+  },
+  {
+    label: "Ngày tháng năm (đầy đủ)",
+    render: (date) =>
+      `ngày ${date.getDate()} tháng ${date.getMonth() + 1} năm ${date.getFullYear()}`,
+  },
+  {
+    label: "Thứ, ngày/tháng/năm",
+    render: (date) =>
+      `${VIETNAMESE_WEEKDAYS[date.getDay()]}, ${String(
+        date.getDate(),
+      ).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(
+        2,
+        "0",
+      )}/${date.getFullYear()}`,
+  },
+  {
+    label: "Năm-tháng-ngày (ISO)",
+    render: (date) =>
+      `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+        2,
+        "0",
+      )}-${String(date.getDate()).padStart(2, "0")}`,
+  },
+];
+
+/** Ký hiệu doanh nghiệp — giáo dục dùng thường xuyên. */
+const WRITER_SYMBOLS = [
+  "₫",
+  "€",
+  "$",
+  "¥",
+  "©",
+  "®",
+  "™",
+  "§",
+  "¶",
+  "°",
+  "±",
+  "×",
+  "÷",
+  "≠",
+  "≤",
+  "≥",
+  "≈",
+  "∞",
+  "√",
+  "π",
+  "Σ",
+  "Δ",
+  "µ",
+  "%",
+  "‰",
+  "→",
+  "←",
+  "↑",
+  "↓",
+  "•",
+  "…",
+  "—",
+  "–",
+  "“",
+  "”",
+  "‘",
+  "’",
+  "½",
+  "¼",
+  "¾",
+  "²",
+  "³",
+];
+
+const DOCX_MIME =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
 function colorInputValue(value: string, fallback: string): string {
   if (/^#[0-9a-fA-F]{6}$/.test(value)) {
     return value;
@@ -262,13 +444,16 @@ export function WriterEditor({
   initialContent,
   onChange,
   title,
-  printSignal,
+  documentPath,
 }: WriterEditorProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const linkInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  /** Định dạng đã chép cho "Chép định dạng" — null khi chưa chép gì. */
+  const painterMarksRef = useRef<readonly Mark[] | null>(null);
   /** Đo lại phân trang sau mỗi thay đổi — hàm được gọi từ effect cũ. */
   const measureRef = useRef<(() => void) | null>(null);
   /** Cấu hình trang hiện tại — effect tạo EditorView chỉ đọc một lần nên cần ref. */
@@ -293,6 +478,8 @@ export function WriterEditor({
   const [stats, setStats] = useState(() => ({
     words: countWords(initialPlain),
     characters: initialPlain.length,
+    charactersNoSpaces: initialPlain.replace(/\s/g, "").length,
+    paragraphs: initialDoc ? countParagraphs(initialDoc) : 1,
   }));
   const [empty, setEmpty] = useState(() => initialPlain.trim() === "");
 
@@ -302,6 +489,10 @@ export function WriterEditor({
   const [replacement, setReplacement] = useState("");
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [activeMatch, setActiveMatch] = useState(0);
+  const [painterArmed, setPainterArmed] = useState(false);
+  const [showMarks, setShowMarks] = useState(false);
+  const [clipboardError, setClipboardError] = useState<string | null>(null);
+  const [clipboardNotice, setClipboardNotice] = useState<string | null>(null);
 
   const [tablePickerOpen, setTablePickerOpen] = useState(false);
   const [outlineOpen, setOutlineOpen] = useState(false);
@@ -327,6 +518,17 @@ export function WriterEditor({
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
   const [linkError, setLinkError] = useState<string | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
+  /** Bảng chèn phụ đang mở: ngày tháng hoặc ký hiệu. */
+  const [insertPanel, setInsertPanel] = useState<"date" | "symbol" | null>(
+    null,
+  );
+  /** Bảng thống kê tài liệu (số từ, đoạn, thời gian đọc…). */
+  const [statsOpen, setStatsOpen] = useState(false);
+  /** Trạng thái xuất PDF: đang chạy / thông báo thành công / thông báo lỗi. */
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportNotice, setExportNotice] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   useEffect(() => {
     onChangeRef.current = onChange;
@@ -440,13 +642,20 @@ export function WriterEditor({
       }),
       nodeViews: {
         task_item: (node, view, getPos) => new TaskItemView(node, view, getPos),
+        image: (node, view, getPos) =>
+          new ImageView(node, view, getPos, documentPath ?? null),
       },
       dispatchTransaction(transaction) {
         const next = view.state.apply(transaction);
         view.updateState(next);
         if (transaction.docChanged) {
           const text = next.doc.textBetween(0, next.doc.content.size, "\n", " ");
-          setStats({ words: countWords(text), characters: text.length });
+          setStats({
+            words: countWords(text),
+            characters: text.length,
+            charactersNoSpaces: text.replace(/\s/g, "").length,
+            paragraphs: countParagraphs(next.doc),
+          });
           setEmpty(text.trim() === "");
           onChangeRef.current?.({
             text,
@@ -616,15 +825,144 @@ export function WriterEditor({
     });
   }, [pageSetup, title]);
 
-  /** Yêu cầu in từ bên ngoài (ribbon “Xuất bản → PDF”). */
-  const printSignalRef = useRef(printSignal);
-  useEffect(() => {
-    if (printSignal === undefined || printSignalRef.current === printSignal) {
+  /**
+   * Xuất tệp PDF thật — không qua hộp thoại in.
+   * Desktop: chọn chỗ lưu rồi ghi tệp; bản web: tải tệp xuống thư mục Tải về.
+   */
+  const exportPdfNow = useCallback(async () => {
+    const host = hostRef.current;
+    if (!host) {
       return;
     }
-    printSignalRef.current = printSignal;
-    printNow();
-  }, [printSignal, printNow]);
+    const surface = host.querySelector<HTMLElement>(".ProseMirror");
+    if (!surface) {
+      return;
+    }
+    setExportError(null);
+    setExportBusy(true);
+    try {
+      const result = await exportWriterPdf({
+        surface,
+        title: title ?? "",
+        pageSetup,
+      });
+      const base = sanitizeFileName(title || "tai-lieu");
+      if (hasNativeCore()) {
+        const path = await pickExportPath(
+          `${base}.pdf`,
+          "Xuất PDF",
+          { name: "Tài liệu PDF", extensions: ["pdf"] },
+        );
+        if (!path) {
+          return;
+        }
+        await writeDocumentBinary(path, bytesToBase64(result.bytes));
+      } else {
+        downloadBinaryFile(`${base}.pdf`, result.bytes, "application/pdf");
+      }
+      setExportNotice(`Đã xuất PDF ${result.pageCount} trang.`);
+    } catch (error) {
+      setExportError(
+        `Không xuất được PDF: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    } finally {
+      setExportBusy(false);
+    }
+  }, [pageSetup, title]);
+
+  /**
+   * Xuất tệp Word (.docx) từ nội dung đang soạn.
+   * Desktop: chọn chỗ lưu; bản web: tải xuống thư mục Tải về.
+   */
+  const exportWordNow = useCallback(async () => {
+    const view = viewRef.current;
+    if (!view) {
+      return;
+    }
+    setExportError(null);
+    setExportBusy(true);
+    try {
+      const base = sanitizeFileName(title || "tai-lieu");
+      const bytes = writerDocxBytes(view.state.doc.toJSON(), title ?? "");
+      if (hasNativeCore()) {
+        const path = await pickExportPath(`${base}.docx`, "Xuất Word", {
+          name: "Tài liệu Word",
+          extensions: ["docx"],
+        });
+        if (!path) {
+          return;
+        }
+        await writeDocumentBinary(path, bytesToBase64(bytes));
+      } else {
+        downloadBinaryFile(`${base}.docx`, bytes, DOCX_MIME);
+      }
+      setExportNotice("Đã xuất tệp Word (.docx).");
+    } catch (error) {
+      setExportError(
+        `Không xuất được Word: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    } finally {
+      setExportBusy(false);
+    }
+  }, [title]);
+
+  /** Xuất văn bản thuần (.txt) — giữ xuống dòng giữa các đoạn. */
+  const exportTextNow = useCallback(async () => {
+    const view = viewRef.current;
+    if (!view) {
+      return;
+    }
+    setExportError(null);
+    setExportBusy(true);
+    try {
+      const base = sanitizeFileName(title || "tai-lieu");
+      const text = view.state.doc.textBetween(
+        0,
+        view.state.doc.content.size,
+        "\n\n",
+        "\n",
+      );
+      const bytes = new TextEncoder().encode(
+        text.endsWith("\n") ? text : `${text}\n`,
+      );
+      if (hasNativeCore()) {
+        const path = await pickExportPath(`${base}.txt`, "Xuất văn bản", {
+          name: "Văn bản thuần",
+          extensions: ["txt"],
+        });
+        if (!path) {
+          return;
+        }
+        await writeDocumentBinary(path, bytesToBase64(bytes));
+      } else {
+        downloadBinaryFile(`${base}.txt`, bytes, "text/plain;charset=utf-8");
+      }
+      setExportNotice("Đã xuất tệp văn bản (.txt).");
+    } catch (error) {
+      setExportError(
+        `Không xuất được văn bản: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    } finally {
+      setExportBusy(false);
+    }
+  }, [title]);
+
+  /** Xoá thông báo "Đã xuất" sau vài giây. */
+  useEffect(() => {
+    if (!exportNotice) {
+      return;
+    }
+    const timer = window.setTimeout(() => setExportNotice(null), 4000);
+    return () => window.clearTimeout(timer);
+  }, [exportNotice]);
+
+  useEffect(() => {
+    if (!clipboardNotice) {
+      return;
+    }
+    const timer = window.setTimeout(() => setClipboardNotice(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [clipboardNotice]);
 
   const run = (command: Command) => () => {
     const view = viewRef.current;
@@ -634,6 +972,134 @@ export function WriterEditor({
     command(view.state, view.dispatch, view);
     view.focus();
     forceRender((value) => value + 1);
+  };
+
+  /** Cắt/Chép vùng chọn qua lệnh trình duyệt — ProseMirror lo phần nội dung. */
+  const runClipboard = (command: "cut" | "copy") => {
+    const view = viewRef.current;
+    if (!view) {
+      return;
+    }
+    setClipboardError(null);
+    view.focus();
+    const done =
+      typeof document.execCommand === "function" &&
+      document.execCommand(command);
+    if (!done) {
+      setClipboardError(
+        "Trình duyệt không cho phép thao tác này — hãy dùng phím tắt Ctrl+X hoặc Ctrl+C.",
+      );
+    }
+  };
+
+  /** Dán văn bản thuần từ bộ nhớ tạm (webview có thể chặn đọc clipboard). */
+  const pasteFromClipboard = async () => {
+    const view = viewRef.current;
+    if (!view) {
+      return;
+    }
+    setClipboardError(null);
+    view.focus();
+    if (
+      typeof document.execCommand === "function" &&
+      document.execCommand("paste")
+    ) {
+      forceRender((value) => value + 1);
+      return;
+    }
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        view.dispatch(view.state.tr.insertText(text).scrollIntoView());
+      }
+    } catch (error) {
+      setClipboardError(
+        `Không đọc được bộ nhớ tạm (${error instanceof Error ? error.message : String(error)}) — hãy dùng Ctrl+V.`,
+      );
+    }
+  };
+
+  /** Chèn một đoạn văn bản ngắn (ngày tháng, ký hiệu) tại con trỏ. */
+  const insertTextAtCursor = (text: string) => {
+    const view = viewRef.current;
+    if (!view) {
+      return;
+    }
+    view.dispatch(view.state.tr.insertText(text).scrollIntoView());
+    view.focus();
+    forceRender((value) => value + 1);
+  };
+
+  /** Dán văn bản thuần, bỏ mọi định dạng của nguồn. */
+  const pastePlainText = async () => {
+    const view = viewRef.current;
+    if (!view) {
+      return;
+    }
+    setClipboardError(null);
+    view.focus();
+    try {
+      const text = await navigator.clipboard.readText();
+      // `pasteText` chia đoạn theo dấu xuống dòng và đi qua đúng các plugin
+      // xử lý dán (kể cả theo dõi thay đổi), khác với insertText một khối.
+      if (text) {
+        view.pasteText(text);
+      }
+    } catch (error) {
+      setClipboardError(
+        `Không đọc được bộ nhớ tạm (${error instanceof Error ? error.message : String(error)}) — hãy dùng Ctrl+Shift+V.`,
+      );
+    }
+  };
+
+  /** Chép toàn bộ văn bản (không kèm định dạng) vào bộ nhớ tạm. */
+  const copyAllText = async () => {
+    const view = viewRef.current;
+    if (!view) {
+      return;
+    }
+    setClipboardError(null);
+    const text = view.state.doc.textBetween(
+      0,
+      view.state.doc.content.size,
+      "\n\n",
+      "\n",
+    );
+    try {
+      await navigator.clipboard.writeText(text);
+      setClipboardNotice("Đã chép toàn bộ văn bản.");
+    } catch (error) {
+      setClipboardError(
+        `Không chép được toàn bộ văn bản (${error instanceof Error ? error.message : String(error)}) — hãy dùng Ctrl+A rồi Ctrl+C.`,
+      );
+    }
+    view.focus();
+  };
+
+  /**
+   * "Chép định dạng": bấm lần đầu để lấy định dạng tại vùng chọn, chọn đoạn
+   * đích rồi bấm lần hai để dán định dạng.
+   */
+  const toggleFormatPainter = () => {
+    const view = viewRef.current;
+    if (!view) {
+      return;
+    }
+    setClipboardError(null);
+    const pending = painterMarksRef.current;
+    if (pending) {
+      if (view.state.selection.empty) {
+        setClipboardError("Hãy chọn đoạn văn bản cần dán định dạng.");
+        return;
+      }
+      painterMarksRef.current = null;
+      setPainterArmed(false);
+      run(applyFormatting(pending))();
+      return;
+    }
+    painterMarksRef.current = formattingMarksAtSelection(view.state);
+    setPainterArmed(true);
+    view.focus();
   };
 
   /** Bật/tắt chế độ theo dõi thay đổi. */
@@ -879,6 +1345,56 @@ export function WriterEditor({
     forceRender((value) => value + 1);
   };
 
+  /**
+   * Chèn ảnh vào tài liệu.
+   *
+   * Trên Tauri mở hộp thoại chọn tệp của hệ điều hành, đọc ảnh rồi lưu vào thư
+   * mục `assets` cạnh tệp `.vdx` (đường dẫn tương đối trong tài liệu). Khi tài
+   * liệu chưa lưu hoặc đang chạy trong trình duyệt, nhúng ảnh trực tiếp bằng
+   * data URL để không phụ thuộc đường dẫn trên đĩa.
+   */
+  const handleInsertImage = async () => {
+    setImageError(null);
+    if (!hasNativeCore()) {
+      imageInputRef.current?.click();
+      return;
+    }
+    try {
+      const path = await pickImageFile();
+      if (!path) {
+        return;
+      }
+      const base64 = await readImageBase64(path);
+      const fileName = fileNameFromPath(path);
+      const src = documentPath
+        ? await writeImageAsset(documentPath, fileName, base64)
+        : `data:${imageMimeType(fileName)};base64,${base64}`;
+      run(insertImage({ src, alt: fileName }))();
+    } catch (error) {
+      setImageError(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  /** Xử lý ảnh được chọn qua `<input type="file">` (trình duyệt / tài liệu chưa lưu). */
+  const handleImageFile = async (file: File | undefined) => {
+    setImageError(null);
+    if (!file) {
+      return;
+    }
+    if (file.size > MAX_ASSET_BYTES) {
+      setImageError(
+        `Ảnh quá lớn (${Math.round(file.size / (1024 * 1024))} MB). Giới hạn hiện tại là 16 MB.`,
+      );
+      return;
+    }
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      run(insertImage({ src: dataUrl, alt: file.name }))();
+    } catch (error) {
+      setImageError(error instanceof Error ? error.message : String(error));
+    }
+  };
+
   const findNext = (direction: 1 | -1) => {
     const view = viewRef.current;
     if (!view || !query) {
@@ -1044,6 +1560,9 @@ export function WriterEditor({
   const canUndo = state ? undo(state) : false;
   const canRedo = state ? redo(state) : false;
   const tableActive = state ? inTable(state) : false;
+  /** Thời gian đọc ước tính — 200 từ mỗi phút. */
+  const readingMinutes =
+    stats.words === 0 ? 0 : Math.max(1, Math.ceil(stats.words / 200));
 
   const fontFamily = state
     ? (normalizeFontFamily(
@@ -1069,404 +1588,663 @@ export function WriterEditor({
     ? (normalizeLineHeight(currentBlock?.attrs.lineHeight) ?? "")
     : "";
 
+  /** Tăng/giảm cỡ chữ theo nấc gần nhất trong FONT_SIZES (Word style A^/A∨). */
+  const bumpFontSize = (direction: 1 | -1) => {
+    const current = fontSize ? parseFloat(fontSize) : 12;
+    const values = FONT_SIZES.map((size) => parseFloat(size));
+    let next: number;
+    if (direction > 0) {
+      next =
+        values.find((value) => value > current + 0.01) ??
+        values[values.length - 1];
+    } else {
+      next = values[0];
+      for (let index = values.length - 1; index >= 0; index -= 1) {
+        if (values[index] < current - 0.01) {
+          next = values[index];
+          break;
+        }
+      }
+    }
+    if (next === current) {
+      return () => {};
+    }
+    return run(
+      setMarkAttr(writerSchema.marks.fontSize, { size: `${next}pt` }),
+    );
+  };
+
   return (
-    <div className="vd-writer" onKeyDown={handleRootKeyDown}>
+    <div
+      className={`vd-writer${showMarks ? " is-show-marks" : ""}`}
+      onKeyDown={handleRootKeyDown}
+    >
       <div className="vd-writer__toolbar" role="toolbar" aria-label="Định dạng">
-        <div className="vd-writer__toolbar-row">
-        <ToolbarButton
-          label="Hoàn tác (Ctrl+Z)"
-          onClick={run(undo)}
-          disabled={!canUndo}
-        >
-          <Undo2 size={15} aria-hidden="true" />
-        </ToolbarButton>
-        <ToolbarButton
-          label="Làm lại (Ctrl+Y)"
-          onClick={run(redo)}
-          disabled={!canRedo}
-        >
-          <Redo2 size={15} aria-hidden="true" />
-        </ToolbarButton>
+        <div className="vd-writer__toolbar-strip">
+          <div className="vd-writer__tgroup vd-writer__tgroup--rail">
+            <div className="vd-writer__tgroup-line vd-writer__tgroup-line--stack">
+              <ToolbarButton
+                label="Hoàn tác (Ctrl+Z)"
+                onClick={run(undo)}
+                disabled={!canUndo}
+              >
+                <Undo2 size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Làm lại (Ctrl+Y)"
+                onClick={run(redo)}
+                disabled={!canRedo}
+              >
+                <Redo2 size={17} aria-hidden="true" />
+              </ToolbarButton>
+            </div>
+            <span className="vd-writer__tgroup-caption">Hoàn tác</span>
+          </div>
 
-        <span className="vd-writer__divider" />
+          <div className="vd-writer__tgroup">
+            <div className="vd-writer__tgroup-line">
+              <ToolbarButton
+                label="Dán (Ctrl+V)"
+                onClick={() => void pasteFromClipboard()}
+              >
+                <ClipboardPaste size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Cắt (Ctrl+X)"
+                onClick={() => runClipboard("cut")}
+              >
+                <Scissors size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Chép (Ctrl+C)"
+                onClick={() => runClipboard("copy")}
+              >
+                <Copy size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Chép định dạng — bấm lần nữa để dán định dạng vào vùng chọn"
+                active={painterArmed}
+                onClick={toggleFormatPainter}
+              >
+                <Paintbrush size={17} aria-hidden="true" />
+              </ToolbarButton>
+            </div>
+            <div className="vd-writer__tgroup-line">
+              <ToolbarButton
+                label="Dán không định dạng (Ctrl+Shift+V)"
+                onClick={() => void pastePlainText()}
+              >
+                <ClipboardType size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Xóa nội dung đang chọn"
+                disabled={!state || state.selection.empty}
+                onClick={run(deleteSelection)}
+              >
+                <Eraser size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Chép toàn bộ văn bản"
+                onClick={() => void copyAllText()}
+              >
+                <ClipboardCopy size={17} aria-hidden="true" />
+              </ToolbarButton>
+            </div>
+            <span className="vd-writer__tgroup-caption">Bảng tạm</span>
+          </div>
 
-        <select
-          className="vd-writer__select vd-writer__select--family"
-          value={fontFamily}
-          aria-label="Kiểu chữ"
-          title="Kiểu chữ"
-          onChange={(event) =>
-            run(
-              event.target.value
-                ? setMarkAttr(writerSchema.marks.fontFamily, {
-                    family: event.target.value,
-                  })
-                : removeMarkType(writerSchema.marks.fontFamily),
-            )()
-          }
-        >
-          <option value="">Mặc định</option>
-          {FONT_FAMILIES.map((font) => (
-            <option key={font.label} value={font.value}>
-              {font.label}
-            </option>
-          ))}
-          {fontFamily &&
-          !FONT_FAMILIES.some((font) => font.value === fontFamily) ? (
-            <option value={fontFamily}>{fontFamily}</option>
-          ) : null}
-        </select>
+          <div className="vd-writer__tgroup">
+            <div className="vd-writer__tgroup-line">
+              <select
+                className="vd-writer__select vd-writer__select--family"
+                value={fontFamily}
+                aria-label="Kiểu chữ"
+                title="Kiểu chữ"
+                onChange={(event) =>
+                  run(
+                    event.target.value
+                      ? setMarkAttr(writerSchema.marks.fontFamily, {
+                          family: event.target.value,
+                        })
+                      : removeMarkType(writerSchema.marks.fontFamily),
+                  )()
+                }
+              >
+                <option value="">Mặc định</option>
+                {FONT_FAMILIES.map((font) => (
+                  <option key={font.label} value={font.value}>
+                    {font.label}
+                  </option>
+                ))}
+                {fontFamily &&
+                !FONT_FAMILIES.some((font) => font.value === fontFamily) ? (
+                  <option value={fontFamily}>{fontFamily}</option>
+                ) : null}
+              </select>
 
-        <select
-          className="vd-writer__select vd-writer__select--size"
-          value={fontSize}
-          aria-label="Cỡ chữ"
-          title="Cỡ chữ"
-          onChange={(event) =>
-            run(
-              event.target.value
-                ? setMarkAttr(writerSchema.marks.fontSize, {
-                    size: event.target.value,
-                  })
-                : removeMarkType(writerSchema.marks.fontSize),
-            )()
-          }
-        >
-          <option value="">Mặc định</option>
-          {FONT_SIZES.map((size) => (
-            <option key={size} value={size}>
-              {size}
-            </option>
-          ))}
-          {fontSize && !FONT_SIZES.includes(fontSize) ? (
-            <option value={fontSize}>{fontSize}</option>
-          ) : null}
-        </select>
+              <select
+                className="vd-writer__select vd-writer__select--size"
+                value={fontSize}
+                aria-label="Cỡ chữ"
+                title="Cỡ chữ"
+                onChange={(event) =>
+                  run(
+                    event.target.value
+                      ? setMarkAttr(writerSchema.marks.fontSize, {
+                          size: event.target.value,
+                        })
+                      : removeMarkType(writerSchema.marks.fontSize),
+                  )()
+                }
+              >
+                <option value="">Mặc định</option>
+                {FONT_SIZES.map((size) => (
+                  <option key={size} value={size}>
+                    {size}
+                  </option>
+                ))}
+                {fontSize && !FONT_SIZES.includes(fontSize) ? (
+                  <option value={fontSize}>{fontSize}</option>
+                ) : null}
+              </select>
 
-        <span className="vd-writer__color" title="Màu chữ">
-          <span
-            className="vd-writer__color-swatch"
-            style={{ color: textColor }}
-            aria-hidden="true"
-          >
-            A
-          </span>
-          <input
-            type="color"
-            value={colorInputValue(textColor, DEFAULT_TEXT_COLOR)}
-            aria-label="Màu chữ"
-            onChange={(event) =>
-              run(
-                setMarkAttr(writerSchema.marks.textColor, {
-                  color: event.target.value,
-                }),
-              )()
-            }
-          />
-        </span>
+              <ToolbarButton label="Tăng cỡ chữ" onClick={bumpFontSize(1)}>
+                <AArrowUp size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton label="Giảm cỡ chữ" onClick={bumpFontSize(-1)}>
+                <AArrowDown size={17} aria-hidden="true" />
+              </ToolbarButton>
 
-        <span className="vd-writer__color" title="Tô sáng">
-          <span
-            className="vd-writer__color-swatch vd-writer__color-swatch--highlight"
-            style={{ background: highlightColor }}
-            aria-hidden="true"
-          />
-          <input
-            type="color"
-            value={colorInputValue(
-              highlightColor,
-              DEFAULT_HIGHLIGHT_COLOR,
-            )}
-            aria-label="Tô sáng"
-            onChange={(event) =>
-              run(
-                setMarkAttr(writerSchema.marks.highlight, {
-                  color: event.target.value,
-                }),
-              )()
-            }
-          />
-        </span>
-
-        <ToolbarButton
-          label="Xóa định dạng"
-          onClick={run(clearFormatting())}
-        >
-          <RemoveFormatting size={15} aria-hidden="true" />
-        </ToolbarButton>
-
-        <span className="vd-writer__divider" />
-
-        <ToolbarButton
-          label="Đậm (Ctrl+B)"
-          active={strongActive}
-          onClick={run(toggleMark(writerSchema.marks.strong))}
-        >
-          <Bold size={15} aria-hidden="true" />
-        </ToolbarButton>
-        <ToolbarButton
-          label="Nghiêng (Ctrl+I)"
-          active={emActive}
-          onClick={run(toggleMark(writerSchema.marks.em))}
-        >
-          <Italic size={15} aria-hidden="true" />
-        </ToolbarButton>
-        <ToolbarButton
-          label="Gạch chân (Ctrl+U)"
-          active={underlineActive}
-          onClick={run(toggleMark(writerSchema.marks.underline))}
-        >
-          <Underline size={15} aria-hidden="true" />
-        </ToolbarButton>
-        <ToolbarButton
-          label="Gạch ngang (Ctrl+Shift+X)"
-          active={strikeActive}
-          onClick={run(toggleMark(writerSchema.marks.strike))}
-        >
-          <Strikethrough size={15} aria-hidden="true" />
-        </ToolbarButton>
-        <ToolbarButton
-          label="Chỉ số trên (Ctrl+Shift+.)"
-          active={superscriptActive}
-          onClick={run(toggleMark(writerSchema.marks.superscript))}
-        >
-          <Superscript size={15} aria-hidden="true" />
-        </ToolbarButton>
-        <ToolbarButton
-          label="Chỉ số dưới (Ctrl+Shift+,)"
-          active={subscriptActive}
-          onClick={run(toggleMark(writerSchema.marks.subscript))}
-        >
-          <Subscript size={15} aria-hidden="true" />
-        </ToolbarButton>
-
-        <span className="vd-writer__divider" />
-
-        <ToolbarButton
-          label="Thụt lề vào (Ctrl+])"
-          disabled={currentIndent >= 6}
-          onClick={run(changeIndent(1))}
-        >
-          <IndentIncrease size={15} aria-hidden="true" />
-        </ToolbarButton>
-        <ToolbarButton
-          label="Lùi lề ra (Ctrl+[)"
-          disabled={currentIndent <= 0}
-          onClick={run(changeIndent(-1))}
-        >
-          <IndentDecrease size={15} aria-hidden="true" />
-        </ToolbarButton>
-
-        <span className="vd-writer__divider" />
-
-        <select
-          className="vd-writer__select vd-writer__select--block"
-          value={blockStyle}
-          aria-label="Kiểu đoạn"
-          title="Kiểu đoạn"
-          onChange={(event) => {
-            const value = event.target.value;
-            if (value === "paragraph") {
-              run(setBlock(writerSchema.nodes.paragraph))();
-              return;
-            }
-            const level = Number(value.replace("heading-", ""));
-            if (Number.isInteger(level) && level >= 1 && level <= 6) {
-              run(setBlock(writerSchema.nodes.heading, { level }))();
-            }
-          }}
-        >
-          <option value="paragraph">Đoạn văn</option>
-          {[1, 2, 3, 4, 5, 6].map((level) => (
-            <option key={level} value={`heading-${level}`}>
-              Tiêu đề {level}
-            </option>
-          ))}
-        </select>
-        </div>
-
-        <div className="vd-writer__toolbar-row">
-        <span className="vd-writer__divider" />
-
-        <ToolbarButton
-          label="Danh sách gạch đầu dòng (Ctrl+Shift+8)"
-          active={bulletActive}
-          onClick={run(toggleList(writerSchema.nodes.bullet_list))}
-        >
-          <List size={15} aria-hidden="true" />
-        </ToolbarButton>
-        <ToolbarButton
-          label="Danh sách đánh số (Ctrl+Shift+7)"
-          active={orderedActive}
-          onClick={run(toggleList(writerSchema.nodes.ordered_list))}
-        >
-          <ListOrdered size={15} aria-hidden="true" />
-        </ToolbarButton>
-        <ToolbarButton
-          label="Danh sách việc cần làm (Ctrl+Shift+9)"
-          active={taskActive}
-          onClick={run(toggleTaskList())}
-        >
-          <ListChecks size={15} aria-hidden="true" />
-        </ToolbarButton>
-
-        <span className="vd-writer__divider" />
-
-        <ToolbarButton
-          label="Canh trái (Ctrl+Shift+L)"
-          active={currentAlign === "left"}
-          onClick={run(setAlign("left"))}
-        >
-          <AlignLeft size={15} aria-hidden="true" />
-        </ToolbarButton>
-        <ToolbarButton
-          label="Canh giữa (Ctrl+Shift+E)"
-          active={currentAlign === "center"}
-          onClick={run(setAlign("center"))}
-        >
-          <AlignCenter size={15} aria-hidden="true" />
-        </ToolbarButton>
-        <ToolbarButton
-          label="Canh phải (Ctrl+Shift+R)"
-          active={currentAlign === "right"}
-          onClick={run(setAlign("right"))}
-        >
-          <AlignRight size={15} aria-hidden="true" />
-        </ToolbarButton>
-        <ToolbarButton
-          label="Canh đều (Ctrl+Shift+J)"
-          active={currentAlign === "justify"}
-          onClick={run(setAlign("justify"))}
-        >
-          <AlignJustify size={15} aria-hidden="true" />
-        </ToolbarButton>
-
-        <span className="vd-writer__divider" />
-
-        <select
-          className="vd-writer__select vd-writer__select--spacing"
-          value={lineHeight}
-          aria-label="Giãn dòng"
-          title="Giãn dòng"
-          onChange={(event) =>
-            run(setLineHeight(event.target.value || null))()
-          }
-        >
-          {LINE_HEIGHTS.map((item) => (
-            <option key={item.label} value={item.value}>
-              {item.label}
-            </option>
-          ))}
-          {lineHeight &&
-          !LINE_HEIGHTS.some((item) => item.value === lineHeight) ? (
-            <option value={lineHeight}>{lineHeight}</option>
-          ) : null}
-        </select>
-
-        <span className="vd-writer__divider" />
-
-        <ToolbarButton
-          label="Chèn bảng"
-          onClick={() => {
-            setTableSize(null);
-            setTablePickerOpen((open) => !open);
-          }}
-        >
-          <Table size={15} aria-hidden="true" />
-        </ToolbarButton>
-        <ToolbarButton label="Chèn liên kết" onClick={openLinkBar}>
-          <Link2 size={15} aria-hidden="true" />
-        </ToolbarButton>
-        <ToolbarButton label="Ngắt trang" onClick={run(insertPageBreak())}>
-          <SeparatorHorizontal size={15} aria-hidden="true" />
-        </ToolbarButton>
-        <ToolbarButton
-          label="Chèn đường kẻ ngang"
-          onClick={run(insertHorizontalRule())}
-        >
-          <Minus size={15} aria-hidden="true" />
-        </ToolbarButton>
-
-        <span className="vd-writer__divider" />
-
-        <ToolbarButton
-          label="Tìm trong văn bản (Ctrl+F)"
-          onClick={() => {
-            setReplaceMode(false);
-            setSearchOpen(true);
-          }}
-        >
-          <Search size={15} aria-hidden="true" />
-        </ToolbarButton>
-
-        <ToolbarButton
-          label="Bảng điều hướng cấu trúc tài liệu"
-          active={outlineOpen}
-          onClick={() => setOutlineOpen((value) => !value)}
-        >
-          <ListTree size={15} aria-hidden="true" />
-        </ToolbarButton>
-
-        <ToolbarButton
-          label="Đầu trang và chân trang"
-          active={pagePanelOpen}
-          onClick={() => setPagePanelOpen((value) => !value)}
-        >
-          <PanelTop size={15} aria-hidden="true" />
-        </ToolbarButton>
-
-        <ToolbarButton
-          label="Theo dõi thay đổi"
-          active={trackChangesOn}
-          onClick={toggleTrackChangesMode}
-        >
-          <GitCompareArrows size={15} aria-hidden="true" />
-        </ToolbarButton>
-
-        {changeList.length > 0 ? (
-          <>
-            {currentChange ? (
-              <>
-                <ToolbarButton
-                  label="Chấp nhận thay đổi tại con trỏ"
-                  onClick={() => resolveCurrentChange(true)}
+              <span className="vd-writer__color" title="Màu chữ">
+                <span
+                  className="vd-writer__color-swatch"
+                  style={{ color: textColor }}
+                  aria-hidden="true"
                 >
-                  <Check size={15} aria-hidden="true" />
-                </ToolbarButton>
-                <ToolbarButton
-                  label="Bác bỏ thay đổi tại con trỏ"
-                  onClick={() => resolveCurrentChange(false)}
-                >
-                  <X size={15} aria-hidden="true" />
-                </ToolbarButton>
-              </>
-            ) : null}
-            <ToolbarButton
-              label="Chấp nhận mọi thay đổi"
-              onClick={acceptAll}
-            >
-              <CheckCheck size={15} aria-hidden="true" />
-            </ToolbarButton>
-            <ToolbarButton
-              label="Bác bỏ mọi thay đổi"
-              onClick={rejectAll}
-            >
-              <Undo2 size={15} aria-hidden="true" />
-            </ToolbarButton>
-          </>
-        ) : null}
+                  A
+                </span>
+                <input
+                  type="color"
+                  value={colorInputValue(textColor, DEFAULT_TEXT_COLOR)}
+                  aria-label="Màu chữ"
+                  onChange={(event) =>
+                    run(
+                      setMarkAttr(writerSchema.marks.textColor, {
+                        color: event.target.value,
+                      }),
+                    )()
+                  }
+                />
+              </span>
 
-        <ToolbarButton
-          label="Bình luận"
-          active={commentsOpen}
-          onClick={startComment}
-        >
-          <MessageSquarePlus size={15} aria-hidden="true" />
-        </ToolbarButton>
+              <span className="vd-writer__color" title="Tô sáng">
+                <span
+                  className="vd-writer__color-swatch vd-writer__color-swatch--highlight"
+                  style={{ background: highlightColor }}
+                  aria-hidden="true"
+                />
+                <input
+                  type="color"
+                  value={colorInputValue(
+                    highlightColor,
+                    DEFAULT_HIGHLIGHT_COLOR,
+                  )}
+                  aria-label="Tô sáng"
+                  onChange={(event) =>
+                    run(
+                      setMarkAttr(writerSchema.marks.highlight, {
+                        color: event.target.value,
+                      }),
+                    )()
+                  }
+                />
+              </span>
 
-        <ToolbarButton label="In / xuất PDF (Ctrl+P)" onClick={printNow}>
-          <Printer size={15} aria-hidden="true" />
-        </ToolbarButton>
+              <ToolbarButton
+                label="Xóa định dạng"
+                onClick={run(clearFormatting())}
+              >
+                <RemoveFormatting size={17} aria-hidden="true" />
+              </ToolbarButton>
+            </div>
+            <div className="vd-writer__tgroup-line">
+              <ToolbarButton
+                label="Đậm (Ctrl+B)"
+                active={strongActive}
+                onClick={run(toggleMark(writerSchema.marks.strong))}
+              >
+                <Bold size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Nghiêng (Ctrl+I)"
+                active={emActive}
+                onClick={run(toggleMark(writerSchema.marks.em))}
+              >
+                <Italic size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Gạch chân (Ctrl+U)"
+                active={underlineActive}
+                onClick={run(toggleMark(writerSchema.marks.underline))}
+              >
+                <Underline size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Gạch ngang (Ctrl+Shift+X)"
+                active={strikeActive}
+                onClick={run(toggleMark(writerSchema.marks.strike))}
+              >
+                <Strikethrough size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Chỉ số trên (Ctrl+Shift+.)"
+                active={superscriptActive}
+                onClick={run(toggleMark(writerSchema.marks.superscript))}
+              >
+                <Superscript size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Chỉ số dưới (Ctrl+Shift+,)"
+                active={subscriptActive}
+                onClick={run(toggleMark(writerSchema.marks.subscript))}
+              >
+                <Subscript size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <select
+                className="vd-writer__select vd-writer__select--case"
+                value=""
+                aria-label="Đổi chữ hoa/thường"
+                title="Đổi chữ hoa/thường (Aa)"
+                onChange={(event) => {
+                  const mode = event.target.value as CaseMode | "";
+                  if (mode) {
+                    run(changeCase(mode))();
+                  }
+                  // Select chỉ là bảng chọn hành động: trả về "Aa" để lần sau
+                  // có thể chọn lại cùng một kiểu.
+                  event.target.value = "";
+                }}
+              >
+                <option value="">Aa</option>
+                <option value="upper">CHỮ HOA</option>
+                <option value="lower">chữ thường</option>
+                <option value="sentence">Viết hoa đầu câu</option>
+                <option value="capitalize">Viết Hoa Mỗi Từ</option>
+                <option value="toggle">Đảo chữ hoa/thường</option>
+              </select>
+            </div>
+            <span className="vd-writer__tgroup-caption">Phông chữ</span>
+          </div>
+
+          <div className="vd-writer__tgroup">
+            <div className="vd-writer__tgroup-line">
+              <ToolbarButton
+                label="Danh sách gạch đầu dòng (Ctrl+Shift+8)"
+                active={bulletActive}
+                onClick={run(toggleList(writerSchema.nodes.bullet_list))}
+              >
+                <List size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Danh sách đánh số (Ctrl+Shift+7)"
+                active={orderedActive}
+                onClick={run(toggleList(writerSchema.nodes.ordered_list))}
+              >
+                <ListOrdered size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Danh sách việc cần làm (Ctrl+Shift+9)"
+                active={taskActive}
+                onClick={run(toggleTaskList())}
+              >
+                <ListChecks size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Lùi lề ra (Ctrl+[)"
+                disabled={currentIndent <= 0}
+                onClick={run(changeIndent(-1))}
+              >
+                <IndentDecrease size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Thụt lề vào (Ctrl+])"
+                disabled={currentIndent >= 6}
+                onClick={run(changeIndent(1))}
+              >
+                <IndentIncrease size={17} aria-hidden="true" />
+              </ToolbarButton>
+            </div>
+            <div className="vd-writer__tgroup-line">
+              <ToolbarButton
+                label="Canh trái (Ctrl+Shift+L)"
+                active={currentAlign === "left"}
+                onClick={run(setAlign("left"))}
+              >
+                <AlignLeft size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Canh giữa (Ctrl+Shift+E)"
+                active={currentAlign === "center"}
+                onClick={run(setAlign("center"))}
+              >
+                <AlignCenter size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Canh phải (Ctrl+Shift+R)"
+                active={currentAlign === "right"}
+                onClick={run(setAlign("right"))}
+              >
+                <AlignRight size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Canh đều (Ctrl+Shift+J)"
+                active={currentAlign === "justify"}
+                onClick={run(setAlign("justify"))}
+              >
+                <AlignJustify size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <select
+                className="vd-writer__select vd-writer__select--spacing"
+                value={lineHeight}
+                aria-label="Giãn dòng"
+                title="Giãn dòng"
+                onChange={(event) =>
+                  run(setLineHeight(event.target.value || null))()
+                }
+              >
+                {LINE_HEIGHTS.map((item) => (
+                  <option key={item.label} value={item.value}>
+                    {item.label}
+                  </option>
+                ))}
+                {lineHeight &&
+                !LINE_HEIGHTS.some((item) => item.value === lineHeight) ? (
+                  <option value={lineHeight}>{lineHeight}</option>
+                ) : null}
+              </select>
+              <ToolbarButton
+                label="Hiện/ẩn dấu đoạn ¶"
+                active={showMarks}
+                onClick={() => {
+                  setShowMarks((value) => !value);
+                  viewRef.current?.focus();
+                }}
+              >
+                <Pilcrow size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Sắp xếp đoạn văn A→Z (chọn từ hai đoạn trở lên)"
+                onClick={run(sortSelectedBlocks())}
+              >
+                <ArrowDownAZ size={17} aria-hidden="true" />
+              </ToolbarButton>
+            </div>
+            <span className="vd-writer__tgroup-caption">Đoạn văn</span>
+          </div>
+
+          <div className="vd-writer__tgroup">
+            <div className="vd-writer__tgroup-line">
+              <select
+                className="vd-writer__select vd-writer__select--block"
+                value={blockStyle}
+                aria-label="Kiểu đoạn"
+                title="Kiểu đoạn"
+                onChange={(event) => {
+                  const value = event.target.value;
+                  if (value === "paragraph") {
+                    run(setBlock(writerSchema.nodes.paragraph))();
+                    return;
+                  }
+                  const level = Number(value.replace("heading-", ""));
+                  if (Number.isInteger(level) && level >= 1 && level <= 6) {
+                    run(setBlock(writerSchema.nodes.heading, { level }))();
+                  }
+                }}
+              >
+                <option value="paragraph">Đoạn văn</option>
+                {[1, 2, 3, 4, 5, 6].map((level) => (
+                  <option key={level} value={`heading-${level}`}>
+                    Tiêu đề {level}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="vd-writer__tgroup-line">
+              <ToolbarButton
+                label="Đoạn văn thường"
+                active={blockStyle === "paragraph"}
+                onClick={run(setBlock(writerSchema.nodes.paragraph))}
+              >
+                <Type size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Tiêu đề 1"
+                active={blockStyle === "heading-1"}
+                onClick={run(setBlock(writerSchema.nodes.heading, { level: 1 }))}
+              >
+                <Heading1 size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Tiêu đề 2"
+                active={blockStyle === "heading-2"}
+                onClick={run(setBlock(writerSchema.nodes.heading, { level: 2 }))}
+              >
+                <Heading2 size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Tiêu đề 3"
+                active={blockStyle === "heading-3"}
+                onClick={run(setBlock(writerSchema.nodes.heading, { level: 3 }))}
+              >
+                <Heading3 size={17} aria-hidden="true" />
+              </ToolbarButton>
+            </div>
+            <span className="vd-writer__tgroup-caption">Kiểu</span>
+          </div>
+
+          <div className="vd-writer__tgroup">
+            <div className="vd-writer__tgroup-line">
+              <ToolbarButton
+                label="Chèn bảng"
+                onClick={() => {
+                  setTableSize(null);
+                  setTablePickerOpen((open) => !open);
+                }}
+              >
+                <Table size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton label="Chèn liên kết" onClick={openLinkBar}>
+                <Link2 size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Chèn ảnh"
+                onClick={() => void handleInsertImage()}
+              >
+                <Image size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Ngắt trang"
+                onClick={run(insertPageBreak())}
+              >
+                <SeparatorHorizontal size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Chèn đường kẻ ngang"
+                onClick={run(insertHorizontalRule())}
+              >
+                <Minus size={17} aria-hidden="true" />
+              </ToolbarButton>
+            </div>
+            <div className="vd-writer__tgroup-line">
+              <ToolbarButton
+                label="Chèn ngày tháng"
+                active={insertPanel === "date"}
+                onClick={() =>
+                  setInsertPanel((open) => (open === "date" ? null : "date"))
+                }
+              >
+                <CalendarDays size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Chèn ký hiệu"
+                active={insertPanel === "symbol"}
+                onClick={() =>
+                  setInsertPanel((open) =>
+                    open === "symbol" ? null : "symbol",
+                  )
+                }
+              >
+                <Sigma size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Hiện/ẩn số trang"
+                active={pageSetup.showPageNumbers}
+                onClick={() =>
+                  updatePageSetup({
+                    ...pageSetup,
+                    showPageNumbers: !pageSetup.showPageNumbers,
+                  })
+                }
+              >
+                <Hash size={17} aria-hidden="true" />
+              </ToolbarButton>
+            </div>
+            <span className="vd-writer__tgroup-caption">Chèn</span>
+          </div>
+
+          <div className="vd-writer__tgroup">
+            <div className="vd-writer__tgroup-line">
+              <ToolbarButton
+                label="Tìm trong văn bản (Ctrl+F)"
+                onClick={() => {
+                  setReplaceMode(false);
+                  setSearchOpen(true);
+                }}
+              >
+                <Search size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Tìm và thay thế (Ctrl+H)"
+                onClick={() => {
+                  setReplaceMode(true);
+                  setSearchOpen(true);
+                }}
+              >
+                <Replace size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Chọn tất cả (Ctrl+A)"
+                onClick={run(selectAll)}
+              >
+                <SquareDashed size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Bảng điều hướng cấu trúc tài liệu"
+                active={outlineOpen}
+                onClick={() => setOutlineOpen((value) => !value)}
+              >
+                <ListTree size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Đầu trang và chân trang"
+                active={pagePanelOpen}
+                onClick={() => setPagePanelOpen((value) => !value)}
+              >
+                <PanelTop size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Theo dõi thay đổi"
+                active={trackChangesOn}
+                onClick={toggleTrackChangesMode}
+              >
+                <GitCompareArrows size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Bình luận"
+                active={commentsOpen}
+                onClick={startComment}
+              >
+                <MessageSquarePlus size={17} aria-hidden="true" />
+              </ToolbarButton>
+            </div>
+            <div className="vd-writer__tgroup-line">
+              <ToolbarButton
+                label="Thống kê tài liệu"
+                active={statsOpen}
+                onClick={() => setStatsOpen((value) => !value)}
+              >
+                <ChartColumn size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Bảng bình luận"
+                active={commentsOpen}
+                onClick={() => setCommentsOpen((value) => !value)}
+              >
+                <MessageSquare size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Chấp nhận thay đổi tại con trỏ"
+                disabled={changeList.length === 0 || !currentChange}
+                onClick={() => resolveCurrentChange(true)}
+              >
+                <Check size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Bác bỏ thay đổi tại con trỏ"
+                disabled={changeList.length === 0 || !currentChange}
+                onClick={() => resolveCurrentChange(false)}
+              >
+                <X size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Chấp nhận mọi thay đổi"
+                disabled={changeList.length === 0}
+                onClick={acceptAll}
+              >
+                <CheckCheck size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Bác bỏ mọi thay đổi"
+                disabled={changeList.length === 0}
+                onClick={rejectAll}
+              >
+                <Undo2 size={17} aria-hidden="true" />
+              </ToolbarButton>
+            </div>
+            <span className="vd-writer__tgroup-caption">Duyệt</span>
+          </div>
+
+          <div className="vd-writer__tgroup vd-writer__tgroup--end">
+            <div className="vd-writer__tgroup-line">
+              <ToolbarButton label="In (Ctrl+P)" onClick={printNow}>
+                <Printer size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Xuất PDF (tệp, không qua máy in)"
+                onClick={() => void exportPdfNow()}
+                disabled={exportBusy}
+              >
+                <FileDown size={17} aria-hidden="true" />
+              </ToolbarButton>
+            </div>
+            <div className="vd-writer__tgroup-line">
+              <ToolbarButton
+                label="Xuất Word (.docx)"
+                onClick={() => void exportWordNow()}
+                disabled={exportBusy}
+              >
+                <FileType size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
+                label="Xuất văn bản (.txt)"
+                onClick={() => void exportTextNow()}
+                disabled={exportBusy}
+              >
+                <FileText size={17} aria-hidden="true" />
+              </ToolbarButton>
+            </div>
+            <span className="vd-writer__tgroup-caption">In và xuất</span>
+          </div>
         </div>
 
         {tableActive ? (
@@ -1540,6 +2318,117 @@ export function WriterEditor({
         ) : null}
       </div>
 
+      {statsOpen ? (
+        <div
+          className="vd-writer__panel vd-writer__stats"
+          role="dialog"
+          aria-label="Bảng thống kê tài liệu"
+        >
+          <ChartColumn size={17} aria-hidden="true" />
+          <span className="vd-writer__stats-heading">Thống kê tài liệu</span>
+          <dl className="vd-writer__stats-grid">
+            <div>
+              <dt>Số từ</dt>
+              <dd>{stats.words.toLocaleString("vi-VN")}</dd>
+            </div>
+            <div>
+              <dt>Ký tự (có dấu cách)</dt>
+              <dd>{stats.characters.toLocaleString("vi-VN")}</dd>
+            </div>
+            <div>
+              <dt>Ký tự (không dấu cách)</dt>
+              <dd>{stats.charactersNoSpaces.toLocaleString("vi-VN")}</dd>
+            </div>
+            <div>
+              <dt>Đoạn văn</dt>
+              <dd>{stats.paragraphs.toLocaleString("vi-VN")}</dd>
+            </div>
+            <div>
+              <dt>Số trang A4</dt>
+              <dd>{pagination.total}</dd>
+            </div>
+            <div>
+              <dt>Thời gian đọc</dt>
+              <dd>{readingMinutes} phút</dd>
+            </div>
+          </dl>
+          <button
+            type="button"
+            className="vd-writer__panel-action"
+            onClick={() => setStatsOpen(false)}
+          >
+            Đóng
+          </button>
+        </div>
+      ) : null}
+
+      {insertPanel === "date" ? (
+        <div
+          className="vd-writer__panel"
+          role="dialog"
+          aria-label="Bảng chọn ngày tháng"
+        >
+          <CalendarDays size={17} aria-hidden="true" />
+          <span className="vd-writer__panel-hint">Chèn ngày hiện tại</span>
+          {DATE_FORMAT_OPTIONS.map((option) => {
+            const value = option.render(new Date());
+            return (
+              <button
+                key={option.label}
+                type="button"
+                className="vd-writer__panel-action"
+                title={option.label}
+                aria-label={`${option.label}: ${value}`}
+                onClick={() => {
+                  insertTextAtCursor(value);
+                  setInsertPanel(null);
+                }}
+              >
+                {value}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            className="vd-writer__panel-action"
+            onClick={() => setInsertPanel(null)}
+          >
+            Đóng
+          </button>
+        </div>
+      ) : null}
+
+      {insertPanel === "symbol" ? (
+        <div
+          className="vd-writer__panel"
+          role="dialog"
+          aria-label="Bảng chọn ký hiệu"
+        >
+          <Sigma size={17} aria-hidden="true" />
+          <span className="vd-writer__panel-hint">Ký hiệu thường dùng</span>
+          <div className="vd-writer__symbols">
+            {WRITER_SYMBOLS.map((symbol) => (
+              <button
+                key={symbol}
+                type="button"
+                title={`Chèn ${symbol}`}
+                aria-label={`Chèn ký hiệu ${symbol}`}
+                onClick={() => insertTextAtCursor(symbol)}
+              >
+                {symbol}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            className="vd-writer__panel-action"
+            onClick={() => setInsertPanel(null)}
+          >
+            Đóng
+          </button>
+        </div>
+      ) : null}
+
       {tablePickerOpen ? (
         <div
           className="vd-writer__panel"
@@ -1597,7 +2486,7 @@ export function WriterEditor({
           role="dialog"
           aria-label="Chèn liên kết"
         >
-          <Link2 size={15} aria-hidden="true" />
+          <Link2 size={17} aria-hidden="true" />
           <input
             ref={linkInputRef}
             className="vd-writer__search-input"
@@ -1647,13 +2536,76 @@ export function WriterEditor({
         </div>
       ) : null}
 
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept={IMAGE_EXTENSIONS.map((extension) => `.${extension}`).join(",")}
+        className="vd-writer__image-input"
+        aria-label="Chọn tệp ảnh"
+        onChange={(event) => {
+          void handleImageFile(event.target.files?.[0]);
+          event.target.value = "";
+        }}
+      />
+
+      {clipboardNotice ? (
+        <div className="vd-writer__panel">
+          <span role="status">{clipboardNotice}</span>
+        </div>
+      ) : null}
+
+      {clipboardError ? (
+        <div className="vd-writer__panel" role="alert">
+          <span className="vd-writer__panel-error">{clipboardError}</span>
+          <button
+            type="button"
+            className="vd-writer__panel-action"
+            onClick={() => setClipboardError(null)}
+          >
+            Đóng
+          </button>
+        </div>
+      ) : null}
+
+      {imageError ? (
+        <div className="vd-writer__panel" role="alert">
+          <span className="vd-writer__panel-error">{imageError}</span>
+          <button
+            type="button"
+            className="vd-writer__panel-action"
+            onClick={() => setImageError(null)}
+          >
+            Đóng
+          </button>
+        </div>
+      ) : null}
+
+      {exportError ? (
+        <div className="vd-writer__panel" role="alert">
+          <span className="vd-writer__panel-error">{exportError}</span>
+          <button
+            type="button"
+            className="vd-writer__panel-action"
+            onClick={() => setExportError(null)}
+          >
+            Đóng
+          </button>
+        </div>
+      ) : null}
+
+      {exportNotice ? (
+        <div className="vd-writer__panel">
+          <span role="status">{exportNotice}</span>
+        </div>
+      ) : null}
+
       {pagePanelOpen ? (
         <div
           className="vd-writer__panel"
           role="dialog"
           aria-label="Đầu trang và chân trang"
         >
-          <PanelTop size={15} aria-hidden="true" />
+          <PanelTop size={17} aria-hidden="true" />
           <label htmlFor="vd-writer-header">Đầu trang</label>
           <input
             id="vd-writer-header"
@@ -1701,7 +2653,7 @@ export function WriterEditor({
 
       {searchOpen ? (
         <div className="vd-writer__search" role="search" aria-label="Tìm và thay thế">
-          <Search size={15} aria-hidden="true" />
+          <Search size={17} aria-hidden="true" />
           <input
             ref={searchInputRef}
             className="vd-writer__search-input"
@@ -1731,7 +2683,7 @@ export function WriterEditor({
             onClick={() => findNext(-1)}
             disabled={matches.length === 0}
           >
-            <ChevronUp size={15} aria-hidden="true" />
+            <ChevronUp size={17} aria-hidden="true" />
           </button>
           <button
             type="button"
@@ -1740,7 +2692,7 @@ export function WriterEditor({
             onClick={() => findNext(1)}
             disabled={matches.length === 0}
           >
-            <ChevronDown size={15} aria-hidden="true" />
+            <ChevronDown size={17} aria-hidden="true" />
           </button>
           <label className="vd-writer__search-case">
             <input
@@ -1794,7 +2746,7 @@ export function WriterEditor({
             aria-label="Bật/tắt thay thế"
             onClick={() => setReplaceMode((value) => !value)}
           >
-            <Replace size={15} aria-hidden="true" />
+            <Replace size={17} aria-hidden="true" />
           </button>
           <button
             type="button"
@@ -1802,7 +2754,7 @@ export function WriterEditor({
             aria-label="Đóng tìm kiếm"
             onClick={closeSearch}
           >
-            <X size={15} aria-hidden="true" />
+            <X size={17} aria-hidden="true" />
           </button>
         </div>
       ) : null}
@@ -1970,7 +2922,7 @@ export function WriterEditor({
 
       <div className="vd-writer__status">
         <span>
-          {stats.words} từ · {stats.characters} ký tự
+          {stats.words} từ · {stats.characters} ký tự · {stats.paragraphs} đoạn
         </span>
         {changeList.length > 0 ? (
           <span>

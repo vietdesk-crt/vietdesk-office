@@ -10,7 +10,6 @@ export const slidesApp: AppDescriptor = {
   label: "Slides",
   glyph: "P",
   defaultName: "Trình chiếu chưa đặt tên",
-  printable: false,
   home: {
     title: "Trình chiếu",
     description: "Bài giảng, báo cáo, khung 16:9.",

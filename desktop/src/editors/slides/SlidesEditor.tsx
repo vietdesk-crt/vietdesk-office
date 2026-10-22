@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import type { CSSProperties } from "react";
 import { createPortal } from "react-dom";
-import { createSlideId, createDefaultSlides } from "./model";
-import type { Slide } from "./model";
+import { SLIDE_LAYOUTS, createDefaultSlides, createSlideId, slideBodyLines } from "./model";
+import type { Slide, SlideLayout } from "./model";
 
 export interface SlidesEditorProps {
   /** Danh sách slide đã lưu trong tệp `.vdx`. */
@@ -10,12 +11,85 @@ export interface SlidesEditorProps {
   onChange?: (slides: Slide[]) => void;
 }
 
+const LAYOUT_LABELS: Record<SlideLayout, string> = {
+  title: "Slide tiêu đề",
+  "title-content": "Tiêu đề và nội dung",
+  section: "Ngăn cách",
+  "title-only": "Chỉ tiêu đề",
+  blank: "Trống",
+};
+
+/** Bảng màu nhanh lấy cảm hứng từ theme của Google Slides / WPS. */
+const BACKGROUND_PRESETS = [
+  "#ffffff",
+  "#f5f3ce",
+  "#d7e3fc",
+  "#fad2cf",
+  "#c9daf8",
+  "#1e1e3f",
+  "#0f766e",
+  "#3c4043",
+];
+
+function backgroundStyle(slide: Slide): CSSProperties {
+  if (!slide.background) return {};
+  // Tự động đảo màu chữ theo độ sáng nền (giống WPS khi đổi màu slide).
+  return { background: slide.background, color: readableTextColor(slide.background) };
+}
+
+function hexChannels(color: string): number[] {
+  const hex = color.slice(1);
+  const full =
+    hex.length <= 4
+      ? hex
+          .slice(0, 3)
+          .split("")
+          .map((c) => parseInt(c + c, 16))
+      : [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  return full.slice(0, 3).map((value) => (Number.isFinite(value) ? value : 0));
+}
+
+function readableTextColor(color: string): string {
+  const [red, green, blue] = hexChannels(color);
+  const luminance = (0.299 * red + 0.587 * green + 0.114 * blue) / 255;
+  return luminance < 0.55 ? "#f7f7f5" : "#1a1a1a";
+}
+
+/** Nội dung slide theo layout — dùng chung cho khung xem và trình chiếu. */
+function SlideContent({ slide }: { slide: Slide }) {
+  const lines = slideBodyLines(slide.body);
+  const showBody =
+    slide.layout === "title" ||
+    slide.layout === "title-content" ||
+    slide.layout === "section";
+
+  return (
+    <>
+      {slide.layout !== "blank" ? (
+        <div className="vd-slide__title">{slide.title || "(Chưa đặt tiêu đề)"}</div>
+      ) : null}
+      {showBody ? (
+        slide.layout === "title-content" && lines.length > 0 ? (
+          <ul className="vd-slide__bullets">
+            {lines.map((line, index) => (
+              <li key={index}>{line}</li>
+            ))}
+          </ul>
+        ) : (
+          <div className="vd-slide__subtitle">{lines.join("\n")}</div>
+        )
+      ) : null}
+    </>
+  );
+}
+
 /**
- * Trình chiếu: danh sách slide (thêm / nhân đôi / xóa / đổi thứ tự)
- * + khung soạn 16:9 + chế độ trình chiếu toàn màn hình (F5).
+ * Trình chiếu: danh sách slide (thêm / nhân đôi / xóa / đổi thứ tự) + khung
+ * soạn 16:9 theo layout + màu nền + ghi chú diễn giả + chế độ trình chiếu toàn
+ * màn hình (F5).
  *
- * Chưa có transition, theme, hay layout master — những phần đó cần mô hình
- * dữ liệu riêng và sẽ do lõi OOXML (native/core/modules/ooxml) định nghĩa.
+ * Chưa có transition, ảnh nền, và đối tượng tự do trên canvas — những phần đó
+ * cần mô hình dữ liệu riêng và sẽ do lõi OOXML định nghĩa.
  */
 export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
   const initial = initialSlides ?? createDefaultSlides();
@@ -23,6 +97,7 @@ export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
   const [selectedId, setSelectedId] = useState(initial[0]?.id ?? "");
   const [presenting, setPresenting] = useState(false);
   const [presentIndex, setPresentIndex] = useState(0);
+  const [showNotes, setShowNotes] = useState(false);
   const onChangeRef = useRef(onChange);
   const presentRef = useRef<HTMLDivElement>(null);
 
@@ -41,7 +116,7 @@ export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
     }
   };
 
-  const updateSlide = (patch: Partial<Pick<Slide, "title" | "body">>) => {
+  const updateSlide = (patch: Partial<Omit<Slide, "id">>) => {
     if (!selected) {
       return;
     }
@@ -55,8 +130,11 @@ export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
   const addSlide = () => {
     const slide: Slide = {
       id: createSlideId(),
+      layout: "title-content",
       title: "Tiêu đề mới",
       body: "Nội dung...",
+      background: null,
+      notes: "",
     };
     const at = Math.max(selectedIndex, 0) + 1;
     commit([...slides.slice(0, at), slide, ...slides.slice(at)], slide.id);
@@ -110,6 +188,7 @@ export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
       return;
     }
     setPresentIndex(Math.max(selectedIndex, 0));
+    setShowNotes(false);
     setPresenting(true);
   };
 
@@ -132,6 +211,11 @@ export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
       if (event.key === "Escape") {
         event.preventDefault();
         stopPresent();
+        return;
+      }
+      if (event.key === "s" || event.key === "S") {
+        event.preventDefault();
+        setShowNotes((value) => !value);
         return;
       }
       if (
@@ -216,8 +300,20 @@ export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
               onClick={() => setSelectedId(slide.id)}
               aria-current={slide.id === selected?.id}
             >
-              <span className="vd-slides__number">{index + 1}</span>
-              <span className="vd-slides__thumb-title">{slide.title}</span>
+              <span
+                className={`vd-slides__thumb-frame${
+                  slide.background ? " has-background" : ""
+                }`}
+                style={slide.background ? { background: slide.background } : undefined}
+              >
+                <span className="vd-slides__number">{index + 1}</span>
+              </span>
+              <span className="vd-slides__thumb-text">
+                <span className="vd-slides__thumb-title">{slide.title}</span>
+                <span className="vd-slides__thumb-layout">
+                  {LAYOUT_LABELS[slide.layout]}
+                </span>
+              </span>
             </button>
             <div className="vd-slides__thumb-actions">
               <button
@@ -269,47 +365,125 @@ export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
 
       <section className="vd-slides__stage">
         <div className="vd-slides__toolbar">
-          <span className="vd-slides__hint">
-            F5 — trình chiếu · ←/→ — chuyển slide khi trình chiếu
-          </span>
+          <div className="vd-slides__tools">
+            <label className="vd-slides__tool">
+              <span className="vd-slides__tool-label">Kiểu</span>
+              <select
+                className="vd-slides__select"
+                value={selected?.layout ?? "title-content"}
+                onChange={(event) =>
+                  updateSlide({ layout: event.target.value as SlideLayout })
+                }
+                disabled={!selected}
+                aria-label="Kiểu slide"
+              >
+                {SLIDE_LAYOUTS.map((layout) => (
+                  <option key={layout} value={layout}>
+                    {LAYOUT_LABELS[layout]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="vd-slides__tool" role="group" aria-label="Màu nền slide">
+              <span className="vd-slides__tool-label">Nền</span>
+              <div className="vd-slides__swatches">
+                {BACKGROUND_PRESETS.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    className={`vd-slides__swatch${
+                      selected?.background === color ? " is-active" : ""
+                    }`}
+                    style={{ background: color }}
+                    title={color}
+                    aria-label={`Đặt nền ${color}`}
+                    disabled={!selected}
+                    onClick={() => updateSlide({ background: color })}
+                  />
+                ))}
+                <input
+                  type="color"
+                  className="vd-slides__color"
+                  value={selected?.background ?? "#ffffff"}
+                  onChange={(event) =>
+                    updateSlide({ background: event.target.value })
+                  }
+                  disabled={!selected}
+                  aria-label="Màu nền tùy chỉnh"
+                />
+                <button
+                  type="button"
+                  className="vd-slides__clear-bg"
+                  disabled={!selected?.background}
+                  onClick={() => updateSlide({ background: null })}
+                >
+                  Xóa nền
+                </button>
+              </div>
+            </div>
+          </div>
           <button
             type="button"
-            className="vd-button"
+            className="vd-button is-primary"
             onClick={startPresent}
             disabled={slides.length === 0}
           >
             ▶ Trình chiếu
           </button>
         </div>
-        <div className="vd-slides__canvas">
-          {selected ? (
-            <>
-              <textarea
-                className="vd-slides__title"
-                value={selected.title}
-                onChange={(event) => updateSlide({ title: event.target.value })}
-                rows={1}
-                spellCheck
-                lang="vi"
-                aria-label="Tiêu đề slide"
-              />
-              <textarea
-                className="vd-slides__body"
-                value={selected.body}
-                onChange={(event) => updateSlide({ body: event.target.value })}
-                rows={6}
-                spellCheck
-                lang="vi"
-                aria-label="Nội dung slide"
-              />
-            </>
-          ) : null}
-        </div>
+
+        {selected ? (
+          <>
+            <div
+              className={`vd-slides__canvas vd-slide--${selected.layout}`}
+              style={backgroundStyle(selected)}
+            >
+              <SlideContent slide={selected} />
+            </div>
+            <div className="vd-slides__fields">
+              <label className="vd-slides__field">
+                <span className="vd-slides__field-label">Tiêu đề</span>
+                <input
+                  className="vd-slides__input"
+                  value={selected.title}
+                  onChange={(event) => updateSlide({ title: event.target.value })}
+                  lang="vi"
+                />
+              </label>
+              <label className="vd-slides__field">
+                <span className="vd-slides__field-label">Nội dung</span>
+                <textarea
+                  className="vd-slides__textarea"
+                  value={selected.body}
+                  onChange={(event) => updateSlide({ body: event.target.value })}
+                  rows={4}
+                  spellCheck
+                  lang="vi"
+                  placeholder="Mỗi dòng là một gạch đầu dòng"
+                />
+              </label>
+              <label className="vd-slides__field">
+                <span className="vd-slides__field-label">Ghi chú diễn giả</span>
+                <textarea
+                  className="vd-slides__textarea vd-slides__notes"
+                  value={selected.notes}
+                  onChange={(event) => updateSlide({ notes: event.target.value })}
+                  rows={2}
+                  spellCheck
+                  lang="vi"
+                  placeholder="Không hiện khi trình chiếu"
+                />
+              </label>
+            </div>
+          </>
+        ) : null}
         <div className="vd-slides__status">
           <span>
             Slide {selectedIndex + 1}/{slides.length}
           </span>
-          <span>16:9 · chưa hỗ trợ hiệu ứng</span>
+          <span className="vd-slides__hint">
+            F5 — trình chiếu · ←/→ — chuyển slide · Esc — thoát
+          </span>
         </div>
       </section>
 
@@ -323,10 +497,25 @@ export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
               aria-label="Chế độ trình chiếu"
               onClick={() => stepPresent(1)}
             >
-              <div className="vd-present__canvas">
-                <div className="vd-present__title">{current.title}</div>
-                <div className="vd-present__body">{current.body}</div>
+              <div
+                className={`vd-present__canvas vd-slide--${current.layout}`}
+                style={backgroundStyle(current)}
+              >
+                <SlideContent slide={current} />
               </div>
+              {showNotes ? (
+                <div
+                  className="vd-present__notes"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <span className="vd-present__notes-label">
+                    Ghi chú diễn giả (S để ẩn)
+                  </span>
+                  <div className="vd-present__notes-text">
+                    {current.notes.trim() || "— chưa có ghi chú —"}
+                  </div>
+                </div>
+              ) : null}
               <div
                 className="vd-present__hud"
                 onClick={(event) => event.stopPropagation()}

@@ -10,7 +10,6 @@ export const sheetsApp: AppDescriptor = {
   label: "Sheets",
   glyph: "S",
   defaultName: "Bảng tính chưa đặt tên",
-  printable: false,
   home: {
     title: "Bảng tính",
     description: "Bảng lương, dự toán, công thức và số tiền VND.",

@@ -6,19 +6,18 @@ export const writerApp: AppDescriptor = {
   label: "Writer",
   glyph: "W",
   defaultName: "Văn bản chưa đặt tên",
-  printable: true,
   home: {
     title: "Văn bản",
     description: "Công văn, quyết định, biên bản — chuẩn NĐ30.",
-    formats: "Lưu .vdx · DOCX đang phát triển",
+    formats: "Lưu .vdx / .docx · Xuất PDF",
   },
   createDefaultContent: createEmptyWriterDocument,
   normalizeContent: normalizeWriterContent,
-  renderEditor: ({ document, printSignal, onChange }) => (
+  renderEditor: ({ document, onChange }) => (
     <WriterEditor
       initialContent={document.content}
       title={document.name}
-      printSignal={printSignal}
+      documentPath={document.path}
       onChange={({ doc }) => onChange(doc)}
     />
   ),

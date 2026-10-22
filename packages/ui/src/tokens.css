@@ -3,15 +3,15 @@
    thẩm mỹ văn phòng Việt Nam (đỏ điều làm điểm nhấn). */
 
 :root {
-  --vd-bg: #f6f6f4;
-  --vd-panel: #ffffff;
-  --vd-panel-alt: #fbfbfa;
-  --vd-border: #dcdcd7;
-  --vd-border-strong: #b9b9b2;
-  --vd-text: #1c1c1a;
-  --vd-muted: #6b6b64;
-  --vd-accent: #b3192b;
-  --vd-accent-soft: #f7e6e8;
+  --vd-bg: #f3f0ea;
+  --vd-panel: #fcfaf5;
+  --vd-panel-alt: #f6f4ee;
+  --vd-border: #e0dcd2;
+  --vd-border-strong: #b9b3a5;
+  --vd-text: #262220;
+  --vd-muted: #6e675c;
+  --vd-accent: #a8503f;
+  --vd-accent-soft: #f5e9e3;
   --vd-shadow: 0 1px 2px rgb(0 0 0 / 6%), 0 8px 24px rgb(0 0 0 / 4%);
   --vd-radius: 6px;
   --vd-font: "Inter", "Segoe UI", "Be Vietnam Pro", system-ui, -apple-system,
@@ -38,15 +38,15 @@
 
 [data-theme="light"] {
   color-scheme: light;
-  --vd-bg: #f6f6f4;
-  --vd-panel: #ffffff;
-  --vd-panel-alt: #fbfbfa;
-  --vd-border: #dcdcd7;
-  --vd-border-strong: #b9b9b2;
-  --vd-text: #1c1c1a;
-  --vd-muted: #6b6b64;
-  --vd-accent: #b8362f;
-  --vd-accent-soft: #f7e6e8;
+  --vd-bg: #f3f0ea;
+  --vd-panel: #fcfaf5;
+  --vd-panel-alt: #f6f4ee;
+  --vd-border: #e0dcd2;
+  --vd-border-strong: #b9b3a5;
+  --vd-text: #262220;
+  --vd-muted: #6e675c;
+  --vd-accent: #a8503f;
+  --vd-accent-soft: #f5e9e3;
   --vd-shadow: 0 1px 2px rgb(0 0 0 / 6%), 0 8px 24px rgb(0 0 0 / 4%);
 }
 

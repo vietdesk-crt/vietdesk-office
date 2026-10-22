@@ -83,7 +83,9 @@ pub fn run() {
             recent::recent_clear,
             recent::recent_store_path,
             document::document_read,
+            document::document_read_binary,
             document::document_write,
+            document::document_write_binary,
             asset::asset_read_base64,
             asset::asset_write,
         ])

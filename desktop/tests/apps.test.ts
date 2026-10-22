@@ -13,11 +13,13 @@ import {
   createDefaultSlides,
   normalizeSlidesContent,
   readSlides,
+  slideBodyLines,
 } from "../src/editors/slides";
 import {
   createEmptyWriterDocument,
   normalizeWriterContent,
 } from "../src/editors/writer";
+import { writerSchema } from "../src/editors/writer/schema";
 
 function paragraphDoc(text = ""): Record<string, unknown> {
   return {
@@ -54,12 +56,6 @@ describe("registry ứng dụng", () => {
 
   it("thẻ tạo mới đi theo thứ tự ứng dụng", () => {
     expect(HOME_CARDS.map((card) => card.kind)).toEqual([...DOCUMENT_KINDS]);
-  });
-
-  it("chỉ Writer nhận lệnh in / xuất PDF", () => {
-    expect(APPS.writer.printable).toBe(true);
-    expect(APPS.sheets.printable).toBe(false);
-    expect(APPS.slides.printable).toBe(false);
   });
 
   it("chuẩn hoá nội dung mặc định qua đúng model của từng ứng dụng", () => {
@@ -126,7 +122,14 @@ describe("model nội dung Writer", () => {
       ],
     }) as Record<string, unknown>;
 
-    expect(normalized.content).toEqual(paragraphDoc("Xin chào").content);
+    // Schema gán attrs mặc định (align/indent/lineHeight) khi khôi phục —
+    // nội dung hợp lệ được giữ nguyên theo nghĩa, so bằng lượt khôi phục schema.
+    const expected = writerSchema.nodeFromJSON(
+      paragraphDoc("Xin chào") as Parameters<
+        typeof writerSchema.nodeFromJSON
+      >[0],
+    ).toJSON();
+    expect(normalized.content).toEqual(expected.content);
     expect(normalized.pageSetup).toEqual({
       header: "Đầu trang",
       footer: "",
@@ -176,7 +179,7 @@ describe("model nội dung Slides", () => {
     );
   });
 
-  it("bỏ slide sai cấu trúc và chỉ giữ trường đã biết", () => {
+  it("bỏ slide sai cấu trúc, điền mặc định trường mở rộng", () => {
     const slides = readSlides({
       slides: [
         { id: "s1", title: "Mở đầu", body: "Nội dung", extra: true },
@@ -186,7 +189,63 @@ describe("model nội dung Slides", () => {
       ],
     });
 
-    expect(slides).toEqual([{ id: "s1", title: "Mở đầu", body: "Nội dung" }]);
+    expect(slides).toEqual([
+      {
+        id: "s1",
+        layout: "title-content",
+        title: "Mở đầu",
+        body: "Nội dung",
+        background: null,
+        notes: "",
+      },
+    ]);
     expect(normalizeSlidesContent({ slides })).toEqual({ slides });
+  });
+
+  it("giữ layout hợp lệ, color hex hợp lệ và loại giá trị xấu", () => {
+    const slides = readSlides({
+      slides: [
+        {
+          id: "s1",
+          layout: "section",
+          title: "Ngăn cách",
+          body: "",
+          background: "#1e1e3f",
+          notes: "Ghi chú",
+        },
+        {
+          id: "s2",
+          layout: "khong-ton-tai",
+          title: "X",
+          body: "Y",
+          background: "url(evil)",
+          notes: 42,
+        },
+      ],
+    });
+
+    expect(slides[0]).toEqual({
+      id: "s1",
+      layout: "section",
+      title: "Ngăn cách",
+      body: "",
+      background: "#1e1e3f",
+      notes: "Ghi chú",
+    });
+    // Layout sai → mặc định; background không phải hex → null; notes sai → "".
+    expect(slides[1]).toMatchObject({
+      layout: "title-content",
+      background: null,
+      notes: "",
+    });
+  });
+
+  it("tách dòng nội dung và gỡ ký hiệu đầu dòng tự gõ", () => {
+    expect(slideBodyLines("• Một\n- Hai\nBa\n\n   ")).toEqual([
+      "Một",
+      "Hai",
+      "Ba",
+    ]);
+    expect(slideBodyLines("")).toEqual([]);
   });
 });

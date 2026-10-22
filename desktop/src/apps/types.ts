@@ -7,6 +7,8 @@ export type AppId = DocumentType;
 /** Phần trạng thái của một tài liệu mà adapter của từng ứng dụng cần. */
 export interface AppDocument {
   name: string;
+  /** Đường dẫn tệp trên đĩa; null khi tài liệu chưa lưu. */
+  path: string | null;
   content: unknown;
   /** Tăng khi nạp tài liệu khác — dùng làm `key` để remount editor. */
   revision: number;
@@ -14,8 +16,6 @@ export interface AppDocument {
 
 export interface EditorRenderOptions {
   document: AppDocument;
-  /** Tăng khi người dùng yêu cầu in từ ribbon. */
-  printSignal: number;
   onChange: (content: unknown) => void;
 }
 
@@ -38,8 +38,6 @@ export interface AppDescriptor {
   label: string;
   glyph: string;
   defaultName: string;
-  /** Ứng dụng có nhận yêu cầu in / xuất PDF từ ribbon không. */
-  printable: boolean;
   home: HomeCard;
   createDefaultContent: () => unknown;
   normalizeContent: (value: unknown) => unknown;

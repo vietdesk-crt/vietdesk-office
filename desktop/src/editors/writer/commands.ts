@@ -2,7 +2,7 @@
  * Các lệnh định dạng dùng chung cho toolbar và phím tắt Writer.
  */
 import { setBlockType, toggleMark } from "prosemirror-commands";
-import type { MarkType, Node as PMNode, NodeType } from "prosemirror-model";
+import type { Mark, MarkType, Node as PMNode, NodeType } from "prosemirror-model";
 import type { Command, EditorState } from "prosemirror-state";
 import { TextSelection } from "prosemirror-state";
 import type { Transaction } from "prosemirror-state";
@@ -25,6 +25,7 @@ import {
   MAX_INDENT,
   normalizeAlign,
   normalizeHref,
+  normalizeImageSize,
   normalizeIndent,
   normalizeLineHeight,
   writerSchema,
@@ -309,6 +310,305 @@ export function clearFormatting(): Command {
   };
 }
 
+/** Kiểu đổi chữ hoa/thường tương ứng menu "Aa" của Word. */
+export type CaseMode =
+  | "upper"
+  | "lower"
+  | "sentence"
+  | "capitalize"
+  | "toggle";
+
+/**
+ * Một bước của "Viết hoa đầu câu"; trả về cả trạng thái để nối tiếp qua các
+ * text node khác định dạng trong cùng đoạn văn.
+ */
+function sentenceCaseStep(
+  text: string,
+  startOfSentence: boolean,
+): { text: string; startOfSentence: boolean } {
+  let result = "";
+  let start = startOfSentence;
+  for (const char of text.toLocaleLowerCase("vi")) {
+    if (start && /[\p{L}\p{N}]/u.test(char)) {
+      result += char.toLocaleUpperCase("vi");
+      start = false;
+      continue;
+    }
+    result += char;
+    if (/[.!?]/.test(char)) {
+      start = true;
+    }
+  }
+  return { text: result, startOfSentence: start };
+}
+
+function toSentenceCase(text: string): string {
+  return sentenceCaseStep(text, true).text;
+}
+
+function toToggleCase(text: string): string {
+  let result = "";
+  for (const char of text) {
+    const upper = char.toLocaleUpperCase("vi");
+    const lower = char.toLocaleLowerCase("vi");
+    if (upper === lower) {
+      result += char;
+    } else {
+      result += char === lower ? upper : lower;
+    }
+  }
+  return result;
+}
+
+/** Biến đổi chuỗi theo kiểu chữ; tách riêng để kiểm thử độc lập. */
+export function transformCaseText(text: string, mode: CaseMode): string {
+  switch (mode) {
+    case "upper":
+      return text.toLocaleUpperCase("vi");
+    case "lower":
+      return text.toLocaleLowerCase("vi");
+    case "sentence":
+      return toSentenceCase(text);
+    case "capitalize":
+      return text.replace(
+        /\S+/g,
+        (word) =>
+          word.charAt(0).toLocaleUpperCase("vi") +
+          word.slice(1).toLocaleLowerCase("vi"),
+      );
+    case "toggle":
+      return toToggleCase(text);
+    default:
+      return text;
+  }
+}
+
+/**
+ * Đổi chữ hoa/thường cho vùng chọn.
+ *
+ * Mỗi đoạn văn bản được biến đổi riêng và giữ nguyên mark của nó, nhờ vậy
+ * chữ đậm/màu/liên kết bên trong không bị mất.
+ */
+export function changeCase(mode: CaseMode): Command {
+  return (state, dispatch) => {
+    const { from, to, empty } = state.selection;
+    if (empty) {
+      return false;
+    }
+    if (!dispatch) {
+      return true;
+    }
+
+    // Thu thập trước rồi thay từ cuối về đầu: đổi chữ hoa/thường có thể làm
+    // chuỗi dài ra (ví dụ "ß" → "SS"), khi đó vị trí phía sau sẽ lệch nếu
+    // thay theo thứ tự xuôi.
+    const ranges: { from: number; to: number; text: string; node: PMNode }[] =
+      [];
+    let sentenceStart = true;
+    let block: PMNode | null = null;
+    state.doc.nodesBetween(from, to, (node, pos, parentNode) => {
+      if (!node.isText || !node.text) {
+        return true;
+      }
+      // Mỗi khối mở đầu một câu mới; trong cùng khối thì trạng thái được nối
+      // tiếp qua các text node khác định dạng (đậm, màu, liên kết…).
+      if (parentNode !== block) {
+        block = parentNode;
+        sentenceStart = true;
+      }
+
+      const start = Math.max(pos, from);
+      const end = Math.min(pos + node.nodeSize, to);
+      if (end <= start) {
+        return true;
+      }
+      const text = node.text.slice(start - pos, end - pos);
+      let next: string;
+      if (mode === "sentence") {
+        const prefix = node.text.slice(0, start - pos);
+        if (prefix) {
+          sentenceStart = sentenceCaseStep(
+            prefix,
+            sentenceStart,
+          ).startOfSentence;
+        }
+        const step = sentenceCaseStep(text, sentenceStart);
+        next = step.text;
+        sentenceStart = step.startOfSentence;
+      } else {
+        next = transformCaseText(text, mode);
+      }
+      if (next !== text) {
+        ranges.push({ from: start, to: end, text: next, node });
+      }
+      return true;
+    });
+
+    if (ranges.length === 0) {
+      return false;
+    }
+
+    const transaction = state.tr;
+    for (const range of ranges.reverse()) {
+      transaction.replaceWith(
+        range.from,
+        range.to,
+        writerSchema.text(range.text, range.node.marks),
+      );
+    }
+    dispatch(transaction);
+    return true;
+  };
+}
+
+/** Các mark định dạng ký tự mà "Chép định dạng" mang theo. */
+const FORMATTING_MARKS = new Set([
+  "code",
+  "strong",
+  "em",
+  "underline",
+  "strike",
+  "superscript",
+  "subscript",
+  "fontFamily",
+  "fontSize",
+  "textColor",
+  "highlight",
+]);
+
+/** Định dạng ký tự đang áp dụng tại vùng chọn (dùng cho Format Painter). */
+export function formattingMarksAtSelection(
+  state: EditorState,
+): readonly Mark[] {
+  const { from, to, empty, $from } = state.selection;
+  if (empty) {
+    return (state.storedMarks ?? $from.marks()).filter((mark) =>
+      FORMATTING_MARKS.has(mark.type.name),
+    );
+  }
+
+  // Lấy định dạng của ký tự đầu tiên trong vùng chọn, giống Format Painter
+  // của Word (không phụ thuộc vào text node cuối cùng).
+  let marks: readonly Mark[] = [];
+  let found = false;
+  state.doc.nodesBetween(from, to, (node) => {
+    if (node.isText && !found) {
+      marks = node.marks;
+      found = true;
+    }
+    return true;
+  });
+  return marks.filter((mark) => FORMATTING_MARKS.has(mark.type.name));
+}
+
+/** Dán định dạng đã chép lên vùng chọn (thay định dạng ký tự cũ). */
+export function applyFormatting(marks: readonly Mark[]): Command {
+  return (state, dispatch) => {
+    const { from, to, empty } = state.selection;
+    if (empty) {
+      return false;
+    }
+    if (!dispatch) {
+      return true;
+    }
+
+    // Giữ liên kết, dấu vết thay đổi và ghim bình luận — chúng không phải
+    // định dạng ký tự nên không được xoá khi dán định dạng.
+    const kept: { from: number; to: number; mark: Mark }[] = [];
+    state.doc.nodesBetween(from, to, (node, pos) => {
+      if (!node.isText) {
+        return true;
+      }
+      const start = Math.max(pos, from);
+      const end = Math.min(pos + node.nodeSize, to);
+      if (end <= start) {
+        return true;
+      }
+      for (const mark of node.marks) {
+        if (!FORMATTING_MARKS.has(mark.type.name)) {
+          kept.push({ from: start, to: end, mark });
+        }
+      }
+      return true;
+    });
+
+    const transaction = state.tr.removeMark(from, to);
+    for (const mark of marks) {
+      if (FORMATTING_MARKS.has(mark.type.name)) {
+        transaction.addMark(from, to, mark);
+      }
+    }
+    for (const item of kept) {
+      transaction.addMark(item.from, item.to, item.mark);
+    }
+    dispatch(transaction);
+    return true;
+  };
+}
+
+/**
+ * Sắp xếp các đoạn văn/tiêu đề cấp cao nhất trong vùng chọn theo ABC.
+ *
+ * Từ chối khi vùng chọn có bảng, danh sách, ngắt trang… xen vào — đổi thứ tự
+ * các khối lồng nhau sẽ phá cấu trúc tài liệu.
+ */
+export function sortSelectedBlocks(): Command {
+  return (state, dispatch) => {
+    const { from, to, empty } = state.selection;
+    if (empty) {
+      return false;
+    }
+
+    const blocks: { node: PMNode; pos: number; end: number; text: string }[] =
+      [];
+    let allowed = true;
+    state.doc.forEach((node, offset) => {
+      const end = offset + node.nodeSize;
+      if (end <= from || offset >= to) {
+        return;
+      }
+      if (
+        node.type !== writerSchema.nodes.paragraph &&
+        node.type !== writerSchema.nodes.heading
+      ) {
+        allowed = false;
+        return;
+      }
+      blocks.push({
+        node,
+        pos: offset,
+        end,
+        text: node.textBetween(0, node.content.size, " ", " "),
+      });
+    });
+
+    if (!allowed || blocks.length < 2) {
+      return false;
+    }
+    if (!dispatch) {
+      return true;
+    }
+
+    const sorted = [...blocks].sort((left, right) =>
+      left.text.localeCompare(right.text, "vi", { sensitivity: "base" }),
+    );
+    if (sorted.every((block, index) => block === blocks[index])) {
+      return false;
+    }
+
+    dispatch(
+      state.tr
+        .replaceWith(
+          blocks[0].pos,
+          blocks[blocks.length - 1].end,
+          sorted.map((block) => block.node),
+        )
+        .scrollIntoView(),
+    );
+    return true;
+  };
+}
+
 /** Bật/tắt danh sách; nếu đang ở loại khác thì đổi loại tại chỗ. */
 export function toggleList(type: NodeType): Command {
   return (state, dispatch, view) => {
@@ -579,6 +879,39 @@ export function insertHorizontalRule(): Command {
       writerSchema.nodes.horizontal_rule.create(),
     );
     dispatch(transaction.scrollIntoView());
+    return true;
+  };
+}
+
+/**
+ * Chèn ảnh vào vị trí con trỏ.
+ *
+ * `src` là đường dẫn tương đối trong thư mục `assets` cạnh tệp tài liệu, hoặc
+ * một data URL khi tài liệu chưa lưu trên đĩa. Kích thước bị chặn về khoảng
+ * 16–4000 px theo quy tắc của schema.
+ */
+export function insertImage(attrs: {
+  src: string;
+  alt?: string;
+  width?: number | null;
+  height?: number | null;
+}): Command {
+  return (state, dispatch) => {
+    if (!attrs.src) {
+      return false;
+    }
+    const node = writerSchema.nodes.image.createAndFill({
+      src: attrs.src,
+      alt: attrs.alt ?? "",
+      width: normalizeImageSize(attrs.width ?? null),
+      height: normalizeImageSize(attrs.height ?? null),
+    });
+    if (!node) {
+      return false;
+    }
+    if (dispatch) {
+      dispatch(state.tr.replaceSelectionWith(node).scrollIntoView());
+    }
     return true;
   };
 }

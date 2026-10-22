@@ -49,6 +49,31 @@ pub fn document_read(path: String) -> Result<String, String> {
     })
 }
 
+/// Đọc thô tệp nhị phân rồi mã base64 — dùng cho OOXML/ODF (bản chất là ZIP,
+/// không phải UTF-8 nên `document_read` không đọc được).
+#[tauri::command]
+pub fn document_read_binary(path: String) -> Result<String, String> {
+    use base64::engine::general_purpose::STANDARD as BASE64;
+    use base64::Engine as _;
+
+    let target = PathBuf::from(&path);
+    let metadata =
+        fs::metadata(&target).map_err(|error| format!("Không mở được tệp: {error}"))?;
+
+    if !metadata.is_file() {
+        return Err("Đường dẫn không phải là tệp.".to_string());
+    }
+    if metadata.len() > MAX_BYTES {
+        return Err(format!(
+            "Tệp quá lớn ({} MB). Giới hạn hiện tại là 32 MB.",
+            metadata.len() / (1024 * 1024)
+        ));
+    }
+
+    let bytes = fs::read(&target).map_err(|error| format!("Không đọc được tệp: {error}"))?;
+    Ok(BASE64.encode(bytes))
+}
+
 /// Ghi tài liệu nguyên tử (tệp tạm → `rename`).
 #[tauri::command]
 pub fn document_write(path: String, contents: String) -> Result<(), String> {
@@ -77,6 +102,61 @@ pub fn document_write(path: String, contents: String) -> Result<(), String> {
 
     if let Err(error) = fs::rename(&temp, &target) {
         // Windows không cho `rename` đè tệp đã tồn tại.
+        if target.exists() {
+            fs::remove_file(&target)
+                .map_err(|error| format!("Không thay được tệp cũ: {error}"))?;
+            fs::rename(&temp, &target)
+                .map_err(|error| format!("Không cập nhật được tệp: {error}"))?;
+        } else {
+            let _ = fs::remove_file(&temp);
+            return Err(format!("Không ghi được tệp: {error}"));
+        }
+    }
+
+    Ok(())
+}
+
+/// Ghi tệp nhị phân (DOCX, PDF…) từ base64 — ghi nguyên tử như `document_write`.
+#[tauri::command]
+pub fn document_write_binary(
+    path: String,
+    contents_base64: String,
+) -> Result<(), String> {
+    use base64::engine::general_purpose::STANDARD as BASE64;
+    use base64::Engine as _;
+
+    let heap_limit = contents_base64.len() / 3 * 4 + 4; // xấp xỉ độ dài sau giải mã
+    if heap_limit as u64 > MAX_BYTES {
+        return Err("Nội dung vượt quá 32 MB.".to_string());
+    }
+
+    let bytes = BASE64
+        .decode(contents_base64.as_bytes())
+        .map_err(|error| format!("Dữ liệu ảnh không hợp lệ: {error}"))?;
+
+    if bytes.is_empty() {
+        return Err("Không có nội dung để ghi.".to_string());
+    }
+
+    let target = PathBuf::from(&path);
+    ensure_parent(&target)?;
+
+    let file_name = target
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("document.bin");
+    let temp = target.with_file_name(format!(".{file_name}.{}.tmp", std::process::id()));
+
+    {
+        let mut file = fs::File::create(&temp)
+            .map_err(|error| format!("Không tạo được tệp tạm: {error}"))?;
+        file.write_all(&bytes)
+            .map_err(|error| format!("Không ghi được nội dung: {error}"))?;
+        file.sync_all()
+            .map_err(|error| format!("Không đồng bộ được tệp: {error}"))?;
+    }
+
+    if let Err(error) = fs::rename(&temp, &target) {
         if target.exists() {
             fs::remove_file(&target)
                 .map_err(|error| format!("Không thay được tệp cũ: {error}"))?;
@@ -149,6 +229,24 @@ mod tests {
         let missing = dir.join("khong-co.vdx");
         let error = document_read(missing.to_string_lossy().into_owned()).unwrap_err();
         assert!(error.contains("Không mở được tệp"));
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn doc_nhi_phan_ma_base64_dung_dan() {
+        use base64::engine::general_purpose::STANDARD as BASE64;
+        use base64::Engine as _;
+
+        let dir = temp_dir();
+        let path = dir.join("tai-lieu.docx");
+        //Byte không hợp lệ UTF-8 (0xFF) — chỉ đọc được qua đường nhị phân.
+        let payload: Vec<u8> = vec![0x50, 0x4b, 0x03, 0x04, 0xff, 0xfe, 0x00, 0x7f];
+        fs::write(&path, &payload).expect("ghi tệp");
+
+        let encoded =
+            document_read_binary(path.to_string_lossy().into_owned()).expect("đọc nhị phân");
+        assert_eq!(BASE64.decode(encoded).expect("giải mã"), payload);
+
         let _ = fs::remove_dir_all(dir);
     }
 }
