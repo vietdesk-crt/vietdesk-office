@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VietDesk Office — Bộ Nhận Diện Thương Hiệu: Bản Sáng & Bản Tối</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #121013;
+      --card-bg: #1B181D;
+      --card-border: #2C262F;
+      
+      --vn-red: #B8362F;
+      --vn-red-dark: #E2544B;
+      --vn-gold: #D49A42;
+      --vn-gold-dark: #FCE1A8;
+      
+      --text-main: #F4F2EE;
+      --text-muted: #A59F99;
+      --text-dim: #736D67;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Be Vietnam Pro', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text-main);
+      line-height: 1.6;
+      padding-bottom: 90px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* Header */
+    .header {
+      padding: 60px 0 40px;
+      text-align: center;
+      position: relative;
+      border-bottom: 1px solid var(--card-border);
+      background: radial-gradient(circle at 50% 20%, rgba(184, 54, 47, 0.16) 0%, transparent 60%);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      background: rgba(212, 154, 66, 0.12);
+      border: 1px solid rgba(212, 154, 66, 0.35);
+      color: var(--vn-gold-dark);
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 16px;
+    }
+
+    .header h1 {
+      font-size: 46px;
+      font-weight: 900;
+      letter-spacing: -1px;
+      margin-bottom: 14px;
+      background: linear-gradient(135deg, #FFF 40%, var(--vn-gold-dark) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .header p {
+      font-size: 17.5px;
+      color: var(--text-muted);
+      max-width: 720px;
+      margin: 0 auto;
+    }
+
+    /* Section */
+    .section {
+      margin-top: 52px;
+    }
+
+    .section-title {
+      font-size: 24px;
+      font-weight: 800;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .section-title::before {
+      content: '';
+      display: inline-block;
+      width: 4px;
+      height: 24px;
+      background: linear-gradient(to bottom, var(--vn-red), var(--vn-gold));
+      border-radius: 2px;
+    }
+
+    .section-desc {
+      color: var(--text-muted);
+      font-size: 15px;
+      margin-bottom: 28px;
+    }
+
+    /* Interactive Desktop Simulator */
+    .sim-container {
+      background: #0B0A0C;
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+      margin-top: 20px;
+    }
+
+    .sim-toolbar {
+      padding: 12px 20px;
+      background: #181519;
+      border-bottom: 1px solid #2B252E;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .sim-controls {
+      display: flex;
+      gap: 8px;
+    }
+
+    .sim-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+    .sim-dot.red { background: #FF5F56; }
+    .sim-dot.yellow { background: #FFBD2E; }
+    .sim-dot.green { background: #27C93F; }
+
+    .sim-theme-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 16px;
+      background: linear-gradient(135deg, var(--vn-red), #8C201A);
+      color: #FFF;
+      border: none;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(184, 54, 47, 0.4);
+      transition: all 0.2s ease;
+    }
+
+    .sim-theme-toggle:hover {
+      background: linear-gradient(135deg, #D44A42, var(--vn-red));
+      transform: translateY(-1px);
+    }
+
+    /* Simulated Window */
+    .sim-app-window {
+      transition: background 0.3s ease, color 0.3s ease;
+    }
+
+    .sim-app-window[data-theme="light"] {
+      --w-bg: #F6F6F4;
+      --w-panel: #FFFFFF;
+      --w-panel-alt: #FBFBFA;
+      --w-border: #DCDCD7;
+      --w-text: #1C1C1A;
+      --w-muted: #6B6B64;
+      --w-accent: #B8362F;
+      --w-card-bg: #FFFFFF;
+    }
+
+    .sim-app-window[data-theme="dark"] {
+      --w-bg: #161416;
+      --w-panel: #1E1B1E;
+      --w-panel-alt: #262226;
+      --w-border: #352F36;
+      --w-text: #ECECEA;
+      --w-muted: #9A9A94;
+      --w-accent: #E2544B;
+      --w-card-bg: #201D21;
+    }
+
+    .sim-app-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 10px 20px;
+      background: var(--w-panel);
+      border-bottom: 1px solid var(--w-border);
+    }
+
+    .sim-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 15px;
+      color: var(--w-text);
+    }
+
+    .sim-brand-mark {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: var(--w-panel-alt);
+      border: 1px solid var(--w-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .sim-crumb {
+      font-size: 12px;
+      color: var(--w-muted);
+    }
+
+    .sim-core-badge {
+      margin-left: auto;
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--w-border);
+      color: var(--w-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .sim-core-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #27C93F;
+    }
+
+    .sim-body {
+      display: flex;
+      min-height: 440px;
+      background: var(--w-bg);
+      color: var(--w-text);
+    }
+
+    .sim-rail {
+      width: 64px;
+      background: var(--w-panel);
+      border-right: 1px solid var(--w-border);
+      padding: 16px 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .sim-rail-item {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--w-muted);
+      cursor: pointer;
+    }
+
+    .sim-rail-item.active {
+      background: rgba(184, 54, 47, 0.12);
+      color: var(--w-accent);
+      font-weight: 700;
+    }
+
+    .sim-rail-item span.glyph {
+      font-size: 16px;
+      margin-bottom: 2px;
+    }
+
+    .sim-main {
+      flex: 1;
+      padding: 36px 48px;
+    }
+
+    .sim-hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .sim-hero-title {
+      font-size: 28px;
+      font-weight: 800;
+      margin-bottom: 8px;
+      color: var(--w-text);
+    }
+
+    .sim-hero-lead {
+      color: var(--w-muted);
+      font-size: 14.5px;
+      margin-bottom: 28px;
+      max-width: 600px;
+    }
+
+    .sim-cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+
+    .sim-card {
+      background: var(--w-card-bg);
+      border: 1px solid var(--w-border);
+      border-radius: 14px;
+      padding: 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .sim-card:hover {
+      border-color: var(--w-accent);
+      transform: translateY(-2px);
+    }
+
+    .sim-card-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: 900;
+      margin-bottom: 12px;
+    }
+    .sim-card-icon.writer { background: rgba(184, 54, 47, 0.15); color: #B8362F; }
+    .sim-card-icon.sheets { background: rgba(39, 201, 63, 0.15); color: #27C93F; }
+    .sim-card-icon.slides { background: rgba(212, 154, 66, 0.15); color: #D49A42; }
+
+    .sim-card-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      color: var(--w-text);
+    }
+
+    .sim-card-desc {
+      font-size: 12.5px;
+      color: var(--w-muted);
+    }
+
+    /* Duo Grid: Light vs Dark */
+    .duo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(440px, 1fr));
+      gap: 32px;
+    }
+
+    .theme-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35);
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+
+    .theme-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(212, 154, 66, 0.5);
+    }
+
+    .preview-box {
+      height: 300px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 32px;
+      position: relative;
+    }
+
+    .preview-box.paper {
+      background: #EDE8DE;
+      border-bottom: 1px solid #DCD5C5;
+    }
+
+    .preview-box.dark {
+      background: #0A080A;
+      border-bottom: 1px solid #231E26;
+    }
+
+    .preview-box img {
+      max-width: 220px;
+      max-height: 220px;
+      width: 100%;
+      height: auto;
+      filter: drop-shadow(0 14px 28px rgba(0,0,0,0.3));
+    }
+
+    .card-body {
+      padding: 24px 28px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .theme-badge {
+      display: inline-block;
+      align-self: flex-start;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+    }
+
+    .theme-badge.light {
+      background: #E8E0D0;
+      color: #6B4E1B;
+    }
+
+    .theme-badge.dark {
+      background: #2D231E;
+      color: #FCE1A8;
+      border: 1px solid rgba(252, 225, 168, 0.3);
+    }
+
+    .card-title {
+      font-size: 20px;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+
+    .card-text {
+      color: var(--text-muted);
+      font-size: 14.5px;
+      margin-bottom: 18px;
+      flex: 1;
+    }
+
+    .feature-list {
+      background: #141116;
+      border: 1px solid #241F28;
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      font-size: 13.5px;
+    }
+
+    .feature-list li {
+      list-style-type: none;
+      margin-bottom: 6px;
+      display: flex;
+      gap: 8px;
+    }
+
+    .feature-list li:last-child {
+      margin-bottom: 0;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 13.5px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      background: linear-gradient(135deg, var(--vn-red), #8C201A);
+      color: #FFF;
+      border: none;
+    }
+
+    .btn:hover {
+      background: linear-gradient(135deg, #D44A42, var(--vn-red));
+      box-shadow: 0 4px 12px rgba(184, 54, 47, 0.4);
+    }
+
+    /* Wordmark showcase */
+    .wordmark-container {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      margin-top: 16px;
+    }
+
+    .wordmark-item {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 24px 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .wordmark-stage {
+      padding: 28px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .wordmark-stage.light {
+      background: #F8F6F0;
+      border: 1px solid #E5DEC9;
+    }
+
+    .wordmark-stage.dark {
+      background: #141116;
+      border: 1px solid #28212C;
+    }
+
+    .wordmark-stage img {
+      max-width: 560px;
+      width: 100%;
+      height: auto;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="container">
+      <div class="badge">🇻🇳 Bộ Nhận Diện Hoàn Chỉnh · Hai Chế Độ</div>
+      <h1>VIETDESK OFFICE</h1>
+      <p>Biểu trưng chính thức (Phương án 1 - Dải Lụa Chữ V) đã được tích hợp đầy đủ vào giao diện desktop với nút chuyển nhanh <strong>Chế độ Sáng / Chế độ Tối</strong>.</p>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <!-- Interactive Desktop Simulator -->
+    <section class="section">
+      <h2 class="section-title">Trải Nghiệm Trực Quan Trên Giao Diện Desktop (Live Simulator)</h2>
+      <p class="section-desc">Bấm nút chuyển đổi chế độ để quan sát biểu trưng VietDesk và toàn bộ cửa sổ ứng dụng tự động đổi màu.</p>
+
+      <div class="sim-container">
+        <!-- Control bar -->
+        <div class="sim-toolbar">
+          <div class="sim-controls">
+            <span class="sim-dot red"></span>
+            <span class="sim-dot yellow"></span>
+            <span class="sim-dot green"></span>
+          </div>
+          <button type="button" class="sim-theme-toggle" id="toggleThemeBtn">
+            <span id="themeBtnIcon">🌙</span>
+            <span id="themeBtnText">Bấm để đổi sang Giao diện Tối</span>
+          </button>
+        </div>
+
+        <!-- Simulated Window -->
+        <div class="sim-app-window" id="appWindow" data-theme="light">
+          <!-- Window Header / Titlebar -->
+          <div class="sim-app-header">
+            <div class="sim-brand">
+              <div class="sim-brand-mark" id="brandMark">
+                <!-- SVG Logo Mark -->
+                <svg viewBox="0 0 512 512" width="20" height="20" fill="none" id="simLogoSvg">
+                  <g transform="translate(0, 10)">
+                    <path d="M 121,120 C 136,120 171,150 191,210 C 211,270 231,355 256,395 C 231,375 181,290 151,220 C 131,175 111,135 121,120 Z" fill="#C24138" class="sim-c-red" />
+                    <path d="M 121,120 C 151,108 196,130 216,185 C 234,235 246,325 256,395 C 241,340 218,245 186,185 C 164,145 136,124 121,120 Z" fill="#B8362F" opacity="0.85" />
+                    <path d="M 256,395 C 276,345 311,255 351,185 C 378,140 404,120 391,120 C 376,120 351,145 326,195 C 296,255 271,335 256,395 Z" fill="#D49A42" class="sim-c-gold" />
+                    <path d="M 256,395 C 282,335 331,235 381,160 C 401,130 416,128 408,135 C 386,155 341,250 288,340 C 271,368 261,385 256,395 Z" fill="#FCE1A8" opacity="0.85" />
+                    <polygon points="331,105 337,119 351,119 340,127 344,142 331,133 318,142 322,127 311,119 325,119" fill="#D49A42" class="sim-c-gold" />
+                    <circle cx="256" cy="395" r="5" fill="#D49A42" class="sim-c-gold" />
+                  </g>
+                </svg>
+              </div>
+              <span>VietDesk</span>
+            </div>
+            <span class="sim-crumb">Trang chủ</span>
+            <div class="sim-core-badge">
+              <span class="sim-core-dot"></span>
+              <span>Lõi C++ v0.1</span>
+            </div>
+          </div>
+
+          <!-- Window Body -->
+          <div class="sim-body">
+            <!-- App Rail -->
+            <div class="sim-rail">
+              <div class="sim-rail-item active">
+                <span class="glyph">⌂</span>
+                <span>Home</span>
+              </div>
+              <div class="sim-rail-item">
+                <span class="glyph">W</span>
+                <span>Writer</span>
+              </div>
+              <div class="sim-rail-item">
+                <span class="glyph">S</span>
+                <span>Sheets</span>
+              </div>
+              <div class="sim-rail-item">
+                <span class="glyph">P</span>
+                <span>Slides</span>
+              </div>
+            </div>
+
+            <!-- Home Content -->
+            <div class="sim-main">
+              <div class="sim-hero-badge">
+                <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: var(--w-accent);">VIETDESK OFFICE</span>
+                <span style="font-size: 12px; color: var(--w-muted);">· Bản sắc Việt</span>
+              </div>
+              <h2 class="sim-hero-title">Hôm nay bạn muốn soạn gì?</h2>
+              <p class="sim-hero-lead">Một không gian chung cho văn bản, bảng tính và trình chiếu — đầy đủ tiếng Việt, chuẩn văn bản hành chính.</p>
+
+              <!-- Cards -->
+              <div class="sim-cards">
+                <div class="sim-card">
+                  <div class="sim-card-icon writer">W</div>
+                  <div class="sim-card-title">Văn bản</div>
+                  <div class="sim-card-desc">Công văn, quyết định — chuẩn NĐ30.</div>
+                </div>
+                <div class="sim-card">
+                  <div class="sim-card-icon sheets">S</div>
+                  <div class="sim-card-title">Bảng tính</div>
+                  <div class="sim-card-desc">Bảng lương, dự toán, số tiền VND.</div>
+                </div>
+                <div class="sim-card">
+                  <div class="sim-card-icon slides">P</div>
+                  <div class="sim-card-title">Trình chiếu</div>
+                  <div class="sim-card-desc">Bài giảng, báo cáo tỷ lệ 16:9.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section: App Icons -->
+    <section class="section">
+      <h2 class="section-title">Biểu Tượng Ứng Dụng (App Icons Sáng / Tối)</h2>
+      <div class="duo-grid">
+        <!-- Light Mode Icon -->
+        <article class="theme-card">
+          <div class="preview-box paper">
+            <img src="vietdesk-app-icon-light.svg" alt="VietDesk App Icon Light Mode" />
+          </div>
+          <div class="card-body">
+            <span class="theme-badge light">☀️ Nền Sáng · Giấy Dó Mộc</span>
+            <h3 class="card-title">Bản Sáng (Light Mode Icon)</h3>
+            <p class="card-text">Nền ngà ấm (#F8F6F0) mô phỏng trang giấy Dó truyền thống, giúp dịu mắt và giảm mỏi thị giác.</p>
+            <a href="vietdesk-app-icon-light.svg" download class="btn">Tải SVG Bản Sáng</a>
+          </div>
+        </article>
+
+        <!-- Dark Mode Icon -->
+        <article class="theme-card">
+          <div class="preview-box dark">
+            <img src="vietdesk-app-icon-dark.svg" alt="VietDesk App Icon Dark Mode" />
+          </div>
+          <div class="card-body">
+            <span class="theme-badge dark">🌙 Nền Tối · Cánh Gián Sơn Mài</span>
+            <h3 class="card-title">Bản Tối (Dark Mode Icon)</h3>
+            <p class="card-text">Nền gỗ mun / cánh gián sâu thẳm (#141116) với dải lụa chữ V phát quang dịu nhẹ, sang trọng trên màn OLED.</p>
+            <a href="vietdesk-app-icon-dark.svg" download class="btn">Tải SVG Bản Tối</a>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- Section: Horizontal Wordmarks -->
+    <section class="section">
+      <h2 class="section-title">Logo Ngang Kèm Chữ (Wordmark)</h2>
+      <div class="wordmark-container">
+        <div class="wordmark-item">
+          <span class="theme-badge light">Bản Nền Sáng</span>
+          <div class="wordmark-stage light">
+            <img src="vietdesk-logo-refined-horizontal.svg" alt="VietDesk Wordmark Light" />
+          </div>
+        </div>
+
+        <div class="wordmark-item">
+          <span class="theme-badge dark">Bản Nền Tối</span>
+          <div class="wordmark-stage dark">
+            <img src="vietdesk-logo-refined-horizontal-dark.svg" alt="VietDesk Wordmark Dark" />
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    const appWindow = document.getElementById('appWindow');
+    const toggleBtn = document.getElementById('toggleThemeBtn');
+    const btnIcon = document.getElementById('themeBtnIcon');
+    const btnText = document.getElementById('themeBtnText');
+
+    let currentTheme = 'light';
+
+    toggleBtn.addEventListener('click', () => {
+      currentTheme = currentTheme === 'light' ? 'dark' : 'light';
+      appWindow.setAttribute('data-theme', currentTheme);
+      
+      if (currentTheme === 'dark') {
+        btnIcon.textContent = '☀️';
+        btnText.textContent = 'Bấm để đổi sang Giao diện Sáng';
+        // Adjust SVG colors for dark mode
+        document.querySelectorAll('.sim-c-red').forEach(el => el.setAttribute('fill', '#E2544B'));
+        document.querySelectorAll('.sim-c-gold').forEach(el => el.setAttribute('fill', '#FCE1A8'));
+      } else {
+        btnIcon.textContent = '🌙';
+        btnText.textContent = 'Bấm để đổi sang Giao diện Tối';
+        // Adjust SVG colors for light mode
+        document.querySelectorAll('.sim-c-red').forEach(el => el.setAttribute('fill', '#C24138'));
+        document.querySelectorAll('.sim-c-gold').forEach(el => el.setAttribute('fill', '#D49A42'));
+      }
+    });
+  </script>
+
+</body>
+</html>

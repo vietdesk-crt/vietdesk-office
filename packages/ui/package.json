@@ -1,0 +1,14 @@
+{
+  "name": "@vietdesk/ui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./tokens.css": "./src/tokens.css"
+  },
+  "sideEffects": ["*.css"],
+  "peerDependencies": {
+    "react": "^18.3.1"
+  }
+}

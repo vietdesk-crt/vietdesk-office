@@ -1,0 +1,13 @@
+{
+  "name": "@vietdesk/ipc-contract",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.1.1",
+    "@tauri-apps/plugin-dialog": "^2.0.1"
+  }
+}

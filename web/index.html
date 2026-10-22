@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VietDesk Office — Bộ văn phòng miễn phí cho người Việt</title>
+  <meta name="description" content="Viết văn bản, làm bảng tính, soạn slide — tất cả trong một ứng dụng miễn phí, nhẹ và dễ dùng cho người Việt. Không quảng cáo, không cần mạng, dữ liệu nằm trên máy bạn." />
+  <meta property="og:title" content="VietDesk Office — Bộ văn phòng miễn phí cho người Việt" />
+  <meta property="og:description" content="Viết văn bản, làm bảng tính, soạn slide ngay trên máy tính. Miễn phí, nhẹ, không quảng cáo." />
+  <meta property="og:type" content="website" />
+  <link rel="icon" type="image/svg+xml" href="assets/icon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <div class="scroll-progress" id="scroll-progress" aria-hidden="true"></div>
+
+  <header class="nav" id="top">
+    <div class="container nav-inner">
+      <a class="nav-brand" href="#top" aria-label="VietDesk Office — về đầu trang">
+        <img src="assets/icon.svg" alt="" width="44" height="44" />
+        <span class="brand-text" aria-hidden="true"><span class="brand-viet">Viet</span><span class="brand-desk">Desk</span></span>
+      </a>
+      <nav class="nav-links" id="nav-links" aria-label="Điều hướng chính">
+        <a href="#ung-dung">Làm được gì</a>
+        <a href="#uu-diem">Ưu điểm</a>
+        <a href="#cau-hoi">Câu hỏi</a>
+        <a href="#tai-xuong">Tải xuống</a>
+      </nav>
+      <div class="nav-actions">
+        <a class="btn btn-primary" href="#tai-xuong">Dùng miễn phí</a>
+      </div>
+      <button class="nav-toggle" id="nav-toggle" aria-expanded="false" aria-controls="nav-links" aria-label="Mở menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ============ HERO ============ -->
+    <section class="hero">
+      <div class="hero-glow" aria-hidden="true"></div>
+      <div class="container hero-inner">
+        <p class="hero-badge">
+          <span class="dot" aria-hidden="true"></span>
+          Miễn phí · Không quảng cáo · Không cần đăng ký
+        </p>
+        <h1>Viết, tính toán, thuyết trình —<br /><span class="accent">miễn phí cho người Việt</span></h1>
+        <p class="hero-sub">
+          VietDesk là bộ văn phòng gồm <strong>Writer</strong> (viết văn bản),
+          <strong>Sheets</strong> (bảng tính) và <strong>Slides</strong> (slide thuyết trình),
+          gói gọn trong một ứng dụng duy nhất trên máy tính của bạn.
+          Mở là làm việc ngay — không tốn tiền, không quảng cáo, không cần Internet.
+        </p>
+        <div class="hero-cta">
+          <a class="btn btn-primary btn-lg" href="#tai-xuong">Dùng thử miễn phí</a>
+          <a class="btn btn-outline btn-lg" href="#ung-dung">Xem làm được gì</a>
+        </div>
+        <ul class="trust-chips" aria-label="Cam kết với người dùng">
+          <li>Miễn phí 100%</li>
+          <li>Không quảng cáo</li>
+          <li>Không cần mạng</li>
+          <li>Dữ liệu nằm trên máy bạn</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ============ APPS ============ -->
+    <section class="section" id="ung-dung">
+      <div class="container">
+        <p class="eyebrow">Ba việc hằng ngày, một ứng dụng duy nhất</p>
+        <h2>Bạn cần làm gì, VietDesk đều có sẵn</h2>
+        <p class="section-sub">
+          Không phải cài ba phần mềm riêng lẻ. Mở VietDesk, chọn việc bạn cần làm — xong.
+        </p>
+        <div class="card-grid reveal">
+          <article class="app-card">
+            <div class="app-icon app-icon-writer" aria-hidden="true">W</div>
+            <h3>Writer</h3>
+            <p class="app-tagline">Viết văn bản</p>
+            <p>
+              Soạn thư, báo cáo, bài luận… với những thao tác quen thuộc:
+              in đậm, in nghiêng, chia tiêu đề. Viết xong lưu lại để làm tiếp lúc khác.
+            </p>
+          </article>
+          <article class="app-card">
+            <div class="app-icon app-icon-sheets" aria-hidden="true">S</div>
+            <h3>Sheets</h3>
+            <p class="app-tagline">Làm bảng tính</p>
+            <p>
+              Nhập điểm, chi tiêu, số liệu công việc… rồi để máy tự tính:
+              cộng, trừ, nhân, chia, tính tổng, trung bình — vài cú nhấp chuột.
+            </p>
+          </article>
+          <article class="app-card">
+            <div class="app-icon app-icon-slides" aria-hidden="true">P</div>
+            <h3>Slides</h3>
+            <p class="app-tagline">Soạn slide</p>
+            <p>
+              Tạo bài thuyết trình theo từng trang, khung hình chuẩn 16:9
+              để trình chiếu lên máy chiếu hay màn hình lớn.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ BENEFITS ============ -->
+    <section class="section section-alt" id="uu-diem">
+      <div class="container">
+        <p class="eyebrow">Ưu điểm</p>
+        <h2>Vì sao nên dùng VietDesk</h2>
+        <div class="feature-grid reveal">
+          <div class="feature">
+            <div class="feature-icon" aria-hidden="true">✓</div>
+            <h3>Miễn phí trọn đời</h3>
+            <p>Không mất tiền bản quyền, không gói thuê bao, không quảng cáo chen giữa công việc của bạn.</p>
+          </div>
+          <div class="feature">
+            <div class="feature-icon" aria-hidden="true">✓</div>
+            <h3>Nhẹ, không ì máy</h3>
+            <p>Ứng dụng nhỏ gọn, khởi động nhanh. Máy tính cấu hình khiêm tốn vẫn dùng thoải mái.</p>
+          </div>
+          <div class="feature">
+            <div class="feature-icon" aria-hidden="true">✓</div>
+            <h3>Không cần Internet</h3>
+            <p>Mọi thứ chạy ngay trên máy bạn. Mất mạng, đi công tác xa — công việc vẫn trôi chảy.</p>
+          </div>
+          <div class="feature">
+            <div class="feature-icon" aria-hidden="true">✓</div>
+            <h3>Hiểu tiếng Việt</h3>
+            <p>Giao diện tiếng Việt, được xây dựng cho người Việt ngay từ đầu: hỗ trợ chuẩn hóa dấu và tìm kiếm không cần gõ đủ dấu.</p>
+          </div>
+          <div class="feature">
+            <div class="feature-icon" aria-hidden="true">✓</div>
+            <h3>Dữ liệu thuộc về bạn</h3>
+            <p>Tài liệu của bạn nằm ngay trên máy tính, không tự động bị gửi lên bất kỳ "đám mây" nào.</p>
+          </div>
+          <div class="feature">
+            <div class="feature-icon" aria-hidden="true">✓</div>
+            <h3>Không cần học lại</h3>
+            <p>Cách dùng quen thuộc như những phần mềm văn phòng bạn từng biết: gõ chữ, đánh công thức, tạo slide.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ FOR WHOM ============ -->
+    <section class="section" id="danh-cho-ai">
+      <div class="container">
+        <p class="eyebrow">Dành cho ai</p>
+        <h2>Ai cũng dùng được</h2>
+        <div class="who-grid reveal">
+          <div class="who-card">
+            <h3>Học sinh &amp; sinh viên</h3>
+            <p>Viết bài luận, làm bài tập, chuẩn bị slide thuyết trình môn học — không tốn một đồng nào.</p>
+          </div>
+          <div class="who-card">
+            <h3>Nhân viên văn phòng</h3>
+            <p>Báo cáo, bảng biểu, slide họp hằng ngày mà không phải lo bản quyền hay quảng cáo.</p>
+          </div>
+          <div class="who-card">
+            <h3>Cơ quan &amp; tổ chức</h3>
+            <p>Mã nguồn mở, chạy trong nội bộ, tài liệu không rời khỏi cơ quan của bạn.</p>
+          </div>
+          <div class="who-card">
+            <h3>Bạn chỉ cần công cụ đơn giản</h3>
+            <p>Mở ứng dụng là làm việc ngay. Không rườm rà, không cài đặt phức tạp.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ FAQ ============ -->
+    <section class="section section-alt" id="cau-hoi">
+      <div class="container container-narrow">
+        <p class="eyebrow">Câu hỏi thường gặp</p>
+        <h2>Thắc mắc của bạn</h2>
+        <div class="faq-list reveal">
+          <details class="faq-item">
+            <summary>VietDesk có thật sự miễn phí không?</summary>
+            <p class="faq-a">Có. VietDesk là phần mềm mã nguồn mở với giấy phép MIT — bạn dùng hoàn toàn miễn phí, kể cả phục vụ công việc, không có bản "trả phí ẩn" hay giới hạn tính năng.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Có mở được file Word, Excel, PowerPoint không?</summary>
+            <p class="faq-a">Tính năng này đang được xây dựng. Bản hiện tại cho phép soạn và lưu tài liệu riêng của VietDesk; việc đọc và lưu file <strong>.docx</strong>, <strong>.xlsx</strong>, <strong>.pptx</strong> là mục tiêu kế tiếp và tiến độ được cập nhật công khai trên GitHub.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Chạy trên máy tính nào?</summary>
+            <p class="faq-a">Hiện hỗ trợ <strong>Windows</strong> và <strong>Linux</strong>. Ứng dụng được thiết kế nhẹ nên máy cấu hình không mạnh vẫn dùng tốt.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Có phải đăng ký tài khoản không?</summary>
+            <p class="faq-a">Không. Cài vào máy là dùng ngay — không đăng ký, không đăng nhập, không xin thông tin cá nhân.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Tài liệu của tôi có bị gửi đi đâu không?</summary>
+            <p class="faq-a">Không. VietDesk làm việc hoàn toàn trên máy bạn: tài liệu lưu trong máy, không tự động tải lên dịch vụ nào. Bạn toàn quyền kiểm soát dữ liệu của mình.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ DOWNLOAD ============ -->
+    <section class="section" id="tai-xuong">
+      <div class="container container-narrow">
+        <p class="eyebrow">Bắt đầu</p>
+        <h2>Dùng thử VietDesk ngay hôm nay</h2>
+        <p class="section-sub">
+          VietDesk đang ở giai đoạn đầu nên chưa có file cài đặt chỉ với một cú nhấp chuột.
+          Hôm nay bạn có thể chạy thử từ mã nguồn (khoảng 10 phút, cần một chút kiến thức kỹ thuật),
+          hoặc theo dõi dự án để nhận thông báo khi bản cài đặt chính thức ra mắt.
+        </p>
+        <div class="hero-cta dl-cta reveal">
+          <a class="btn btn-primary btn-lg" href="https://github.com/vietdesk-crt/vietdesk-office#readme" target="_blank" rel="noopener">Hướng dẫn chạy thử</a>
+          <a class="btn btn-outline btn-lg" href="https://github.com/vietdesk-crt/vietdesk-office" target="_blank" rel="noopener">Theo dõi trên GitHub</a>
+        </div>
+
+        <details class="dev-block reveal">
+          <summary>Bạn rành kỹ thuật? Xem lệnh chạy nhanh</summary>
+          <div class="code-block">
+            <div class="code-head">
+              <span class="code-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span>terminal</span>
+              <button class="copy-btn" data-copy="git clone https://github.com/vietdesk-crt/vietdesk-office.git&#10;cd vietdesk-office&#10;npm install&#10;npm run tauri dev" aria-label="Sao chép lệnh">Sao chép</button>
+            </div>
+            <pre><code>git clone https://github.com/vietdesk-crt/vietdesk-office.git
+cd vietdesk-office
+npm install
+npm run tauri dev</code></pre>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <!-- ============ CTA ============ -->
+    <section class="cta">
+      <div class="container cta-inner reveal">
+        <h2>Một bộ văn phòng của người Việt</h2>
+        <p>Miễn phí, nhẹ, tôn trọng dữ liệu của bạn. Hãy dùng thử và góp ý để VietDesk tốt hơn mỗi ngày.</p>
+        <div class="hero-cta">
+          <a class="btn btn-light btn-lg" href="https://github.com/vietdesk-crt/vietdesk-office" target="_blank" rel="noopener">Dùng thử miễn phí</a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <span class="footer-logo">
+          <img src="assets/icon.svg" alt="" width="38" height="38" />
+          <span class="brand-text brand-text-light" aria-hidden="true"><span class="brand-viet">Viet</span><span class="brand-desk">Desk</span></span>
+        </span>
+        <p>Bộ văn phòng miễn phí cho người Việt.<br />Writer · Sheets · Slides.</p>
+      </div>
+      <nav class="footer-links" aria-label="Liên kết chân trang">
+        <a href="https://github.com/vietdesk-crt/vietdesk-office" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/vietdesk-crt/vietdesk-office/blob/main/LICENSE" target="_blank" rel="noopener">Giấy phép MIT</a>
+        <a href="https://github.com/vietdesk-crt/vietdesk-office/blob/main/ARCHITECTURE.md" target="_blank" rel="noopener">Dành cho lập trình viên</a>
+      </nav>
+    </div>
+    <p class="footer-copy">© 2026 VietDesk. Miễn phí mãi mãi, phát hành theo giấy phép MIT.</p>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Deep Warm Lacquer Dark Background -->
+    <radialGradient id="darkBgGrad" cx="50%" cy="35%" r="75%">
+      <stop offset="0%" stop-color="#241E21"/>
+      <stop offset="60%" stop-color="#161315"/>
+      <stop offset="100%" stop-color="#0E0C0D"/>
+    </radialGradient>
+
+    <!-- Glowing Cinnabar Son Mai Gradient (Refined for Dark Mode) -->
+    <linearGradient id="darkRibbonRed" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#D94B42"/>
+      <stop offset="50%" stop-color="#BA332B"/>
+      <stop offset="100%" stop-color="#8C1F1A"/>
+    </linearGradient>
+
+    <!-- Warm Lustrous Antique Gold Gradient (Refined for Dark Mode) -->
+    <linearGradient id="darkRibbonGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F5CE82"/>
+      <stop offset="50%" stop-color="#DDA046"/>
+      <stop offset="100%" stop-color="#B2782A"/>
+    </linearGradient>
+
+    <!-- Translucent Overlay for Intersecting Folds -->
+    <linearGradient id="darkGoldSheen" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFE8B5" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#DDA046" stop-opacity="0.8"/>
+    </linearGradient>
+
+    <!-- Soft Ambient Warm Rim Filter -->
+    <filter id="darkGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#000000" flood-opacity="0.55"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="6" flood-color="#D94B42" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+
+  <!-- Dark App Icon Container: Dáng bo mềm mại, viền vàng đồng siêu mảnh -->
+  <rect width="512" height="512" rx="104" fill="url(#darkBgGrad)"/>
+  <rect width="510" height="510" x="1" y="1" rx="103" fill="none" stroke="#DDA046" stroke-width="1.2" stroke-opacity="0.25"/>
+
+  <!-- Main Harmonious Ribbon Group (Dark Theme) -->
+  <g filter="url(#darkGlow)" transform="translate(256, 260)">
+    
+    <!-- Left Stem: Lacquer Calligraphic Wing (Đỏ Son Mài Dịu Ánh Lửa) -->
+    <path d="M -135,-140 C -120,-140 -85,-110 -65,-50 C -45,10 -25,95 0,135 C -25,115 -75,30 -105,-40 C -125,-85 -145,-125 -135,-140 Z" 
+          fill="url(#darkRibbonRed)"/>
+    
+    <!-- Left Accompanying Feather Curve -->
+    <path d="M -135,-140 C -105,-152 -60,-130 -40,-75 C -22,-25 -10,65 0,135 C -15,80 -38,-15 -70,-75 C -92,-115 -120,-136 -135,-140 Z" 
+          fill="#C73E36" opacity="0.85"/>
+
+    <!-- Right Stem: Flowing Document Pages / Golden Wing (Vàng Quỳ Ấm Áp) -->
+    <path d="M 0,135 C 20,85 55,-5 95,-75 C 122,-120 148,-140 135,-140 C 120,-140 95,-115 70,-65 C 40,-5 15,75 0,135 Z" 
+          fill="url(#darkRibbonGold)"/>
+
+    <!-- Right Primary Sheet (Trang giấy mở rộng bắt sáng) -->
+    <path d="M 0,135 C 26,75 75,-25 125,-100 C 145,-130 160,-132 152,-125 C 130,-105 85,-10 32,80 C 15,108 5,125 0,135 Z" 
+          fill="url(#darkGoldSheen)"/>
+
+    <!-- Harmonious Five-Pointed Star: Warm Champagne Tint -->
+    <g transform="translate(75, -135) scale(0.72)">
+      <polygon points="0,-28 8.2,-8.5 26.6,-8.5 11.8,2.1 17.5,22.6 0,9.9 -17.5,22.6 -11.8,2.1 -26.6,-8.5 -8.2,-8.5"
+               fill="#F5CE82"/>
+      <polygon points="0,-28 0,9.9 17.5,22.6" fill="#FFF2D4" opacity="0.45"/>
+    </g>
+
+    <!-- Base Jewel Dot -->
+    <circle cx="0" cy="135" r="5" fill="#F5CE82"/>
+  </g>
+</svg>

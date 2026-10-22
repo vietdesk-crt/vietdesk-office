@@ -2,6 +2,23 @@
 **Dự án: VietDesk Office Suite**  
 *Mục tiêu tài liệu: Mô tả 100% sơ đồ hệ thống, cấu trúc các khối và các luồng đi logic (Logic Flows) từ Cơ bản đến Cửa cuối mà không dùng code lập trình.*
 
+> **Ghi chú triển khai (2026-10) — đọc trước khi đối chiếu với mã nguồn**
+>
+> Tài liệu này là **bản thiết kế mục tiêu**, không phải mô tả mã nguồn hiện tại.
+> Stack đã chốt để hiện thực hoá:
+> - **UI:** Tauri 2 + React/TypeScript (`desktop/`, gồm `src/editors/writer`, `src/editors/sheets`, `src/editors/slides`).
+> - **Lõi tính toán:** C++17 trong `native/core/`, phơi ra C ABI
+>   (`native/core/include/vietdesk/core.h`).
+> - **Rust:** chỉ là lớp cầu nối (`native/core-bridge`, command Tauri), **không**
+>   chứa nghiệp vụ.
+> - Các khối ghi "WASM" trong sơ đồ (chuyển mã, kiểm tra chính tả) sẽ chạy
+>   **native trong C++** ở bản desktop; WASM chỉ dùng nếu sau này mở bản web.
+> - Phân trang A4, OOXML và bảng mã nằm ở `native/core/modules/*` và hiện
+>   là placeholder có hợp đồng dữ liệu — xem `README.md` mục "Trạng thái".
+> - Engine công thức đã chạy trong C++ (`src/formula/`), UI gọi qua
+>   `sheet_compute`; bản TypeScript chỉ còn là fallback cho trình duyệt.
+
+
 ---
 
 ## MỤC LỤC TỔNG THỂ
@@ -129,7 +146,7 @@ flowchart LR
 ---
 
 ### Luồng 1.3: Ghi đĩa Nguyên tử (Atomic Local Save - Chống Hỏng File)
-*Mục đích: Không bao giờ ghi đè trực tiếp lên file đang mở. Nếu đang ghi mà máy sập nguồn, file gốc vẫn nguyên vẹn.*
+*Mục đích: Không bao giờ ghi đè trực tiếp lên file đang mở. Nếu đang ghi mà máy sập nguồn, file gốc vẫn nguyên vẹn. Đã hiện thực trong `desktop/src-tauri/src/document.rs`.*
 
 ```mermaid
 sequenceDiagram
@@ -141,11 +158,11 @@ sequenceDiagram
 
     User->>Editor: Bấm Ctrl+S (Lưu tài liệu)
     Editor->>Editor: Tạo bản sao bất biến (Snapshot JSON) của cây AST
-    Editor->>DiskService: Gửi chuỗi nhị phân cần lưu
-    DiskService->>Storage: 1. Tạo tệp tạm: `tailieu.docx.tmp`
+    Editor->>DiskService: Gửi chuỗi JSON của tệp `.vdx`
+    DiskService->>Storage: 1. Tạo tệp tạm: `tailieu.vdx.<pid>.tmp`
     DiskService->>Storage: 2. Ghi toàn bộ dữ liệu vào tệp `.tmp`
     DiskService->>Storage: 3. Lệnh OS Flush (`fsync`): Ép bộ nhớ đệm ghi xuống phiến đĩa
-    DiskService->>Storage: 4. Đổi tên nguyên tử (Atomic Rename): `tailieu.docx.tmp` -> `tailieu.docx`
+    DiskService->>Storage: 4. Đổi tên nguyên tử (Atomic Rename): `tailieu.vdx.<pid>.tmp` -> `tailieu.vdx`
     Note over Storage: Tệp gốc được thay thế trong 1 micro-giây! Không sợ mất dữ liệu.
     DiskService-->>Editor: Xác nhận lưu thành công (Success)
     Editor-->>User: Đổi trạng thái tiêu đề: "Đã lưu vào máy"

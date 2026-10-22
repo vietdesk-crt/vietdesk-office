@@ -1,0 +1,22 @@
+{
+  "name": "vietdesk-office",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Bộ ứng dụng văn phòng VietDesk — Writer, Sheets, Slides",
+  "type": "module",
+  "workspaces": [
+    "desktop",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @vietdesk/desktop",
+    "build": "npm run build --workspace @vietdesk/desktop",
+    "typecheck": "npm run typecheck --workspace @vietdesk/desktop",
+    "tauri": "npm run tauri --workspace @vietdesk/desktop",
+    "test": "npm run test --workspace @vietdesk/desktop",
+    "test:core": "node scripts/test-core.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

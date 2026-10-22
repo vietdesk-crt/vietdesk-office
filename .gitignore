@@ -23,58 +23,29 @@ yarn-error.log*
 pnpm-debug.log*
 .pnpm-store/
 
+# --- Rust ---
+target/
+
+# --- C++ / CMake ---
+native/core/build/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.lib
+*.pdb
+
 # --- Python ---
 __pycache__/
 *.py[cod]
 .venv/
 venv/
-env/
-.env/
-*.egg-info/
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.coverage
-htmlcov/
 
-# --- Java / JVM ---
-target/
-*.class
-*.jar
-.gradle/
-.gradle/**
-
-# --- .NET / C# ---
-bin/
-obj/
-*.user
-.vs/
-
-# --- Go ---
-bin/
-*.exe
-*.test
-*.out
-
-# --- Rust ---
-target/
-debug/
-release/
-
-# --- Environment & secrets ---
+# --- Môi trường & bí mật ---
 .env
 .env.*
 !.env.example
-*.pem
-*.key
-secrets/
-
-# --- Logs ---
-logs/
-*.log
-
-# --- Thùng rác tạm ---
-tmp/
-temp/
-*.bak
-*.tmp

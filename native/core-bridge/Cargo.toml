@@ -1,0 +1,15 @@
+[package]
+name = "vietdesk-core-bridge"
+version = "0.1.0"
+edition = "2021"
+description = "Cầu nối an toàn giữa Rust và lõi C++ VietDesk"
+license = "MIT"
+
+[dependencies]
+
+[build-dependencies]
+cc = "1.1"
+
+[lib]
+name = "vietdesk_core_bridge"
+path = "src/lib.rs"

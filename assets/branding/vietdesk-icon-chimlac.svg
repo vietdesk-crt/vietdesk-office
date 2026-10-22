@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#140608" />
+      <stop offset="50%" stop-color="#1f090d" />
+      <stop offset="100%" stop-color="#2a0b12" />
+    </linearGradient>
+
+    <!-- Crimson Primary Gradient -->
+    <linearGradient id="crimsonGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF334B" />
+      <stop offset="50%" stop-color="#DA251D" />
+      <stop offset="100%" stop-color="#8F0D15" />
+    </linearGradient>
+
+    <!-- Golden Sun Gradient -->
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFF082" />
+      <stop offset="35%" stop-color="#FFD000" />
+      <stop offset="75%" stop-color="#F59E0B" />
+      <stop offset="100%" stop-color="#D97706" />
+    </linearGradient>
+
+    <!-- Amber Glow Gradient -->
+    <linearGradient id="amberGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFE066" />
+      <stop offset="100%" stop-color="#FF4D4D" />
+    </linearGradient>
+
+    <!-- Soft Drop Shadow for Layers -->
+    <filter id="dropShadow" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.45" />
+    </filter>
+    <filter id="starGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- App Icon Squircle Container -->
+  <rect x="24" y="24" width="464" height="464" rx="108" fill="url(#bgGrad)" />
+  <rect x="24" y="24" width="464" height="464" rx="108" fill="none" stroke="url(#crimsonGrad)" stroke-width="2" stroke-opacity="0.4" />
+
+  <!-- Subtle Dong Son Bronze Drum Ring Watermark in Background -->
+  <g opacity="0.08" stroke="url(#goldGrad)" stroke-width="2" fill="none" transform="translate(256, 256)">
+    <circle r="190" stroke-dasharray="8 6" />
+    <circle r="160" />
+    <circle r="130" stroke-dasharray="4 8" />
+    <!-- 8 Sun Rays radiating outward -->
+    <path d="M 0,-190 L 0,-130 M 0,130 L 0,190 M -190,0 L -130,0 M 130,0 L 190,0 M -134,-134 L -92,-92 M 92,92 L 134,134 M -134,134 L -92,92 M 92,-92 L 134,-134" stroke-width="3" />
+  </g>
+
+  <!-- Central "V" Symbol - Chim Lạc Wings & Office Paper Sheets -->
+  <g filter="url(#dropShadow)">
+    <!-- Right Layer 3: Background Feather / Slide Presentation Card (Gold accent) -->
+    <path d="M 256,390 C 275,340 310,265 375,175 C 388,157 400,145 408,138 C 412,134 402,156 388,185 C 362,238 322,330 270,398 Z" 
+          fill="url(#goldGrad)" opacity="0.85" />
+
+    <!-- Right Layer 2: Middle Feather / Spreadsheets Sheet (Amber red to gold) -->
+    <path d="M 256,396 C 272,330 305,230 365,145 C 378,126 385,120 380,128 C 365,152 320,248 274,394 Z" 
+          fill="url(#amberGrad)" />
+
+    <!-- Left Wing: Majestic Chim Lạc Neck & Crest soaring into the letter 'V' -->
+    <path d="M 256,410 C 242,390 190,290 150,215 C 120,160 102,118 96,96 C 114,118 135,152 165,198 C 198,248 238,328 256,410 Z" 
+          fill="#B91C1C" />
+
+    <path d="M 256,410 C 240,365 195,260 148,172 C 124,128 102,95 96,96 C 92,97 105,125 125,170 C 160,250 220,355 256,410 Z" 
+          fill="url(#crimsonGrad)" />
+
+    <!-- Lac Bird Beak / Stylized Crown Accent -->
+    <path d="M 96,96 C 115,88 140,82 170,82 C 145,95 125,115 110,135 C 102,118 97,105 96,96 Z" 
+          fill="url(#goldGrad)" />
+
+    <!-- Right Wing Main Leaf / Document Fold (Crisp Modern Geometry) -->
+    <path d="M 256,410 C 278,360 326,245 380,150 C 352,215 310,310 278,390 C 270,398 262,406 256,410 Z" 
+          fill="url(#goldGrad)" />
+  </g>
+
+  <!-- Golden 5-Pointed Star (Vietnam National Pride & Excellence) -->
+  <g transform="translate(305, 120) scale(0.9)" filter="url(#starGlow)">
+    <!-- Star polygon (center at 0,0, radius 32) -->
+    <polygon points="0,-32 9.5,-9.8 30.4,-9.8 13.5,2.4 20,25.8 0,11.3 -20,25.8 -13.5,2.4 -30.4,-9.8 -9.5,-9.8" 
+             fill="url(#goldGrad)" />
+    <!-- Inner faceted star highlights for 3D premium look -->
+    <polygon points="0,-32 0,11.3 20,25.8" fill="#FFF399" opacity="0.4" />
+    <polygon points="0,-32 0,11.3 -20,25.8" fill="#D97706" opacity="0.3" />
+  </g>
+
+  <!-- Sleek Light Streak across the logo -->
+  <path d="M 120,60 L 392,60 C 440,60 452,80 452,120 L 452,140 C 400,100 280,80 120,60 Z" fill="#FFFFFF" opacity="0.04" />
+</svg>
