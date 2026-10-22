@@ -9,7 +9,9 @@
  * Hỗ trợ: + - * / ( ), tham chiếu ô, vùng ô, SUM / MIN / MAX / AVERAGE.
  */
 
-export type CellMap = Readonly<Record<string, string>>;
+import type { CellMap } from "./model";
+
+export type { CellMap } from "./model";
 
 export interface CellResult {
   /** Chuỗi hiển thị trong ô (đã định dạng theo vi-VN). */

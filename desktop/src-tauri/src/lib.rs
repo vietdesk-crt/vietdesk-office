@@ -8,6 +8,7 @@ use std::collections::HashMap;
 
 use vietdesk_core_bridge as core;
 
+mod asset;
 mod document;
 mod recent;
 
@@ -83,6 +84,8 @@ pub fn run() {
             recent::recent_store_path,
             document::document_read,
             document::document_write,
+            asset::asset_read_base64,
+            asset::asset_write,
         ])
         .run(tauri::generate_context!())
         .expect("không khởi động được VietDesk");

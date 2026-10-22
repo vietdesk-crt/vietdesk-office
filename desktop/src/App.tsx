@@ -9,8 +9,6 @@ import {
   forgetFile,
   hasNativeCore,
   isVietDeskDocument,
-  KIND_GLYPH,
-  KIND_LABEL,
   kindFromFileName,
   listRecentFiles,
   parseDocument,
@@ -30,24 +28,19 @@ import {
 import type {
   CoreInfo,
   DocumentEnvelope,
-  DocumentKind,
   RecentEntry,
 } from "@vietdesk/ipc-contract";
-import { SheetsEditor } from "./editors/sheets";
-import type { CellMap } from "./editors/sheets";
-import { createDefaultSlides, SlidesEditor } from "./editors/slides";
-import type { Slide } from "./editors/slides";
 import { AppRail, Ribbon } from "@vietdesk/ui";
 import type { RailItem, RibbonGroup } from "@vietdesk/ui";
-import { createEmptyWriterDocument, WriterEditor } from "./editors/writer";
 import { Moon, Sun } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { APP_IDS, APPS, appForKind } from "./apps";
+import type { AppId } from "./apps";
 import { downloadTextFile } from "./download";
 import { draftId, readDrafts, removeDraft, saveDraft } from "./drafts";
 import type { Draft } from "./drafts";
 import { fileNameFromPath } from "./format";
 import { Home } from "./Home";
-import type { CreatableKind } from "./Home";
 import { VietDeskLogo } from "./Logo";
 import { Settings } from "./Settings";
 import type { ThemePreference } from "./settings";
@@ -57,7 +50,6 @@ import {
   writeThemePreference,
 } from "./settings";
 
-type AppId = CreatableKind;
 type View = "home" | "settings" | AppId;
 
 interface DocState {
@@ -75,17 +67,15 @@ interface DocState {
   revision: number;
 }
 
-const APP_META: Record<AppId, { label: string; glyph: string; defaultName: string }> = {
-  writer: { label: "Writer", glyph: "W", defaultName: "Văn bản chưa đặt tên" },
-  sheets: { label: "Sheets", glyph: "S", defaultName: "Bảng tính chưa đặt tên" },
-  slides: { label: "Slides", glyph: "P", defaultName: "Trình chiếu chưa đặt tên" },
-};
+const APP_RAIL_ITEMS: RailItem[] = APP_IDS.map((id) => ({
+  id,
+  label: APPS[id].label,
+  glyph: APPS[id].glyph,
+}));
 
 const RAIL_ITEMS: RailItem[] = [
   { id: "home", label: "Trang chủ", glyph: "⌂" },
-  { id: "writer", label: "Writer", glyph: "W" },
-  { id: "sheets", label: "Sheets", glyph: "S" },
-  { id: "slides", label: "Slides", glyph: "P" },
+  ...APP_RAIL_ITEMS,
   { id: "settings", label: "Cài đặt", glyph: "⚙", separatorBefore: true },
 ];
 
@@ -97,85 +87,8 @@ const TOOL_LABELS: Record<ToolAction, string> = {
   diacritics: "Bỏ dấu",
 };
 
-function appForKind(kind: DocumentKind): AppId {
-  if (kind === "sheets") {
-    return "sheets";
-  }
-  if (kind === "slides") {
-    return "slides";
-  }
-  return "writer";
-}
-
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-/** Nội dung mặc định khi tạo tài liệu mới hoặc khi tệp thiếu nội dung hợp lệ. */
-function defaultContent(kind: AppId): unknown {
-  if (kind === "writer") {
-    return createEmptyWriterDocument();
-  }
-  if (kind === "sheets") {
-    return { cells: {} };
-  }
-  return { slides: createDefaultSlides() };
-}
-
-/**
- * Chuẩn hoá nội dung đọc từ `.vdx` về đúng dạng mà editor hiểu.
- * Dữ liệu lạ bị bỏ qua thay vì làm sập trình soạn thảo.
- */
-function readContent(kind: AppId, content: unknown): unknown {
-  if (kind === "writer") {
-    return isRecord(content) && content.type === "doc"
-      ? content
-      : createEmptyWriterDocument();
-  }
-
-  if (kind === "sheets") {
-    const cells: Record<string, string> = {};
-    if (isRecord(content) && isRecord(content.cells)) {
-      for (const [key, value] of Object.entries(content.cells)) {
-        if (typeof value === "string") {
-          cells[key] = value;
-        }
-      }
-    }
-    return { cells };
-  }
-
-  const slides: Slide[] = [];
-  if (isRecord(content) && Array.isArray(content.slides)) {
-    for (const item of content.slides) {
-      if (
-        isRecord(item) &&
-        typeof item.id === "string" &&
-        typeof item.title === "string" &&
-        typeof item.body === "string"
-      ) {
-        slides.push({ id: item.id, title: item.title, body: item.body });
-      }
-    }
-  }
-  return { slides: slides.length > 0 ? slides : createDefaultSlides() };
-}
-
-function cellsOf(content: unknown): CellMap {
-  return isRecord(content) && isRecord(content.cells)
-    ? (content.cells as CellMap)
-    : {};
-}
-
-function slidesOf(content: unknown): Slide[] {
-  if (isRecord(content) && Array.isArray(content.slides)) {
-    return content.slides as Slide[];
-  }
-  return createDefaultSlides();
 }
 
 function buildEnvelope(
@@ -197,40 +110,24 @@ function formatSavedTime(timestamp: number): string {
   }).format(new Date(timestamp));
 }
 
+function emptyDocument(kind: AppId, now: number): DocState {
+  return {
+    name: APPS[kind].defaultName,
+    path: null,
+    loaded: true,
+    content: APPS[kind].createDefaultContent(),
+    dirty: false,
+    savedAt: null,
+    createdAt: now,
+    revision: 0,
+  };
+}
+
 function emptyDocs(): Record<AppId, DocState> {
   const now = Date.now();
-  return {
-    writer: {
-      name: APP_META.writer.defaultName,
-      path: null,
-      loaded: true,
-      content: defaultContent("writer"),
-      dirty: false,
-      savedAt: null,
-      createdAt: now,
-      revision: 0,
-    },
-    sheets: {
-      name: APP_META.sheets.defaultName,
-      path: null,
-      loaded: true,
-      content: defaultContent("sheets"),
-      dirty: false,
-      savedAt: null,
-      createdAt: now,
-      revision: 0,
-    },
-    slides: {
-      name: APP_META.slides.defaultName,
-      path: null,
-      loaded: true,
-      content: defaultContent("slides"),
-      dirty: false,
-      savedAt: null,
-      createdAt: now,
-      revision: 0,
-    },
-  };
+  return Object.fromEntries(
+    APP_IDS.map((kind) => [kind, emptyDocument(kind, now)]),
+  ) as Record<AppId, DocState>;
 }
 
 interface Notice {
@@ -261,14 +158,14 @@ export function App() {
   const [toolsOpen, setToolsOpen] = useState(false);
   const [sample, setSample] = useState("Nguye\u0302\u0303n Vie\u0302\u0323t");
   const [result, setResult] = useState("");
+  /** Tăng lên mỗi lần người dùng yêu cầu in từ ribbon. */
+  const [printSignal, setPrintSignal] = useState(0);
   const [busy, setBusy] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const untitledCounter = useRef<Record<AppId, number>>({
-    writer: 1,
-    sheets: 1,
-    slides: 1,
-  });
+  const untitledCounter = useRef<Record<AppId, number>>(
+    Object.fromEntries(APP_IDS.map((id) => [id, 1])) as Record<AppId, number>,
+  );
 
   /** Bản sao mới nhất của `docs` cho các callback chạy ngoài vòng render. */
   const docsRef = useRef(docs);
@@ -453,7 +350,7 @@ export function App() {
             envelope.meta.title.trim() ||
             documentTitleFromFileName(fallbackName),
           path,
-          content: readContent(kind, envelope.content),
+          content: APPS[kind].normalizeContent(envelope.content),
           createdAt: envelope.meta.createdAt,
         });
         if (opened) {
@@ -473,7 +370,7 @@ export function App() {
         kind,
         name: draft.name,
         path: draft.path,
-        content: readContent(kind, draft.content),
+        content: APPS[kind].normalizeContent(draft.content),
         dirty: true,
         remember: false,
       });
@@ -495,13 +392,13 @@ export function App() {
       const count = untitledCounter.current[kind];
       const name =
         count === 1
-          ? APP_META[kind].defaultName
-          : `${APP_META[kind].defaultName} ${count}`;
+          ? APPS[kind].defaultName
+          : `${APPS[kind].defaultName} ${count}`;
       const created = applyDocument({
         kind,
         name,
         path: null,
-        content: defaultContent(kind),
+        content: APPS[kind].createDefaultContent(),
       });
       if (created) {
         untitledCounter.current[kind] = count + 1;
@@ -542,7 +439,7 @@ export function App() {
         kind: app,
         name: entry.name,
         path: entry.path,
-        content: defaultContent(app),
+        content: APPS[app].createDefaultContent(),
         loaded: entry.path === null,
       });
     },
@@ -569,7 +466,7 @@ export function App() {
         kind: app,
         name,
         path,
-        content: defaultContent(app),
+        content: APPS[app].createDefaultContent(),
         loaded: false,
       });
     } catch (error) {
@@ -591,7 +488,7 @@ export function App() {
               envelope.meta.title.trim() ||
               documentTitleFromFileName(file.name),
             path: null,
-            content: readContent(kind, envelope.content),
+            content: APPS[kind].normalizeContent(envelope.content),
             createdAt: envelope.meta.createdAt,
           });
           if (opened) {
@@ -606,7 +503,7 @@ export function App() {
         kind: app,
         name: file.name,
         path: null,
-        content: defaultContent(app),
+        content: APPS[app].createDefaultContent(),
         loaded: false,
       });
     },
@@ -838,6 +735,8 @@ export function App() {
   const activeApp = view === "home" || view === "settings" ? null : view;
   const activeDoc = activeApp ? docs[activeApp] : null;
   const saveDisabled = !activeApp || !docs[activeApp].loaded;
+  const printDisabled =
+    !activeApp || !APPS[activeApp].printable || !docs[activeApp].loaded;
 
   const ribbonGroups: RibbonGroup[] = [
     {
@@ -906,8 +805,9 @@ export function App() {
           id: "pdf",
           label: "PDF",
           glyph: "PDF",
-          disabled: true,
-          hint: "Cần engine phân trang A4 (native/core/modules/layout)",
+          disabled: printDisabled,
+          hint: "In hoặc xuất PDF (Ctrl+P)",
+          onSelect: () => setPrintSignal((value) => value + 1),
         },
       ],
     },
@@ -943,7 +843,7 @@ export function App() {
 
         <span className="vd-app__crumb" data-tauri-drag-region>
           {activeApp && activeDoc
-            ? `${APP_META[activeApp].label} · ${activeDoc.name}`
+            ? `${APPS[activeApp].label} · ${activeDoc.name}`
             : view === "settings"
               ? "Cài đặt"
               : "Trang chủ"}
@@ -1054,7 +954,7 @@ export function App() {
                   className={`vd-docbar__badge is-${view}`}
                   aria-hidden="true"
                 >
-                  {KIND_GLYPH[view]}
+                  {APPS[view].glyph}
                 </span>
                 <input
                   className="vd-docbar__title"
@@ -1077,7 +977,7 @@ export function App() {
                     •
                   </span>
                 ) : null}
-                <span className="vd-docbar__kind">{KIND_LABEL[view]}</span>
+                <span className="vd-docbar__kind">{APPS[view].label}</span>
                 <span className="vd-docbar__path">
                   {docs[view].path ?? "Chưa lưu vào đĩa"}
                 </span>
@@ -1118,31 +1018,19 @@ export function App() {
                 </div>
               ) : (
                 <>
-                  <div className="vd-app__workspace" hidden={view !== "writer"}>
-                    <WriterEditor
-                      key={`writer-${docs.writer.revision}`}
-                      initialContent={docs.writer.content}
-                      onChange={({ doc }) => handleContentChange("writer", doc)}
-                    />
-                  </div>
-                  <div className="vd-app__workspace" hidden={view !== "sheets"}>
-                    <SheetsEditor
-                      key={`sheets-${docs.sheets.revision}`}
-                      initialCells={cellsOf(docs.sheets.content)}
-                      onChange={(cells) =>
-                        handleContentChange("sheets", { cells })
-                      }
-                    />
-                  </div>
-                  <div className="vd-app__workspace" hidden={view !== "slides"}>
-                    <SlidesEditor
-                      key={`slides-${docs.slides.revision}`}
-                      initialSlides={slidesOf(docs.slides.content)}
-                      onChange={(slides) =>
-                        handleContentChange("slides", { slides })
-                      }
-                    />
-                  </div>
+                  {APP_IDS.map((kind) => (
+                    <div
+                      key={`${kind}-${docs[kind].revision}`}
+                      className="vd-app__workspace"
+                      hidden={view !== kind}
+                    >
+                      {APPS[kind].renderEditor({
+                        document: docs[kind],
+                        printSignal,
+                        onChange: (content) => handleContentChange(kind, content),
+                      })}
+                    </div>
+                  ))}
                 </>
               )}
             </>
@@ -1227,7 +1115,7 @@ export function App() {
         <span>
           {activeApp && activeDoc ? (
             <>
-              {APP_META[activeApp].label} ·{" "}
+              {APPS[activeApp].label} ·{" "}
               {!activeDoc.loaded
                 ? "chưa đọc được nội dung"
                 : activeDoc.dirty

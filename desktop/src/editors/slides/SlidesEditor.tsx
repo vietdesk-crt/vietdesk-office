@@ -1,37 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-
-export interface Slide {
-  id: string;
-  title: string;
-  body: string;
-}
-
-const INITIAL_SLIDES: Slide[] = [
-  {
-    id: "slide-1",
-    title: "VietDesk Office",
-    body: "Bộ ứng dụng văn phòng cho người Việt\nSoạn thảo · Bảng tính · Trình chiếu",
-  },
-  {
-    id: "slide-2",
-    title: "Vì sao VietDesk?",
-    body: "• Chuẩn văn bản hành chính NĐ30\n• Hỗ trợ đầy đủ dấu tiếng Việt\n• Ký số và cộng tác thời gian thực",
-  },
-];
-
-/** Bộ slide mặc định cho tài liệu mới (bản sao, không chia sẻ mảng gốc). */
-export function createDefaultSlides(): Slide[] {
-  return INITIAL_SLIDES.map((slide) => ({ ...slide }));
-}
-
-let slideSequence = 0;
-
-/** Id duy nhất giữa các phiên (không đụng `slide-1`, `slide-2` đã lưu). */
-function createSlideId(): string {
-  slideSequence += 1;
-  return `slide-${Date.now().toString(36)}-${slideSequence}`;
-}
+import { createSlideId, createDefaultSlides } from "./model";
+import type { Slide } from "./model";
 
 export interface SlidesEditorProps {
   /** Danh sách slide đã lưu trong tệp `.vdx`. */
@@ -48,7 +18,7 @@ export interface SlidesEditorProps {
  * dữ liệu riêng và sẽ do lõi OOXML (native/core/modules/ooxml) định nghĩa.
  */
 export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
-  const initial = initialSlides ?? INITIAL_SLIDES;
+  const initial = initialSlides ?? createDefaultSlides();
   const [slides, setSlides] = useState<Slide[]>(initial);
   const [selectedId, setSelectedId] = useState(initial[0]?.id ?? "");
   const [presenting, setPresenting] = useState(false);

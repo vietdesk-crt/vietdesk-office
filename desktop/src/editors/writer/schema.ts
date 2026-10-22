@@ -2,12 +2,12 @@
  * Schema ProseMirror cho Writer.
  *
  * Mở rộng schema cơ bản của ProseMirror bằng:
- *  - canh lề và giãn dòng cho đoạn văn/tiêu đề,
- *  - gạch chân, gạch ngang,
+ *  - canh lề, giãn dòng và thụt lề cho đoạn văn/tiêu đề,
+ *  - gạch chân, gạch ngang, chỉ số trên/dưới,
  *  - kiểu chữ, cỡ chữ, màu chữ, tô sáng,
- *  - danh sách gạch đầu dòng / đánh số,
+ *  - danh sách gạch đầu dòng / đánh số / việc cần làm,
  *  - bảng (bảng, hàng, ô, ô tiêu đề),
- *  - liên kết an toàn và ngắt trang.
+ *  - đường kẻ ngang, liên kết an toàn và ngắt trang.
  *
  * Giữ tương thích với tài liệu `.vdx` cũ: các node/mark cơ bản không đổi,
  * chỉ thêm thuộc tính mới với giá trị mặc định null.
@@ -26,6 +26,12 @@ export const ALIGNMENTS: readonly Alignment[] = [
   "right",
   "justify",
 ];
+
+/** Số cấp thụt lề tối đa (mỗi cấp ~ 1,6em). */
+export const MAX_INDENT = 6;
+
+/** Bề rộng một cấp thụt lề. */
+export const INDENT_STEP_EM = 1.6;
 
 export function normalizeAlign(value: unknown): Alignment | null {
   return value === "left" ||
@@ -116,6 +122,30 @@ function alignFromDOM(dom: HTMLElement): Alignment | null {
   return normalizeAlign(dom.style.textAlign || dom.getAttribute("align"));
 }
 
+/** Đọc số cấp thụt lề từ DOM, quy đổi từ px sang cấp. */
+function indentFromDOM(dom: HTMLElement): number {
+  const raw = dom.style.marginLeft || "";
+  const match = /^(-?\d+(?:\.\d+)?)px$/.exec(raw.trim());
+  if (!match) {
+    return 0;
+  }
+  const pixels = Number(match[1]);
+  if (!Number.isFinite(pixels) || pixels <= 0) {
+    return 0;
+  }
+  // 1em ≈ 16px ở cỡ chữ mặc định — dùng hằng số 25.6px cho 1,6em.
+  return Math.min(MAX_INDENT, Math.round(pixels / 25.6));
+}
+
+/** Chuẩn hoá số cấp thụt lề về khoảng 0..MAX_INDENT. */
+export function normalizeIndent(value: unknown): number {
+  const numeric = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(numeric)) {
+    return 0;
+  }
+  return Math.min(MAX_INDENT, Math.max(0, Math.round(numeric)));
+}
+
 function blockStyleAttrs(attrs: Record<string, unknown>): { style?: string } {
   const styles: string[] = [];
   const align = normalizeAlign(attrs.align);
@@ -126,6 +156,10 @@ function blockStyleAttrs(attrs: Record<string, unknown>): { style?: string } {
   if (lineHeight) {
     styles.push(`line-height: ${lineHeight}`);
   }
+  const indent = normalizeIndent(attrs.indent);
+  if (indent > 0) {
+    styles.push(`margin-left: ${indent * INDENT_STEP_EM}em`);
+  }
   return styles.length ? { style: styles.join("; ") } : {};
 }
 
@@ -133,6 +167,7 @@ function blockAttrsFromDOM(dom: HTMLElement) {
   return {
     align: alignFromDOM(dom),
     lineHeight: normalizeLineHeight(dom.style.lineHeight),
+    indent: indentFromDOM(dom),
   };
 }
 
@@ -146,7 +181,11 @@ function nodeSpec(name: string): NodeSpec {
 
 const paragraphSpec: NodeSpec = {
   ...nodeSpec("paragraph"),
-  attrs: { align: { default: null }, lineHeight: { default: null } },
+  attrs: {
+    align: { default: null },
+    lineHeight: { default: null },
+    indent: { default: 0 },
+  },
   parseDOM: [
     {
       tag: "p",
@@ -164,6 +203,7 @@ const headingSpec: NodeSpec = {
     level: { default: 1 },
     align: { default: null },
     lineHeight: { default: null },
+    indent: { default: 0 },
   },
   parseDOM: [1, 2, 3, 4, 5, 6].map((level) => ({
     tag: `h${level}`,
@@ -190,6 +230,16 @@ const strikeSpec: MarkSpec = {
     { style: "text-decoration=line-through" },
   ],
   toDOM: () => ["s", 0],
+};
+
+const superscriptSpec: MarkSpec = {
+  parseDOM: [{ tag: "sup" }],
+  toDOM: () => ["sup", 0],
+};
+
+const subscriptSpec: MarkSpec = {
+  parseDOM: [{ tag: "sub" }],
+  toDOM: () => ["sub", 0],
 };
 
 const fontFamilySpec: MarkSpec = {
@@ -293,12 +343,188 @@ const linkSpec: MarkSpec = {
   },
 };
 
+/** Tên tác giả mặc định cho các thay đổi được theo dõi. */
+export const DEFAULT_CHANGE_AUTHOR = "Tác giả";
+
+/**
+ * Mark thay đổi được theo dõi: `insertion` (chữ được thêm) và `deletion`
+ * (chữ bị bớt). Hai mark này không lan sang vùng gõ tiếp theo.
+ */
+const changeMarkSpec = (kind: "insertion" | "deletion"): MarkSpec => ({
+  attrs: {
+    author: { default: DEFAULT_CHANGE_AUTHOR },
+    date: { default: null },
+  },
+  inclusive: false,
+  parseDOM: [
+    {
+      tag: `span[data-change="${kind}"]`,
+      getAttrs: (dom: HTMLElement | string) => {
+        const element = dom as HTMLElement;
+        return {
+          author:
+            element.getAttribute("data-author") || DEFAULT_CHANGE_AUTHOR,
+          date: element.getAttribute("data-date"),
+        };
+      },
+    },
+  ],
+  toDOM: (mark) => [
+    "span",
+    {
+      class: `vd-change vd-change--${kind}`,
+      "data-change": kind,
+      "data-author": mark.attrs.author,
+      ...(mark.attrs.date ? { "data-date": mark.attrs.date } : {}),
+    },
+    0,
+  ],
+});
+
+/** Mark ghim bình luận vào văn bản. */
+const commentMarkSpec: MarkSpec = {
+  attrs: { id: { default: "" } },
+  inclusive: false,
+  parseDOM: [
+    {
+      tag: "span[data-comment-id]",
+      getAttrs: (dom: HTMLElement | string) => {
+        const id = (dom as HTMLElement).getAttribute("data-comment-id");
+        return id ? { id } : false;
+      },
+    },
+  ],
+  toDOM: (mark) => [
+    "span",
+    { class: "vd-comment-anchor", "data-comment-id": mark.attrs.id },
+    0,
+  ],
+};
+
+/** Kích thước ảnh (px) — chỉ nhận số trong khoảng hợp lý. */
+export function normalizeImageSize(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+  const numeric = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+  const rounded = Math.round(numeric);
+  if (rounded < 16 || rounded > 4000) {
+    return null;
+  }
+  return rounded;
+}
+
+/**
+ * Node ảnh.
+ *
+ * `src` là đường dẫn *tương đối* tới tệp ảnh trong thư mục `assets` cạnh tệp
+ * tài liệu (hoặc một data URL khi tài liệu chưa lưu trên đĩa). Nhờ vậy tài
+ * liệu vẫn mở được sau khi chuyển sang máy khác.
+ */
+const imageSpec: NodeSpec = {
+  inline: true,
+  group: "inline",
+  atom: true,
+  draggable: true,
+  attrs: {
+    src: {},
+    alt: { default: "" },
+    width: { default: null },
+    height: { default: null },
+  },
+  parseDOM: [
+    {
+      tag: "img[src]",
+      getAttrs: (dom: HTMLElement | string) => {
+        const element = dom as HTMLElement;
+        const src = element.getAttribute("src") ?? "";
+        if (!src) {
+          return false;
+        }
+        return {
+          src,
+          alt: element.getAttribute("alt") ?? "",
+          width: normalizeImageSize(element.getAttribute("width")),
+          height: normalizeImageSize(element.getAttribute("height")),
+        };
+      },
+    },
+  ],
+  toDOM(node) {
+    const attrs: Record<string, string> = {
+      src: String(node.attrs.src ?? ""),
+      alt: String(node.attrs.alt ?? ""),
+    };
+    const width = normalizeImageSize(node.attrs.width);
+    const height = normalizeImageSize(node.attrs.height);
+    if (width) {
+      attrs.width = String(width);
+    }
+    if (height) {
+      attrs.height = String(height);
+    }
+    return ["img", attrs];
+  },
+};
+
 const pageBreakSpec: NodeSpec = {
   group: "block",
   atom: true,
   selectable: false,
   parseDOM: [{ tag: "div.vd-page-break" }],
   toDOM: () => ["div", { class: "vd-page-break" }, ["span", "Ngắt trang"]],
+};
+
+const horizontalRuleSpec: NodeSpec = {
+  group: "block",
+  atom: true,
+  parseDOM: [{ tag: "hr" }],
+  toDOM: () => ["hr", { class: "vd-writer__hr" }],
+};
+
+/** Mục việc cần làm — một mục có ô tick, nội dung là block* như list item. */
+const taskItemSpec: NodeSpec = {
+  content: "paragraph block*",
+  group: "list_item",
+  defining: true,
+  attrs: { checked: { default: false }, indent: { default: 0 } },
+  parseDOM: [
+    {
+      tag: "li[data-task]",
+      getAttrs: (dom: HTMLElement | string) => {
+        const element = dom as HTMLElement;
+        return {
+          checked: element.getAttribute("data-checked") === "true",
+          indent: indentFromDOM(element),
+        };
+      },
+    },
+  ],
+  toDOM(node) {
+    const style = node.attrs.indent
+      ? `margin-left: ${normalizeIndent(node.attrs.indent) * INDENT_STEP_EM}em`
+      : "";
+    return [
+      "li",
+      {
+        class: "vd-writer__task",
+        "data-task": "true",
+        "data-checked": String(Boolean(node.attrs.checked)),
+        ...(style ? { style } : {}),
+      },
+      0,
+    ];
+  },
+};
+
+const taskListSpec: NodeSpec = {
+  content: "task_item+",
+  group: "block",
+  parseDOM: [{ tag: "ul[data-tasklist]" }],
+  toDOM: () => ["ul", { class: "vd-writer__tasklist", "data-tasklist": "true" }, 0],
 };
 
 const tableSpecs = tableNodes({
@@ -309,10 +535,38 @@ const tableSpecs = tableNodes({
 
 let nodes = basicSchema.spec.nodes;
 nodes = addListNodes(nodes, "paragraph block*", "block");
+// `list_item` của addListNodes không có thuộc tính — thêm `indent` để thụt lề
+// được áp dụng đồng nhất cho cả mục danh sách lẫn mục việc cần làm.
+nodes = nodes.update("list_item", {
+  ...nodes.get("list_item")!,
+  attrs: { indent: { default: 0 } },
+  toDOM(node) {
+    const indent = normalizeIndent(node.attrs.indent);
+    return [
+      "li",
+      indent > 0
+        ? { style: `margin-left: ${indent * INDENT_STEP_EM}em` }
+        : {},
+      0,
+    ];
+  },
+  parseDOM: [
+    {
+      tag: "li",
+      getAttrs: (dom: HTMLElement | string) => ({
+        indent: indentFromDOM(dom as HTMLElement),
+      }),
+    },
+  ],
+});
 nodes = nodes
   .update("paragraph", paragraphSpec)
   .update("heading", headingSpec)
+  .addToEnd("image", imageSpec)
   .addToEnd("page_break", pageBreakSpec)
+  .addToEnd("horizontal_rule", horizontalRuleSpec)
+  .addToEnd("task_list", taskListSpec)
+  .addToEnd("task_item", taskItemSpec)
   .addToEnd("table", tableSpecs.table)
   .addToEnd("table_row", tableSpecs.table_row)
   .addToEnd("table_cell", tableSpecs.table_cell)
@@ -322,9 +576,14 @@ const marks = basicSchema.spec.marks
   .update("link", linkSpec)
   .addToEnd("underline", underlineSpec)
   .addToEnd("strike", strikeSpec)
+  .addToEnd("superscript", superscriptSpec)
+  .addToEnd("subscript", subscriptSpec)
   .addToEnd("fontFamily", fontFamilySpec)
   .addToEnd("fontSize", fontSizeSpec)
   .addToEnd("textColor", textColorSpec)
-  .addToEnd("highlight", highlightSpec);
+  .addToEnd("highlight", highlightSpec)
+  .addToEnd("insertion", changeMarkSpec("insertion"))
+  .addToEnd("deletion", changeMarkSpec("deletion"))
+  .addToEnd("comment", commentMarkSpec);
 
 export const writerSchema = new Schema({ nodes, marks });

@@ -2,8 +2,10 @@ import { EditorState, TextSelection } from "prosemirror-state";
 import type { Command } from "prosemirror-state";
 import { describe, expect, it } from "vitest";
 import {
+  changeIndent,
   clearFormatting,
   inTable,
+  insertHorizontalRule,
   insertPageBreak,
   insertTable,
   markValue,
@@ -15,9 +17,27 @@ import {
   setMarkAttr,
   tableCommands,
   toggleList,
+  toggleTaskChecked,
+  toggleTaskList,
 } from "../src/editors/writer/commands";
-import { normalizeHref, writerSchema } from "../src/editors/writer/schema";
+import {
+  normalizeHref,
+  normalizeIndent,
+  writerSchema,
+} from "../src/editors/writer/schema";
 import { findMatches } from "../src/editors/writer/search";
+import {
+  activeOutlineIndex,
+  collectOutline,
+} from "../src/editors/writer/outline";
+import {
+  computePageBreaks,
+  normalizePageSetup,
+  pageContentHeightPx,
+  pageCount,
+  pageOfBlock,
+  readPageSetup,
+} from "../src/editors/writer/page";
 
 function paragraph(text: string, marks = []) {
   return writerSchema.node(
@@ -401,6 +421,228 @@ describe("typography Writer", () => {
     expect(
       markValue(state, writerSchema.marks.fontSize, "size"),
     ).toBeNull();
+  });
+});
+
+describe("định dạng mở rộng trong Writer", () => {
+  it("round-trip được chỉ số trên, chỉ số dưới và thụt lề", () => {
+    const document = writerSchema.node("doc", null, [
+      writerSchema.node("paragraph", { indent: 2 }, [
+        writerSchema.text("H", [writerSchema.marks.superscript.create()]),
+        writerSchema.text("O", [writerSchema.marks.subscript.create()]),
+      ]),
+    ]);
+
+    const restored = writerSchema.nodeFromJSON(document.toJSON());
+    expect(restored.eq(document)).toBe(true);
+    expect(restored.firstChild?.attrs.indent).toBe(2);
+    expect(restored.firstChild?.firstChild?.marks[0].type.name).toBe(
+      "superscript",
+    );
+  });
+
+  it("thụt lề vào rồi lùi lề ra, giữ trong biên 0..6", () => {
+    const document = doc(paragraph("Xin chào"));
+    let state = EditorState.create({
+      schema: writerSchema,
+      doc: document,
+      selection: TextSelection.create(document, 2),
+    });
+
+    state = applyCommand(state, changeIndent(1));
+    expect(state.doc.firstChild?.attrs.indent).toBe(1);
+
+    state = applyCommand(state, changeIndent(-1));
+    expect(state.doc.firstChild?.attrs.indent).toBe(0);
+
+    // Lùi lề ra khi đã ở biên trái không làm thay đổi gì.
+    state = applyCommand(state, changeIndent(-1));
+    expect(state.doc.firstChild?.attrs.indent).toBe(0);
+
+    for (let index = 0; index < 9; index += 1) {
+      state = applyCommand(state, changeIndent(1));
+    }
+    expect(state.doc.firstChild?.attrs.indent).toBe(6);
+  });
+
+  it("đổi sang tiêu đề cấp 4..6 và giữ nguyên thuộc tính", () => {
+    const document = doc(paragraph("Xin chào"));
+    let state = EditorState.create({
+      schema: writerSchema,
+      doc: document,
+      selection: TextSelection.create(document, 2),
+    });
+
+    state = applyCommand(state, setLineHeight("1.5"));
+    state = applyCommand(state, setBlock(writerSchema.nodes.heading, { level: 6 }));
+
+    const block = state.doc.firstChild;
+    expect(block?.type.name).toBe("heading");
+    expect(block?.attrs.level).toBe(6);
+    expect(block?.attrs.lineHeight).toBe("1.5");
+  });
+
+  it("chuẩn hoá số cấp thụt lề từ giá trị rác", () => {
+    expect(normalizeIndent(-3)).toBe(0);
+    expect(normalizeIndent(99)).toBe(6);
+    expect(normalizeIndent("2")).toBe(2);
+    expect(normalizeIndent("abc")).toBe(0);
+  });
+
+  it("bật danh sách việc cần làm và tích/bỏ tích mục", () => {
+    const document = doc(paragraph("Mua đèn"));
+    let state = EditorState.create({
+      schema: writerSchema,
+      doc: document,
+      selection: TextSelection.create(document, 2),
+    });
+
+    state = applyCommand(state, toggleTaskList());
+    expect(state.doc.firstChild?.type.name).toBe("task_list");
+    expect(state.doc.firstChild?.firstChild?.type.name).toBe("task_item");
+    expect(state.doc.firstChild?.firstChild?.attrs.checked).toBe(false);
+
+    state = applyCommand(state, toggleTaskChecked());
+    expect(state.doc.firstChild?.firstChild?.attrs.checked).toBe(true);
+
+    // Bấm lần nữa để chuyển về danh sách gạch đầu dòng.
+    state = applyCommand(state, toggleTaskList());
+    expect(state.doc.firstChild?.type.name).toBe("bullet_list");
+  });
+
+  it("chèn đường kẻ ngang ở cấp đoạn văn", () => {
+    const document = doc(paragraph("Một"), paragraph("Hai"));
+    const state = EditorState.create({
+      schema: writerSchema,
+      doc: document,
+      selection: TextSelection.create(document, 2),
+    });
+
+    const next = applyCommand(state, insertHorizontalRule());
+    expect(next.doc.childCount).toBe(3);
+    expect(next.doc.child(1).type.name).toBe("horizontal_rule");
+    expect(next.doc.child(2).textContent).toBe("Hai");
+  });
+
+  it("render chỉ số trên/dưới và đường kẻ ngang ra DOM", () => {
+    expect(
+      writerSchema.marks.superscript.spec.toDOM!(
+        writerSchema.marks.superscript.create(),
+        true,
+      ),
+    ).toEqual(["sup", 0]);
+    expect(
+      writerSchema.marks.subscript.spec.toDOM!(
+        writerSchema.marks.subscript.create(),
+        true,
+      ),
+    ).toEqual(["sub", 0]);
+
+    const rule = writerSchema.nodes.horizontal_rule.create();
+    expect(writerSchema.nodes.horizontal_rule.spec.toDOM!(rule)).toEqual([
+      "hr",
+      { class: "vd-writer__hr" },
+    ]);
+  });
+});
+
+describe("bảng điều hướng cấu trúc tài liệu", () => {
+  it("thu thập tiêu đề theo thứ tự và giữ cấp", () => {
+    const document = writerSchema.node("doc", null, [
+      writerSchema.node("heading", { level: 1 }, [
+        writerSchema.text("Mở đầu"),
+      ]),
+      writerSchema.node("paragraph", null, [writerSchema.text("Nội dung")]),
+      writerSchema.node("heading", { level: 2 }, [writerSchema.text("Chương 1")]),
+      writerSchema.node("heading", { level: 3 }, [writerSchema.text("Mục 1.1")]),
+    ]);
+
+    const outline = collectOutline(document);
+    expect(outline.map((entry) => entry.text)).toEqual([
+      "Mở đầu",
+      "Chương 1",
+      "Mục 1.1",
+    ]);
+    expect(outline.map((entry) => entry.level)).toEqual([1, 2, 3]);
+    expect(outline[0].pos).toBe(0);
+    expect(outline[1].pos).toBeGreaterThan(outline[0].pos);
+  });
+
+  it("bỏ qua tiêu đề không có nội dung và chuẩn hoá cấp", () => {
+    const document = writerSchema.node("doc", null, [
+      writerSchema.node("heading", { level: 9 }, []),
+      writerSchema.node("heading", { level: 0 }, [writerSchema.text("  A  ")]),
+    ]);
+
+    const outline = collectOutline(document);
+    expect(outline[0].level).toBe(6);
+    expect(outline[0].text).toBe("Tiêu đề trống");
+    expect(outline[1].level).toBe(1);
+    expect(outline[1].text).toBe("A");
+  });
+
+  it("xác định tiêu đề đang ở theo vị trí con trỏ", () => {
+    const document = writerSchema.node("doc", null, [
+      writerSchema.node("heading", { level: 1 }, [writerSchema.text("A")]),
+      writerSchema.node("heading", { level: 1 }, [writerSchema.text("B")]),
+    ]);
+    const outline = collectOutline(document);
+
+    expect(activeOutlineIndex(outline, 0)).toBe(0);
+    expect(activeOutlineIndex(outline, 2)).toBe(0);
+    expect(activeOutlineIndex(outline, 3)).toBe(1);
+    expect(activeOutlineIndex(outline, 100)).toBe(1);
+    expect(activeOutlineIndex([], 10)).toBe(-1);
+  });
+});
+
+describe("trang A4, đầu trang và chân trang", () => {
+  it("chia khối theo chiều cao trang và tôn trọng ngắt trang tay", () => {
+    // Trang chứa được 100px: khối 0 (60px) + khối 1 (60px) vượt → khối 1 sang trang mới.
+    expect(computePageBreaks([60, 60, 40], 100)).toEqual([1]);
+    expect(computePageBreaks([40, 40, 40, 40], 100)).toEqual([2]);
+    expect(computePageBreaks([500], 100)).toEqual([]);
+    expect(computePageBreaks([10, 10], 100, [1])).toEqual([1]);
+    expect(pageCount([60, 60, 40], 100)).toBe(2);
+  });
+
+  it("tính chiều cao vùng nội dung theo lề NĐ30", () => {
+    // A4 297mm — lề trên 20mm — lề dưới 20mm = 257mm.
+    const height = pageContentHeightPx();
+    expect(height).toBeGreaterThan(900);
+    expect(height).toBeLessThan(1000);
+  });
+
+  it("xác định trang chứa khối đang chọn", () => {
+    expect(pageOfBlock([2, 5], 0)).toBe(1);
+    expect(pageOfBlock([2, 5], 2)).toBe(2);
+    expect(pageOfBlock([2, 5], 4)).toBe(2);
+    expect(pageOfBlock([2, 5], 9)).toBe(3);
+  });
+
+  it("đọc cấu hình trang từ tài liệu và bỏ dữ liệu lạ", () => {
+    expect(
+      readPageSetup({
+        type: "doc",
+        pageSetup: { header: "Báo cáo", footer: "Trang", showPageNumbers: false },
+      }),
+    ).toEqual({
+      header: "Báo cáo",
+      footer: "Trang",
+      showPageNumbers: false,
+    });
+
+    // Tài liệu cũ không có cấu hình trang → dùng mặc định.
+    expect(readPageSetup({ type: "doc" })).toEqual({
+      header: "",
+      footer: "",
+      showPageNumbers: true,
+    });
+    expect(normalizePageSetup({ header: 42, showPageNumbers: "no" })).toEqual({
+      header: "",
+      footer: "",
+      showPageNumbers: true,
+    });
   });
 });
 

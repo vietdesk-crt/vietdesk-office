@@ -4,7 +4,7 @@
  */
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WriterEditor } from "../src/editors/writer";
 
 declare global {
@@ -33,6 +33,15 @@ function setSelectValue(select: HTMLSelectElement, value: string) {
   )?.set;
   setter?.call(select, value);
   select.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+function setTextareaValue(textarea: HTMLTextAreaElement, value: string) {
+  const setter = Object.getOwnPropertyDescriptor(
+    HTMLTextAreaElement.prototype,
+    "value",
+  )?.set;
+  setter?.call(textarea, value);
+  textarea.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
 describe("WriterEditor", () => {
@@ -233,6 +242,149 @@ describe("WriterEditor", () => {
     ).not.toBeNull();
   });
 
+  it("mở bảng điều hướng cấu trúc và nhảy tới tiêu đề", async () => {
+    const outlineContainer = document.createElement("div");
+    document.body.appendChild(outlineContainer);
+    const outlineRoot = createRoot(outlineContainer);
+    await act(async () => {
+      outlineRoot.render(
+        <WriterEditor
+          initialContent={{
+            type: "doc",
+            content: [
+              {
+                type: "heading",
+                attrs: { level: 1 },
+                content: [{ type: "text", text: "Mở đầu" }],
+              },
+              {
+                type: "paragraph",
+                content: [{ type: "text", text: "Nội dung" }],
+              },
+              {
+                type: "heading",
+                attrs: { level: 2 },
+                content: [{ type: "text", text: "Chương 1" }],
+              },
+            ],
+          }}
+        />,
+      );
+    });
+    await flush();
+
+    const toggle = outlineContainer.querySelector<HTMLButtonElement>(
+      'button[aria-label="Bảng điều hướng cấu trúc tài liệu"]',
+    );
+    expect(toggle).not.toBeNull();
+
+    await act(async () => {
+      toggle?.click();
+    });
+    await flush();
+
+    const outline = outlineContainer.querySelector(".vd-writer__outline");
+    expect(outline).not.toBeNull();
+    const items = outline?.querySelectorAll("button") ?? [];
+    expect(items).toHaveLength(2);
+    expect(items[0].textContent).toBe("Mở đầu");
+    expect(items[1].textContent).toBe("Chương 1");
+
+    await act(async () => {
+      items[1].click();
+    });
+    await flush();
+
+    // Con trỏ đã nhảy vào tiêu đề "Chương 1".
+    const heading = outlineContainer.querySelectorAll(".ProseMirror h2");
+    expect(heading).toHaveLength(1);
+    expect(heading[0].textContent).toBe("Chương 1");
+
+    await act(async () => {
+      outlineRoot.unmount();
+    });
+    outlineContainer.remove();
+  });
+
+  it("sửa đầu trang, chân trang và hiển thị số trang", async () => {
+    const changes: unknown[] = [];
+    const pageContainer = document.createElement("div");
+    document.body.appendChild(pageContainer);
+    const pageRoot = createRoot(pageContainer);
+    await act(async () => {
+      pageRoot.render(
+        <WriterEditor
+          initialText="chào chào"
+          onChange={({ doc }) => changes.push(doc)}
+        />,
+      );
+    });
+    await flush();
+
+    const toggle = pageContainer.querySelector<HTMLButtonElement>(
+      'button[aria-label="Đầu trang và chân trang"]',
+    );
+    await act(async () => {
+      toggle?.click();
+    });
+    await flush();
+
+    const headerInput = pageContainer.querySelector<HTMLInputElement>(
+      'input[aria-label="Nội dung đầu trang"]',
+    );
+    expect(headerInput).not.toBeNull();
+
+    await act(async () => {
+      if (headerInput) {
+        setInputValue(headerInput, "BÁO CÁO THƯỜNG NIÊN");
+      }
+    });
+    await flush();
+
+    expect(
+      pageContainer.querySelector(".vd-writer__page-header")?.textContent,
+    ).toBe("BÁO CÁO THƯỜNG NIÊN");
+    expect(
+      pageContainer.querySelector(".vd-writer__page-number")?.textContent,
+    ).toContain("Trang 1 / 1");
+
+    // Cấu hình trang phải được gửi ra ngoài để lưu xuống tệp .vdx.
+    const last = changes.at(-1) as { pageSetup?: unknown } | undefined;
+    expect(last?.pageSetup).toMatchObject({
+      header: "BÁO CÁO THƯỜNG NIÊN",
+      showPageNumbers: true,
+    });
+
+    await act(async () => {
+      pageRoot.unmount();
+    });
+    pageContainer.remove();
+  });
+
+  it("dựng bản in rồi gọi hộp thoại in của hệ điều hành", async () => {
+    const print = vi.spyOn(window, "print").mockImplementation(() => {});
+    const button = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="In / xuất PDF (Ctrl+P)"]',
+    );
+    expect(button).not.toBeNull();
+
+    await act(async () => {
+      button?.click();
+    });
+    await flush();
+
+    expect(print).toHaveBeenCalledTimes(1);
+    const root = document.querySelector(".vd-print-root");
+    expect(root).not.toBeNull();
+    expect(root?.querySelectorAll(".vd-print-page").length).toBe(1);
+    expect(
+      root?.querySelector(".vd-writer__page-body")?.textContent,
+    ).toContain("chào");
+
+    document.querySelector(".vd-print-root")?.remove();
+    print.mockRestore();
+  });
+
   it("gắn và kiểm tra liên kết an toàn", async () => {
     // Chọn "chào" bằng ô tìm kiếm để có vùng chọn thật.
     const searchButton = container.querySelector<HTMLButtonElement>(
@@ -306,5 +458,181 @@ describe("WriterEditor", () => {
       '.ProseMirror a[href="https://vietdesk.vn"]',
     );
     expect(anchor?.textContent).toBe("chào");
+  });
+
+  it("bật theo dõi thay đổi rồi xoá chữ sẽ tạo vùng chữ bị đánh dấu", async () => {
+    const toggle = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Theo dõi thay đổi"]',
+    );
+    expect(toggle).not.toBeNull();
+
+    await act(async () => {
+      toggle?.click();
+    });
+    await flush();
+
+    expect(
+      container.querySelector<HTMLButtonElement>(
+        'button[aria-label="Theo dõi thay đổi"]',
+      )?.getAttribute("aria-pressed"),
+    ).toBe("true");
+
+    // Bôi đen "chào" để có vùng chọn thật.
+    const searchButton = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Tìm trong văn bản (Ctrl+F)"]',
+    );
+    await act(async () => {
+      searchButton?.click();
+    });
+    await flush();
+    const searchInput = container.querySelector<HTMLInputElement>(
+      'input[aria-label="Từ cần tìm"]',
+    );
+    await act(async () => {
+      if (searchInput) {
+        setInputValue(searchInput, "chào");
+      }
+    });
+    await flush();
+
+    // Xoá vùng đang chọn — chữ không biến mất mà được đánh dấu là bớt.
+    const surface = container.querySelector<HTMLElement>(".ProseMirror");
+    expect(surface).not.toBeNull();
+    await act(async () => {
+      surface?.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "Backspace",
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    });
+    await flush();
+
+    expect(
+      container.querySelector(".ProseMirror .vd-change--deletion"),
+    ).not.toBeNull();
+    expect(container.querySelector(".ProseMirror")?.textContent).toBe(
+      "chào chào",
+    );
+
+    // Nút duyệt thay đổi xuất hiện; bấm "chấp nhận" thì chữ bị xoá mới mất.
+    const acceptAll = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Chấp nhận mọi thay đổi"]',
+    );
+    expect(acceptAll).not.toBeNull();
+    await act(async () => {
+      acceptAll?.click();
+    });
+    await flush();
+
+    expect(container.querySelector(".ProseMirror")?.textContent).toBe(" chào");
+    expect(
+      container.querySelector(".ProseMirror .vd-change--deletion"),
+    ).toBeNull();
+  });
+
+  it("mở bảng bình luận, gửi bình luận và xoá bình luận", async () => {
+    const changes: unknown[] = [];
+    const commentContainer = document.createElement("div");
+    document.body.appendChild(commentContainer);
+    const commentRoot = createRoot(commentContainer);
+    await act(async () => {
+      commentRoot.render(
+        <WriterEditor
+          initialText="chào chào"
+          onChange={({ doc }) => changes.push(doc)}
+        />,
+      );
+    });
+    await flush();
+
+    // Bôi đen "chào" bằng ô tìm kiếm để có vùng chọn thật.
+    const searchButton = commentContainer.querySelector<HTMLButtonElement>(
+      'button[aria-label="Tìm trong văn bản (Ctrl+F)"]',
+    );
+    await act(async () => {
+      searchButton?.click();
+    });
+    await flush();
+    const searchInput = commentContainer.querySelector<HTMLInputElement>(
+      'input[aria-label="Từ cần tìm"]',
+    );
+    await act(async () => {
+      if (searchInput) {
+        setInputValue(searchInput, "chào");
+      }
+    });
+    await flush();
+    const close = commentContainer.querySelector<HTMLButtonElement>(
+      'button[aria-label="Đóng tìm kiếm"]',
+    );
+    await act(async () => {
+      close?.click();
+    });
+    await flush();
+
+    const commentButton = commentContainer.querySelector<HTMLButtonElement>(
+      'button[aria-label="Bình luận"]',
+    );
+    expect(commentButton).not.toBeNull();
+    await act(async () => {
+      commentButton?.click();
+    });
+    await flush();
+
+    const textarea = commentContainer.querySelector<HTMLTextAreaElement>(
+      'textarea[aria-label="Nội dung bình luận"]',
+    );
+    expect(textarea).not.toBeNull();
+
+    await act(async () => {
+      if (textarea) {
+        setTextareaValue(textarea, "Cần sửa lại câu này");
+      }
+    });
+    await flush();
+
+    const send = Array.from(
+      commentContainer.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((button) => button.textContent === "Gửi");
+    expect(send).toBeDefined();
+    await act(async () => {
+      send?.click();
+    });
+    await flush();
+
+    // Bình luận xuất hiện trong bảng bên cạnh và được ghim vào văn bản.
+    expect(
+      commentContainer.querySelector(".vd-writer__comment-text")?.textContent,
+    ).toBe("Cần sửa lại câu này");
+    expect(
+      commentContainer.querySelector(".ProseMirror .vd-comment-anchor"),
+    ).not.toBeNull();
+
+    // Danh sách bình luận phải được gửi ra ngoài để lưu xuống tệp .vdx.
+    const last = changes.at(-1) as { comments?: unknown[] } | undefined;
+    expect(last?.comments).toHaveLength(1);
+
+    const remove = commentContainer.querySelector<HTMLButtonElement>(
+      ".vd-writer__comment-delete",
+    );
+    expect(remove).not.toBeNull();
+    await act(async () => {
+      remove?.click();
+    });
+    await flush();
+
+    expect(
+      commentContainer.querySelector(".vd-writer__comment-text"),
+    ).toBeNull();
+    expect(
+      commentContainer.querySelector(".ProseMirror .vd-comment-anchor"),
+    ).toBeNull();
+
+    await act(async () => {
+      commentRoot.unmount();
+    });
+    commentContainer.remove();
   });
 });

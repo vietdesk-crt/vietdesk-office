@@ -1349,6 +1349,10 @@ button {
   width: 104px;
 }
 
+.vd-writer__select--block {
+  width: 108px;
+}
+
 .vd-writer__color {
   position: relative;
   display: inline-flex;
@@ -1533,6 +1537,13 @@ button {
   background: var(--vd-accent-soft);
 }
 
+.vd-writer__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+}
+
 .vd-writer__viewport {
   flex: 1;
   overflow: auto;
@@ -1540,12 +1551,259 @@ button {
   background: var(--vd-bg);
 }
 
+/* --- Bảng điều hướng cấu trúc tài liệu ------------------------------------- */
+
+.vd-writer__outline {
+  width: 230px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 10px 8px 16px;
+  border-left: 1px solid var(--vd-border);
+  background: var(--vd-panel);
+  color: var(--vd-text);
+}
+
+.vd-writer__outline-head {
+  padding: 0 6px 8px;
+  color: var(--vd-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.vd-writer__outline-empty {
+  margin: 0;
+  padding: 0 6px;
+  color: var(--vd-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.vd-writer__outline-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vd-writer__outline-list button {
+  display: block;
+  width: 100%;
+  padding: 4px 8px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--vd-text);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vd-writer__outline-list button:hover {
+  background: var(--vd-panel-alt);
+}
+
+.vd-writer__outline-list button.is-active {
+  background: var(--vd-accent-soft);
+  color: var(--vd-accent);
+  font-weight: 600;
+}
+
+/* --- Theo dõi thay đổi ---------------------------------------------------- */
+
+/* Quy ước màu giống Google Docs và Word: chữ thêm là xanh gạch chân,
+   chữ bị bớt là đỏ gạch ngang. */
+.vd-writer__surface .vd-change--insertion {
+  color: #1a7f37;
+  text-decoration: underline;
+  text-decoration-color: rgb(26 127 55 / 45%);
+  text-underline-offset: 2px;
+}
+
+.vd-writer__surface .vd-change--deletion {
+  color: #c0392b;
+  text-decoration: line-through;
+  text-decoration-color: rgb(192 57 43 / 55%);
+}
+
+/* Ghim bình luận: tô nhạt + gạch chân nhỏ để thấy ngay đoạn được bình luận. */
+.vd-writer__surface .vd-comment-anchor {
+  background: #fff3b0;
+  border-bottom: 2px solid #e0a800;
+  cursor: pointer;
+}
+
+/* --- Bảng bình luận bên cạnh ----------------------------------------------- */
+
+.vd-writer__comments {
+  width: 250px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  padding: 10px 10px 16px;
+  border-left: 1px solid var(--vd-border);
+  background: var(--vd-panel);
+  color: var(--vd-text);
+}
+
+.vd-writer__comments-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--vd-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.vd-writer__comments-head button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--vd-muted);
+  cursor: pointer;
+}
+
+.vd-writer__comments-head button:hover {
+  background: var(--vd-panel-alt);
+  border-color: var(--vd-border);
+}
+
+.vd-writer__comment-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--vd-border);
+  border-radius: 8px;
+  background: var(--vd-panel-alt);
+}
+
+.vd-writer__comment-input {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--vd-border);
+  border-radius: 5px;
+  background: var(--vd-panel);
+  color: var(--vd-text);
+  font: inherit;
+  font-size: 12px;
+  resize: vertical;
+}
+
+.vd-writer__comment-input:focus {
+  outline: none;
+  border-color: var(--vd-accent);
+}
+
+.vd-writer__comment-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.vd-writer__comment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vd-writer__comment {
+  position: relative;
+  padding: 8px 24px 8px 8px;
+  border: 1px solid var(--vd-border);
+  border-radius: 8px;
+  background: var(--vd-panel-alt);
+}
+
+.vd-writer__comment-quote {
+  width: 100%;
+  margin: 0 0 4px;
+  padding: 0 0 0 6px;
+  border: none;
+  border-left: 3px solid #e0a800;
+  background: none;
+  color: var(--vd-muted);
+  font: inherit;
+  font-size: 11px;
+  font-style: italic;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.vd-writer__comment-body {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11.5px;
+}
+
+.vd-writer__comment-time {
+  color: var(--vd-muted);
+  font-size: 10.5px;
+}
+
+.vd-writer__comment-text {
+  margin: 3px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.vd-writer__comment-delete {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--vd-muted);
+  cursor: pointer;
+}
+
+.vd-writer__comment-delete:hover {
+  background: var(--vd-panel);
+  border-color: var(--vd-border);
+  color: #c0392b;
+}
+
 .vd-writer__page {
   position: relative;
-  width: min(760px, 100%);
-  min-height: 70vh;
+  width: 210mm;
+  min-height: 297mm;
   margin: 0 auto;
-  padding: 56px 64px;
+  /* Lề NĐ30: trái 3cm, phải 1,5cm, trên 2cm, dưới 2cm. */
+  padding: 20mm 15mm 20mm 30mm;
   background: #fff;
   color: #1a1a1a;
   border-radius: 2px;
@@ -1556,6 +1814,43 @@ button {
   .vd-writer__page {
     background: #f4f1ea;
   }
+}
+
+/* --- Đầu trang / chân trang (nằm trong lề trên / lề dưới) ------------------ */
+
+.vd-writer__page-header,
+.vd-writer__page-footer {
+  position: absolute;
+  left: 30mm;
+  right: 15mm;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  color: #6f6a5e;
+  font-size: 11px;
+  line-height: 1.4;
+  pointer-events: none;
+}
+
+.vd-writer__page-header {
+  top: 9mm;
+}
+
+.vd-writer__page-footer {
+  bottom: 9mm;
+}
+
+.vd-writer__page-footer-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vd-writer__page-number {
+  flex: none;
+  font-variant-numeric: tabular-nums;
 }
 
 .vd-writer__surface {
@@ -1584,9 +1879,9 @@ button {
 
 .vd-writer__placeholder {
   position: absolute;
-  top: 57px;
-  left: 65px;
-  right: 64px;
+  top: 20mm;
+  left: 30mm;
+  right: 15mm;
   color: #a5a196;
   font-family: "Noto Serif", "Times New Roman", Times, serif;
   font-size: 15pt;
@@ -1610,6 +1905,39 @@ button {
   margin: 1em 0 0.4em;
   font-size: 14pt;
   line-height: 1.4;
+}
+
+.vd-writer__surface h4 {
+  margin: 0.9em 0 0.35em;
+  font-size: 13pt;
+  line-height: 1.4;
+}
+
+.vd-writer__surface h5 {
+  margin: 0.9em 0 0.3em;
+  font-size: 12pt;
+  line-height: 1.4;
+}
+
+.vd-writer__surface h6 {
+  margin: 0.9em 0 0.3em;
+  font-size: 11pt;
+  line-height: 1.4;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.vd-writer__surface sup,
+.vd-writer__surface sub {
+  font-size: 0.72em;
+  line-height: 0;
+}
+
+.vd-writer__surface hr.vd-writer__hr {
+  height: 0;
+  margin: 1.1em 0;
+  border: 0;
+  border-top: 1px solid #c3bcaa;
 }
 
 .vd-writer__surface ul,
@@ -1723,6 +2051,39 @@ button {
   border-top: 1px dashed #c3bcaa;
 }
 
+/* --- Danh sách việc cần làm ------------------------------------------------ */
+
+.vd-writer__surface ul.vd-writer__tasklist {
+  padding-left: 0.2em;
+  list-style: none;
+}
+
+.vd-writer__surface li.vd-writer__task {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0.15em 0;
+}
+
+.vd-writer__surface li.vd-writer__task > .vd-writer__task-check {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  margin-top: 0.32em;
+  accent-color: var(--vd-accent);
+  cursor: pointer;
+}
+
+.vd-writer__surface li.vd-writer__task > .vd-writer__task-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.vd-writer__surface li.vd-writer__task[data-checked="true"] > .vd-writer__task-content {
+  color: #7d786c;
+  text-decoration: line-through;
+}
+
 .vd-writer__status {
   display: flex;
   justify-content: space-between;
@@ -1731,6 +2092,67 @@ button {
   background: var(--vd-panel-alt);
   color: var(--vd-muted);
   font-size: 11px;
+}
+
+/* --- In / xuất PDF --------------------------------------------------------- */
+
+/* Cây bản in được gắn thẳng vào `body` (ngoài `.vd-app`) nên phải tự ẩn đi
+   khi chưa in — nếu không nó sẽ chen vào giữa giao diện. */
+.vd-print-root {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  html,
+  body,
+  #root {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+    background: #fff;
+  }
+
+  /* Chỉ in nội dung tài liệu — ẩn toàn bộ giao diện. */
+  .vd-app {
+    display: none !important;
+  }
+
+  .vd-print-root {
+    display: block !important;
+  }
+
+  .vd-print-root .vd-print-page {
+    /* 296mm thay vì 297mm: chừa 1mm để trình duyệt không sinh thêm một
+       trang trắng do làm tròn khi kéo khung trang vừa khít trang giấy. */
+    min-height: 296mm;
+    margin: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: #fff;
+    break-after: page;
+    page-break-after: always;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .vd-print-root .vd-print-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  .vd-print-root .vd-writer__surface {
+    min-height: 0;
+  }
+
+  .vd-print-root a,
+  .vd-print-root input {
+    pointer-events: none;
+  }
 }
 
 /* ---------------------------------------------------------------------------

@@ -10,4 +10,6 @@ export {
   formatNumber,
   parseNumber,
 } from "./formula";
-export type { CellMap, CellResult } from "./formula";
+export type { CellResult } from "./formula";
+export { normalizeSheetsContent, readCells } from "./model";
+export type { CellMap } from "./model";

@@ -9,9 +9,10 @@
  * UI chỉ làm việc với `RecentEntry`, không cần biết đang ở chế độ nào.
  */
 import { invoke } from "@tauri-apps/api/core";
+import type { DocumentType } from "./document";
 import { hasNativeCore } from "./env";
 
-export type DocumentKind = "writer" | "sheets" | "slides" | "unknown";
+export type DocumentKind = DocumentType | "unknown";
 
 export interface RecentEntry {
   /** Khoá duy nhất: đường dẫn tuyệt đối, hoặc `unsaved:<kind>:<tên>`. */
@@ -83,20 +84,6 @@ export function kindFromFileName(name: string): DocumentKind {
   const extension = name.split(".").pop()?.toLowerCase() ?? "";
   return EXTENSION_KIND[extension] ?? "unknown";
 }
-
-export const KIND_LABEL: Record<DocumentKind, string> = {
-  writer: "Writer",
-  sheets: "Sheets",
-  slides: "Slides",
-  unknown: "Tệp khác",
-};
-
-export const KIND_GLYPH: Record<DocumentKind, string> = {
-  writer: "W",
-  sheets: "S",
-  slides: "P",
-  unknown: "?",
-};
 
 /** Sắp xếp: ghim trước, sau đó mới nhất trước. */
 export function sortRecent(entries: RecentEntry[]): RecentEntry[] {

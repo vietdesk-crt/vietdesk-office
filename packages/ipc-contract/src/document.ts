@@ -23,7 +23,10 @@ export const DOCUMENT_FORMAT = "vietdesk.document";
 export const DOCUMENT_VERSION = 1;
 export const DOCUMENT_EXTENSION = "vdx";
 
-export type DocumentType = "writer" | "sheets" | "slides";
+/** Mọi loại tài liệu VietDesk hỗ trợ — nguồn sự thật duy nhất. */
+export const DOCUMENT_KINDS = ["writer", "sheets", "slides"] as const;
+
+export type DocumentType = (typeof DOCUMENT_KINDS)[number];
 
 export interface DocumentMeta {
   title: string;
@@ -48,7 +51,7 @@ export class DocumentFormatError extends Error {
   }
 }
 
-const KINDS: readonly DocumentType[] = ["writer", "sheets", "slides"];
+const KINDS: readonly DocumentType[] = DOCUMENT_KINDS;
 
 /** Tệp có phải định dạng gốc của VietDesk không? */
 export function isVietDeskDocument(fileName: string): boolean {

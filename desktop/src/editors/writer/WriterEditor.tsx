@@ -5,22 +5,31 @@ import {
   AlignLeft,
   AlignRight,
   Bold,
+  Check,
+  CheckCheck,
   ChevronDown,
   ChevronUp,
-  Heading1,
-  Heading2,
-  Heading3,
+  GitCompareArrows,
+  IndentDecrease,
+  IndentIncrease,
   Italic,
   Link2,
   List,
+  ListChecks,
   ListOrdered,
-  Pilcrow,
+  ListTree,
+  MessageSquarePlus,
+  Minus,
+  PanelTop,
+  Printer,
   Redo2,
   RemoveFormatting,
   Replace,
   Search,
   SeparatorHorizontal,
   Strikethrough,
+  Subscript,
+  Superscript,
   Table,
   Underline,
   Undo2,
@@ -34,11 +43,13 @@ import { EditorState, TextSelection } from "prosemirror-state";
 import type { Command } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 import { tableEditing } from "prosemirror-tables";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
+  changeIndent,
   clearFormatting,
   inTable,
+  insertHorizontalRule,
   insertPageBreak,
   insertTable,
   listActive,
@@ -53,19 +64,52 @@ import {
   tableCommands,
   tableKeymap,
   toggleList,
+  toggleTaskList,
   writerKeymap,
 } from "./commands";
 import { searchHighlightKey, searchHighlightPlugin } from "./highlight";
 import {
+  DEFAULT_CHANGE_AUTHOR,
   normalizeAlign,
   normalizeColor,
   normalizeFontFamily,
   normalizeFontSize,
   normalizeHref,
+  normalizeIndent,
   normalizeLineHeight,
   writerSchema,
 } from "./schema";
 import { findMatches } from "./search";
+import { activeOutlineIndex, collectOutline } from "./outline";
+import {
+  acceptAllChanges,
+  acceptChange,
+  changeAt,
+  collectChanges,
+  createTrackChangesPlugin,
+  isTrackChangesEnabled,
+  rejectAllChanges,
+  rejectChange,
+  toggleTrackChanges,
+} from "./changes";
+import {
+  createCommentId,
+  findCommentRange,
+  formatCommentTime,
+  MAX_COMMENT_QUOTE,
+  MAX_COMMENT_TEXT,
+  readComments,
+} from "./comments";
+import type { WriterComment } from "./comments";
+import {
+  computePageBreaks,
+  pageContentHeightPx,
+  pageOfBlock,
+  readPageSetup,
+} from "./page";
+import type { PageSetup } from "./page";
+import { printDocument } from "./print";
+import { TaskItemView } from "./task-view";
 
 export interface WriterEditorProps {
   /** Nội dung ban đầu (văn bản thuần), dùng khi không có `initialContent`. */
@@ -74,6 +118,10 @@ export interface WriterEditorProps {
   initialContent?: unknown;
   /** Gọi mỗi khi nội dung thay đổi — kèm JSON để lưu xuống đĩa. */
   onChange?: (payload: { text: string; doc: unknown }) => void;
+  /** Tên tài liệu — dùng làm tên tệp khi xuất PDF. */
+  title?: string;
+  /** Tăng lên để yêu cầu in (ribbon “Xuất bản → PDF”). */
+  printSignal?: number;
 }
 
 function buildDoc(text: string): PMNode {
@@ -96,11 +144,6 @@ function docFromJSON(json: unknown): PMNode | null {
   } catch {
     return null;
   }
-}
-
-/** Nội dung ProseMirror của một văn bản trống (dùng làm mặc định khi lưu). */
-export function createEmptyWriterDocument(): unknown {
-  return buildDoc("").toJSON();
 }
 
 interface ToolbarButtonProps {
@@ -218,12 +261,20 @@ export function WriterEditor({
   initialText,
   initialContent,
   onChange,
+  title,
+  printSignal,
 }: WriterEditorProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const linkInputRef = useRef<HTMLInputElement>(null);
+  /** Đo lại phân trang sau mỗi thay đổi — hàm được gọi từ effect cũ. */
+  const measureRef = useRef<(() => void) | null>(null);
+  /** Cấu hình trang hiện tại — effect tạo EditorView chỉ đọc một lần nên cần ref. */
+  const pageSetupRef = useRef<PageSetup>(readPageSetup(initialContent));
+  /** Danh sách bình luận — effect tạo EditorView chỉ đọc một lần nên cần ref. */
+  const commentsRef = useRef<WriterComment[]>(readComments(initialContent));
 
   // Chỉ đọc nội dung ban đầu một lần: sau đó EditorView tự giữ state.
   // App remount component bằng `key` khi mở tài liệu khác.
@@ -253,6 +304,22 @@ export function WriterEditor({
   const [activeMatch, setActiveMatch] = useState(0);
 
   const [tablePickerOpen, setTablePickerOpen] = useState(false);
+  const [outlineOpen, setOutlineOpen] = useState(false);
+  const [pagePanelOpen, setPagePanelOpen] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [comments, setComments] = useState<WriterComment[]>(() =>
+    readComments(initialContent),
+  );
+  const [commentDraft, setCommentDraft] = useState<string | null>(null);
+  const [commentAnchor, setCommentAnchor] = useState<{
+    from: number;
+    to: number;
+  } | null>(null);
+  const [commentError, setCommentError] = useState<string | null>(null);
+  const [pageSetup, setPageSetup] = useState<PageSetup>(() =>
+    readPageSetup(initialContent),
+  );
+  const [pagination, setPagination] = useState({ page: 1, total: 1 });
   const [tableSize, setTableSize] = useState<{
     rows: number;
     cols: number;
@@ -264,6 +331,87 @@ export function WriterEditor({
   useEffect(() => {
     onChangeRef.current = onChange;
   }, [onChange]);
+
+  useEffect(() => {
+    commentsRef.current = comments;
+  }, [comments]);
+
+  /**
+   * Đo chiều cao từng khối rồi chia thành trang A4.
+   *
+   * Chiều cao lấy từ DOM (trình duyệt mới biết), nhưng phép chia trang là
+   * hàm thuần tuý nên kiểm thử được độc lập.
+   */
+  const measurePagination = () => {
+    const view = viewRef.current;
+    const host = hostRef.current;
+    if (!view || !host) {
+      return;
+    }
+    const surface = host.querySelector<HTMLElement>(".ProseMirror");
+    if (!surface) {
+      return;
+    }
+
+    const blocks = Array.from(surface.children) as HTMLElement[];
+    const heights = blocks.map((block) => block.getBoundingClientRect().height);
+
+    const forced: number[] = [];
+    view.state.doc.forEach((node, _offset, index) => {
+      if (node.type.name === "page_break") {
+        forced.push(index);
+      }
+    });
+
+    const breaks = computePageBreaks(
+      heights,
+      pageContentHeightPx(),
+      forced,
+    );
+
+    const selectionPos = view.state.selection.from;
+    let selectionIndex = 0;
+    view.state.doc.forEach((node, offset, index) => {
+      if (offset <= selectionPos && selectionPos < offset + node.nodeSize) {
+        selectionIndex = index;
+      }
+    });
+
+    const page = pageOfBlock(breaks, selectionIndex);
+    const total = breaks.length + 1;
+    setPagination((previous) =>
+      previous.page === page && previous.total === total
+        ? previous
+        : { page, total },
+    );
+  };
+
+  measureRef.current = measurePagination;
+
+  /** Đổi đầu trang / chân trang / hiển thị số trang và báo ra ngoài để lưu. */
+  const updatePageSetup = (next: PageSetup) => {
+    setPageSetup(next);
+    pageSetupRef.current = next;
+    const view = viewRef.current;
+    if (!view) {
+      return;
+    }
+    const text = view.state.doc.textBetween(
+      0,
+      view.state.doc.content.size,
+      "\n",
+      " ",
+    );
+    onChangeRef.current?.({
+      text,
+      doc: {
+        ...view.state.doc.toJSON(),
+        pageSetup: next,
+        comments: commentsRef.current,
+      },
+    });
+    forceRender((value) => value + 1);
+  };
 
   useEffect(() => {
     const host = hostRef.current;
@@ -278,6 +426,7 @@ export function WriterEditor({
         plugins: [
           history(),
           searchHighlightPlugin,
+          createTrackChangesPlugin(),
           tableEditing({ allowTableNodeSelection: false }),
           keymap({
             "Mod-z": undo,
@@ -289,6 +438,9 @@ export function WriterEditor({
           keymap(baseKeymap),
         ],
       }),
+      nodeViews: {
+        task_item: (node, view, getPos) => new TaskItemView(node, view, getPos),
+      },
       dispatchTransaction(transaction) {
         const next = view.state.apply(transaction);
         view.updateState(next);
@@ -296,7 +448,15 @@ export function WriterEditor({
           const text = next.doc.textBetween(0, next.doc.content.size, "\n", " ");
           setStats({ words: countWords(text), characters: text.length });
           setEmpty(text.trim() === "");
-          onChangeRef.current?.({ text, doc: next.doc.toJSON() });
+          onChangeRef.current?.({
+            text,
+            doc: {
+              ...next.doc.toJSON(),
+              pageSetup: pageSetupRef.current,
+              comments: commentsRef.current,
+            },
+          });
+          measureRef.current?.();
         }
         forceRender((value) => value + 1);
       },
@@ -306,7 +466,15 @@ export function WriterEditor({
     // Cập nhật toolbar/trạng thái sau khi view được gắn.
     forceRender((value) => value + 1);
 
+    // Đo phân trang lại khi cửa sổ đổi kích thước (bề rộng cột văn bản đổi
+    // theo nên chiều cao các khối cũng đổi).
+    const handleResize = () => measureRef.current?.();
+    window.addEventListener("resize", handleResize);
+    const frame = requestAnimationFrame(() => measureRef.current?.());
+
     return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("resize", handleResize);
       view.destroy();
       viewRef.current = null;
     };
@@ -322,6 +490,36 @@ export function WriterEditor({
   );
   const activeIndex =
     matches.length === 0 ? 0 : Math.min(activeMatch, matches.length - 1);
+
+  const outline = useMemo(() => (doc ? collectOutline(doc) : []), [doc]);
+  const activeOutline = state
+    ? activeOutlineIndex(outline, state.selection.from)
+    : -1;
+
+  /** Chế độ theo dõi thay đổi đang bật hay không. */
+  const trackChangesOn = state ? isTrackChangesEnabled(state) : false;
+  /** Các thay đổi đang chờ người dùng chấp nhận hoặc bác bỏ. */
+  const changeList = useMemo(
+    () => (doc ? collectChanges(doc) : []),
+    [doc],
+  );
+  /** Thay đổi đang chứa con trỏ — dùng cho nút duyệt từng thay đổi. */
+  const currentChange = doc && state ? changeAt(doc, state.selection.from) : null;
+
+  /** Nhảy tới tiêu đề được bấm trong bảng điều hướng. */
+  const jumpToHeading = (pos: number) => {
+    const view = viewRef.current;
+    if (!view) {
+      return;
+    }
+    view.dispatch(
+      view.state.tr
+        .setSelection(TextSelection.create(view.state.doc, pos + 1))
+        .scrollIntoView(),
+    );
+    view.focus();
+    forceRender((value) => value + 1);
+  };
 
   // Chọn kết quả đầu tiên khi từ khoá thay đổi.
   useEffect(() => {
@@ -393,12 +591,230 @@ export function WriterEditor({
     return () => cancelAnimationFrame(frame);
   }, [linkOpen]);
 
+  /**
+   * In tài liệu hoặc xuất PDF.
+   *
+   * Bản in được dựng riêng (mỗi trang A4 có đầu trang, chân trang và số trang
+   * riêng) rồi mới gọi hộp thoại in của hệ điều hành — cùng một đường đi cho
+   * cả in giấy lẫn “Lưu thành PDF”.
+   */
+  const printNow = useCallback(() => {
+    const host = hostRef.current;
+    if (!host) {
+      return;
+    }
+    const surface = host.querySelector<HTMLElement>(".ProseMirror");
+    if (!surface) {
+      return;
+    }
+    printDocument({
+      surface,
+      header: pageSetup.header,
+      footer: pageSetup.footer,
+      showPageNumbers: pageSetup.showPageNumbers,
+      title,
+    });
+  }, [pageSetup, title]);
+
+  /** Yêu cầu in từ bên ngoài (ribbon “Xuất bản → PDF”). */
+  const printSignalRef = useRef(printSignal);
+  useEffect(() => {
+    if (printSignal === undefined || printSignalRef.current === printSignal) {
+      return;
+    }
+    printSignalRef.current = printSignal;
+    printNow();
+  }, [printSignal, printNow]);
+
   const run = (command: Command) => () => {
     const view = viewRef.current;
     if (!view) {
       return;
     }
     command(view.state, view.dispatch, view);
+    view.focus();
+    forceRender((value) => value + 1);
+  };
+
+  /** Bật/tắt chế độ theo dõi thay đổi. */
+  const toggleTrackChangesMode = () => {
+    const view = viewRef.current;
+    if (!view) {
+      return;
+    }
+    toggleTrackChanges(view.state, view.dispatch);
+    view.focus();
+    forceRender((value) => value + 1);
+  };
+
+  /** Chấp nhận mọi thay đổi đang chờ. */
+  const acceptAll = () => {
+    const view = viewRef.current;
+    if (!view) {
+      return;
+    }
+    acceptAllChanges(view);
+    view.focus();
+    forceRender((value) => value + 1);
+  };
+
+  /** Bác bỏ mọi thay đổi đang chờ. */
+  const rejectAll = () => {
+    const view = viewRef.current;
+    if (!view) {
+      return;
+    }
+    rejectAllChanges(view);
+    view.focus();
+    forceRender((value) => value + 1);
+  };
+
+  /** Chấp nhận hoặc bác bỏ thay đổi đang chứa con trỏ. */
+  const resolveCurrentChange = (accept: boolean) => {
+    const view = viewRef.current;
+    if (!view) {
+      return;
+    }
+    if (accept) {
+      acceptChange(view);
+    } else {
+      rejectChange(view);
+    }
+    view.focus();
+    forceRender((value) => value + 1);
+  };
+
+  /** Ghi lại nội dung tài liệu kèm danh sách bình luận mới. */
+  const persistComments = (next: WriterComment[]) => {
+    const view = viewRef.current;
+    if (!view) {
+      return;
+    }
+    const text = view.state.doc.textBetween(
+      0,
+      view.state.doc.content.size,
+      "\n",
+      " ",
+    );
+    onChangeRef.current?.({
+      text,
+      doc: {
+        ...view.state.doc.toJSON(),
+        pageSetup: pageSetupRef.current,
+        comments: next,
+      },
+    });
+  };
+
+  /** Mở ô viết bình luận cho đoạn văn bản đang bôi đen. */
+  const startComment = () => {
+    const view = viewRef.current;
+    if (!view) {
+      return;
+    }
+    setCommentsOpen(true);
+    const { from, to, empty } = view.state.selection;
+    if (empty) {
+      setCommentAnchor(null);
+      setCommentDraft(null);
+      setCommentError("Hãy bôi đen đoạn văn bản cần bình luận.");
+      return;
+    }
+    setCommentAnchor({ from, to });
+    setCommentDraft("");
+    setCommentError(null);
+  };
+
+  /** Lưu bình luận mới và ghim vào đúng đoạn văn bản đã bôi đen. */
+  const submitComment = () => {
+    const view = viewRef.current;
+    const text = (commentDraft ?? "").trim();
+    if (!view || !commentAnchor) {
+      setCommentError("Chưa có đoạn văn bản được bôi đen.");
+      return;
+    }
+    if (!text) {
+      setCommentError("Nhập nội dung bình luận.");
+      return;
+    }
+    if (text.length > MAX_COMMENT_TEXT) {
+      setCommentError(`Bình luận tối đa ${MAX_COMMENT_TEXT} ký tự.`);
+      return;
+    }
+
+    const id = createCommentId();
+    const quote = view.state.doc.textBetween(
+      commentAnchor.from,
+      commentAnchor.to,
+      " ",
+      " ",
+    );
+    view.dispatch(
+      view.state.tr.addMark(
+        commentAnchor.from,
+        commentAnchor.to,
+        writerSchema.marks.comment.create({ id }),
+      ),
+    );
+
+    const next: WriterComment[] = [
+      ...commentsRef.current,
+      {
+        id,
+        author: DEFAULT_CHANGE_AUTHOR,
+        text,
+        quote: quote.slice(0, MAX_COMMENT_QUOTE),
+        createdAt: Date.now(),
+      },
+    ];
+    commentsRef.current = next;
+    setComments(next);
+    setCommentDraft(null);
+    setCommentAnchor(null);
+    setCommentError(null);
+    persistComments(next);
+    view.focus();
+    forceRender((value) => value + 1);
+  };
+
+  /** Xoá một bình luận: gỡ ghim khỏi văn bản và khỏi danh sách bên cạnh. */
+  const removeComment = (id: string) => {
+    const view = viewRef.current;
+    if (!view) {
+      return;
+    }
+    const range = findCommentRange(view.state.doc, id);
+    if (range) {
+      view.dispatch(
+        view.state.tr.removeMark(
+          range.from,
+          range.to,
+          writerSchema.marks.comment,
+        ),
+      );
+    }
+    const next = commentsRef.current.filter((item) => item.id !== id);
+    commentsRef.current = next;
+    setComments(next);
+    persistComments(next);
+    forceRender((value) => value + 1);
+  };
+
+  /** Nhảy tới đoạn văn bản được bình luận. */
+  const focusComment = (id: string) => {
+    const view = viewRef.current;
+    if (!view) {
+      return;
+    }
+    const range = findCommentRange(view.state.doc, id);
+    if (!range) {
+      return;
+    }
+    view.dispatch(
+      view.state.tr
+        .setSelection(TextSelection.create(view.state.doc, range.from, range.to))
+        .scrollIntoView(),
+    );
     view.focus();
     forceRender((value) => value + 1);
   };
@@ -418,6 +834,13 @@ export function WriterEditor({
     }
   };
 
+  /**
+   * In tài liệu hoặc xuất PDF.
+   *
+   * Bản in được dựng riêng (mỗi trang A4 có đầu trang, chân trang và số trang
+   * riêng) rồi mới gọi hộp thoại in của hệ điều hành — cùng một đường đi cho
+   * cả in giấy lẫn “Lưu thành PDF”.
+   */
   const openLinkBar = () => {
     const view = viewRef.current;
     if (!view) {
@@ -558,6 +981,11 @@ export function WriterEditor({
 
   const handleRootKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     const mod = event.ctrlKey || event.metaKey;
+    if (mod && !event.altKey && event.key.toLowerCase() === "p") {
+      event.preventDefault();
+      printNow();
+      return;
+    }
     if (mod && !event.altKey && event.key.toLowerCase() === "f") {
       event.preventDefault();
       setReplaceMode(false);
@@ -586,20 +1014,32 @@ export function WriterEditor({
   const strikeActive = state
     ? markActive(state, writerSchema.marks.strike)
     : false;
+  const superscriptActive = state
+    ? markActive(state, writerSchema.marks.superscript)
+    : false;
+  const subscriptActive = state
+    ? markActive(state, writerSchema.marks.subscript)
+    : false;
   const currentBlock = state?.selection.$from.parent;
-  const headingLevel =
+  /**
+   * Kiểu khối đang chọn, dùng cho hộp "Kiểu đoạn": "paragraph" hoặc
+   * "heading-1".."heading-6".
+   */
+  const blockStyle =
     currentBlock?.type === writerSchema.nodes.heading
-      ? Number(currentBlock.attrs.level)
-      : null;
-  const paragraphActive =
-    currentBlock?.type === writerSchema.nodes.paragraph;
+      ? `heading-${Math.min(Math.max(Number(currentBlock.attrs.level) || 1, 1), 6)}`
+      : "paragraph";
   const currentAlign =
     normalizeAlign(currentBlock?.attrs.align) ?? "left";
+  const currentIndent = normalizeIndent(currentBlock?.attrs.indent);
   const bulletActive = state
     ? listActive(state, writerSchema.nodes.bullet_list)
     : false;
   const orderedActive = state
     ? listActive(state, writerSchema.nodes.ordered_list)
+    : false;
+  const taskActive = state
+    ? listActive(state, writerSchema.nodes.task_list)
     : false;
   const canUndo = state ? undo(state) : false;
   const canRedo = state ? redo(state) : false;
@@ -785,37 +1225,64 @@ export function WriterEditor({
         >
           <Strikethrough size={15} aria-hidden="true" />
         </ToolbarButton>
+        <ToolbarButton
+          label="Chỉ số trên (Ctrl+Shift+.)"
+          active={superscriptActive}
+          onClick={run(toggleMark(writerSchema.marks.superscript))}
+        >
+          <Superscript size={15} aria-hidden="true" />
+        </ToolbarButton>
+        <ToolbarButton
+          label="Chỉ số dưới (Ctrl+Shift+,)"
+          active={subscriptActive}
+          onClick={run(toggleMark(writerSchema.marks.subscript))}
+        >
+          <Subscript size={15} aria-hidden="true" />
+        </ToolbarButton>
 
         <span className="vd-writer__divider" />
 
         <ToolbarButton
-          label="Tiêu đề cấp 1 (Ctrl+Alt+1)"
-          active={headingLevel === 1}
-          onClick={run(setBlock(writerSchema.nodes.heading, { level: 1 }))}
+          label="Thụt lề vào (Ctrl+])"
+          disabled={currentIndent >= 6}
+          onClick={run(changeIndent(1))}
         >
-          <Heading1 size={15} aria-hidden="true" />
+          <IndentIncrease size={15} aria-hidden="true" />
         </ToolbarButton>
         <ToolbarButton
-          label="Tiêu đề cấp 2 (Ctrl+Alt+2)"
-          active={headingLevel === 2}
-          onClick={run(setBlock(writerSchema.nodes.heading, { level: 2 }))}
+          label="Lùi lề ra (Ctrl+[)"
+          disabled={currentIndent <= 0}
+          onClick={run(changeIndent(-1))}
         >
-          <Heading2 size={15} aria-hidden="true" />
+          <IndentDecrease size={15} aria-hidden="true" />
         </ToolbarButton>
-        <ToolbarButton
-          label="Tiêu đề cấp 3 (Ctrl+Alt+3)"
-          active={headingLevel === 3}
-          onClick={run(setBlock(writerSchema.nodes.heading, { level: 3 }))}
+
+        <span className="vd-writer__divider" />
+
+        <select
+          className="vd-writer__select vd-writer__select--block"
+          value={blockStyle}
+          aria-label="Kiểu đoạn"
+          title="Kiểu đoạn"
+          onChange={(event) => {
+            const value = event.target.value;
+            if (value === "paragraph") {
+              run(setBlock(writerSchema.nodes.paragraph))();
+              return;
+            }
+            const level = Number(value.replace("heading-", ""));
+            if (Number.isInteger(level) && level >= 1 && level <= 6) {
+              run(setBlock(writerSchema.nodes.heading, { level }))();
+            }
+          }}
         >
-          <Heading3 size={15} aria-hidden="true" />
-        </ToolbarButton>
-        <ToolbarButton
-          label="Đoạn văn thường (Ctrl+Alt+0)"
-          active={paragraphActive}
-          onClick={run(setBlock(writerSchema.nodes.paragraph))}
-        >
-          <Pilcrow size={15} aria-hidden="true" />
-        </ToolbarButton>
+          <option value="paragraph">Đoạn văn</option>
+          {[1, 2, 3, 4, 5, 6].map((level) => (
+            <option key={level} value={`heading-${level}`}>
+              Tiêu đề {level}
+            </option>
+          ))}
+        </select>
         </div>
 
         <div className="vd-writer__toolbar-row">
@@ -834,6 +1301,13 @@ export function WriterEditor({
           onClick={run(toggleList(writerSchema.nodes.ordered_list))}
         >
           <ListOrdered size={15} aria-hidden="true" />
+        </ToolbarButton>
+        <ToolbarButton
+          label="Danh sách việc cần làm (Ctrl+Shift+9)"
+          active={taskActive}
+          onClick={run(toggleTaskList())}
+        >
+          <ListChecks size={15} aria-hidden="true" />
         </ToolbarButton>
 
         <span className="vd-writer__divider" />
@@ -906,6 +1380,12 @@ export function WriterEditor({
         <ToolbarButton label="Ngắt trang" onClick={run(insertPageBreak())}>
           <SeparatorHorizontal size={15} aria-hidden="true" />
         </ToolbarButton>
+        <ToolbarButton
+          label="Chèn đường kẻ ngang"
+          onClick={run(insertHorizontalRule())}
+        >
+          <Minus size={15} aria-hidden="true" />
+        </ToolbarButton>
 
         <span className="vd-writer__divider" />
 
@@ -917,6 +1397,75 @@ export function WriterEditor({
           }}
         >
           <Search size={15} aria-hidden="true" />
+        </ToolbarButton>
+
+        <ToolbarButton
+          label="Bảng điều hướng cấu trúc tài liệu"
+          active={outlineOpen}
+          onClick={() => setOutlineOpen((value) => !value)}
+        >
+          <ListTree size={15} aria-hidden="true" />
+        </ToolbarButton>
+
+        <ToolbarButton
+          label="Đầu trang và chân trang"
+          active={pagePanelOpen}
+          onClick={() => setPagePanelOpen((value) => !value)}
+        >
+          <PanelTop size={15} aria-hidden="true" />
+        </ToolbarButton>
+
+        <ToolbarButton
+          label="Theo dõi thay đổi"
+          active={trackChangesOn}
+          onClick={toggleTrackChangesMode}
+        >
+          <GitCompareArrows size={15} aria-hidden="true" />
+        </ToolbarButton>
+
+        {changeList.length > 0 ? (
+          <>
+            {currentChange ? (
+              <>
+                <ToolbarButton
+                  label="Chấp nhận thay đổi tại con trỏ"
+                  onClick={() => resolveCurrentChange(true)}
+                >
+                  <Check size={15} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Bác bỏ thay đổi tại con trỏ"
+                  onClick={() => resolveCurrentChange(false)}
+                >
+                  <X size={15} aria-hidden="true" />
+                </ToolbarButton>
+              </>
+            ) : null}
+            <ToolbarButton
+              label="Chấp nhận mọi thay đổi"
+              onClick={acceptAll}
+            >
+              <CheckCheck size={15} aria-hidden="true" />
+            </ToolbarButton>
+            <ToolbarButton
+              label="Bác bỏ mọi thay đổi"
+              onClick={rejectAll}
+            >
+              <Undo2 size={15} aria-hidden="true" />
+            </ToolbarButton>
+          </>
+        ) : null}
+
+        <ToolbarButton
+          label="Bình luận"
+          active={commentsOpen}
+          onClick={startComment}
+        >
+          <MessageSquarePlus size={15} aria-hidden="true" />
+        </ToolbarButton>
+
+        <ToolbarButton label="In / xuất PDF (Ctrl+P)" onClick={printNow}>
+          <Printer size={15} aria-hidden="true" />
         </ToolbarButton>
         </div>
 
@@ -1098,6 +1647,58 @@ export function WriterEditor({
         </div>
       ) : null}
 
+      {pagePanelOpen ? (
+        <div
+          className="vd-writer__panel"
+          role="dialog"
+          aria-label="Đầu trang và chân trang"
+        >
+          <PanelTop size={15} aria-hidden="true" />
+          <label htmlFor="vd-writer-header">Đầu trang</label>
+          <input
+            id="vd-writer-header"
+            className="vd-writer__search-input"
+            value={pageSetup.header}
+            placeholder="Ví dụ: BÁO CÁO THƯỜNG NIÊN"
+            aria-label="Nội dung đầu trang"
+            onChange={(event) =>
+              updatePageSetup({ ...pageSetup, header: event.target.value })
+            }
+          />
+          <label htmlFor="vd-writer-footer">Chân trang</label>
+          <input
+            id="vd-writer-footer"
+            className="vd-writer__search-input"
+            value={pageSetup.footer}
+            placeholder="Ví dụ: Ngày cấp phép"
+            aria-label="Nội dung chân trang"
+            onChange={(event) =>
+              updatePageSetup({ ...pageSetup, footer: event.target.value })
+            }
+          />
+          <label className="vd-writer__search-case">
+            <input
+              type="checkbox"
+              checked={pageSetup.showPageNumbers}
+              onChange={(event) =>
+                updatePageSetup({
+                  ...pageSetup,
+                  showPageNumbers: event.target.checked,
+                })
+              }
+            />
+            Hiện số trang
+          </label>
+          <button
+            type="button"
+            className="vd-writer__panel-action"
+            onClick={() => setPagePanelOpen(false)}
+          >
+            Đóng
+          </button>
+        </div>
+      ) : null}
+
       {searchOpen ? (
         <div className="vd-writer__search" role="search" aria-label="Tìm và thay thế">
           <Search size={15} aria-hidden="true" />
@@ -1206,22 +1807,179 @@ export function WriterEditor({
         </div>
       ) : null}
 
-      <div className="vd-writer__viewport">
-        <div className="vd-writer__page">
-          <div ref={hostRef} className="vd-writer__surface" spellCheck lang="vi" />
-          {empty ? (
-            <div className="vd-writer__placeholder" aria-hidden="true">
-              Bắt đầu nhập văn bản…
+      <div className="vd-writer__body">
+        <div className="vd-writer__viewport">
+          <div className="vd-writer__page">
+            <div className="vd-writer__page-header" aria-label="Đầu trang">
+              {pageSetup.header}
             </div>
-          ) : null}
+            <div className="vd-writer__page-body">
+              <div ref={hostRef} className="vd-writer__surface" spellCheck lang="vi" />
+              {empty ? (
+                <div className="vd-writer__placeholder" aria-hidden="true">
+                  Bắt đầu nhập văn bản…
+                </div>
+              ) : null}
+            </div>
+            <div className="vd-writer__page-footer" aria-label="Chân trang">
+              <span className="vd-writer__page-footer-text">
+                {pageSetup.footer}
+              </span>
+              {pageSetup.showPageNumbers ? (
+                <span className="vd-writer__page-number">
+                  Trang {pagination.page} / {pagination.total}
+                </span>
+              ) : null}
+            </div>
+          </div>
         </div>
+
+        {outlineOpen ? (
+          <nav
+            className="vd-writer__outline"
+            aria-label="Điều hướng cấu trúc tài liệu"
+          >
+            <div className="vd-writer__outline-head">Cấu trúc tài liệu</div>
+            {outline.length === 0 ? (
+              <p className="vd-writer__outline-empty">
+                Chưa có tiêu đề nào. Dùng hộp “Kiểu đoạn” để tạo tiêu đề.
+              </p>
+            ) : (
+              <ul className="vd-writer__outline-list">
+                {outline.map((entry, index) => (
+                  <li key={`${entry.pos}-${index}`}>
+                    <button
+                      type="button"
+                      className={
+                        index === activeOutline ? "is-active" : undefined
+                      }
+                      style={{ paddingLeft: 8 + (entry.level - 1) * 14 }}
+                      title={`Tiêu đề cấp ${entry.level}`}
+                      onClick={() => jumpToHeading(entry.pos)}
+                    >
+                      {entry.text}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </nav>
+        ) : null}
+
+        {commentsOpen ? (
+          <aside
+            className="vd-writer__comments"
+            aria-label="Bình luận"
+          >
+            <div className="vd-writer__comments-head">
+              <span>Bình luận ({comments.length})</span>
+              <button
+                type="button"
+                aria-label="Đóng bảng bình luận"
+                title="Đóng"
+                onClick={() => setCommentsOpen(false)}
+              >
+                <X size={14} aria-hidden="true" />
+              </button>
+            </div>
+
+            {commentDraft !== null ? (
+              <div className="vd-writer__comment-composer">
+                <textarea
+                  className="vd-writer__comment-input"
+                  value={commentDraft}
+                  maxLength={MAX_COMMENT_TEXT}
+                  rows={3}
+                  placeholder="Viết bình luận…"
+                  aria-label="Nội dung bình luận"
+                  onChange={(event) => {
+                    setCommentDraft(event.target.value);
+                    setCommentError(null);
+                  }}
+                />
+                {commentError ? (
+                  <span
+                    className="vd-writer__panel-error"
+                    role="alert"
+                  >
+                    {commentError}
+                  </span>
+                ) : null}
+                <div className="vd-writer__comment-actions">
+                  <button
+                    type="button"
+                    className="vd-writer__panel-action"
+                    onClick={submitComment}
+                  >
+                    Gửi
+                  </button>
+                  <button
+                    type="button"
+                    className="vd-writer__panel-action"
+                    onClick={() => {
+                      setCommentDraft(null);
+                      setCommentAnchor(null);
+                      setCommentError(null);
+                    }}
+                  >
+                    Hủy
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {comments.length === 0 && commentDraft === null ? (
+              <p className="vd-writer__outline-empty">
+                Chưa có bình luận nào. Bôi đen đoạn văn bản rồi bấm “Bình luận”.
+              </p>
+            ) : null}
+
+            <ul className="vd-writer__comment-list">
+              {comments.map((comment) => (
+                <li key={comment.id} className="vd-writer__comment">
+                  <button
+                    type="button"
+                    className="vd-writer__comment-quote"
+                    title="Đi tới đoạn được bình luận"
+                    onClick={() => focusComment(comment.id)}
+                  >
+                    {comment.quote || "(không có trích đoạn)"}
+                  </button>
+                  <div className="vd-writer__comment-body">
+                    <strong>{comment.author}</strong>
+                    <span className="vd-writer__comment-time">
+                      {formatCommentTime(comment.createdAt)}
+                    </span>
+                  </div>
+                  <p className="vd-writer__comment-text">{comment.text}</p>
+                  <button
+                    type="button"
+                    className="vd-writer__comment-delete"
+                    aria-label={`Xoá bình luận của ${comment.author}`}
+                    title="Xoá bình luận"
+                    onClick={() => removeComment(comment.id)}
+                  >
+                    <X size={13} aria-hidden="true" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </aside>
+        ) : null}
       </div>
 
       <div className="vd-writer__status">
         <span>
           {stats.words} từ · {stats.characters} ký tự
         </span>
-        <span>A4 · Lề NĐ30 · chưa phân trang</span>
+        {changeList.length > 0 ? (
+          <span>
+            {changeList.length} thay đổi đang chờ duyệt
+          </span>
+        ) : null}
+        <span>
+          A4 · Lề NĐ30 · Trang {pagination.page}/{pagination.total}
+        </span>
       </div>
     </div>
   );

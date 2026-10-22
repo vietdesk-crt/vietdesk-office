@@ -1,44 +1,12 @@
-import {
-  KIND_GLYPH,
-  KIND_LABEL,
-  kindFromFileName,
-} from "@vietdesk/ipc-contract";
+import { kindFromFileName } from "@vietdesk/ipc-contract";
 import type { RecentEntry } from "@vietdesk/ipc-contract";
 import { normalizeForSearch } from "@vietdesk/vietnamese";
 import { useMemo, useState } from "react";
+import { APPS, HOME_CARDS, appDisplay } from "./apps";
+import type { AppId } from "./apps";
 import type { Draft } from "./drafts";
 import { formatFileSize, formatRelativeTime } from "./format";
 import { VietDeskLogo } from "./Logo";
-
-export type CreatableKind = "writer" | "sheets" | "slides";
-
-interface CreateCard {
-  kind: CreatableKind;
-  title: string;
-  description: string;
-  formats: string;
-}
-
-const CARDS: CreateCard[] = [
-  {
-    kind: "writer",
-    title: "Văn bản",
-    description: "Công văn, quyết định, biên bản — chuẩn NĐ30.",
-    formats: "Lưu .vdx · DOCX đang phát triển",
-  },
-  {
-    kind: "sheets",
-    title: "Bảng tính",
-    description: "Bảng lương, dự toán, công thức và số tiền VND.",
-    formats: "Lưu .vdx · XLSX đang phát triển",
-  },
-  {
-    kind: "slides",
-    title: "Trình chiếu",
-    description: "Bài giảng, báo cáo, khung 16:9.",
-    formats: "Lưu .vdx · PPTX đang phát triển",
-  },
-];
 
 export interface HomeProps {
   recents: RecentEntry[];
@@ -46,7 +14,7 @@ export interface HomeProps {
   error: string | null;
   theme?: "light" | "dark";
   drafts?: Draft[];
-  onCreate: (kind: CreatableKind) => void;
+  onCreate: (kind: AppId) => void;
   onOpenRecent: (entry: RecentEntry) => void;
   onOpenFile: () => void;
   onTogglePin: (entry: RecentEntry) => void;
@@ -128,12 +96,12 @@ export function Home({
                   className={`vd-recent__badge is-${draft.kind}`}
                   aria-hidden="true"
                 >
-                  {KIND_GLYPH[draft.kind]}
+                  {APPS[draft.kind].glyph}
                 </span>
                 <span className="vd-draft__info">
                   <span className="vd-draft__name">{draft.name}</span>
                   <span className="vd-draft__meta">
-                    <span>{KIND_LABEL[draft.kind]}</span>
+                    <span>{APPS[draft.kind].label}</span>
                     <span>·</span>
                     <span>{draft.path ?? "chưa lưu vào đĩa"}</span>
                     <span>·</span>
@@ -167,11 +135,11 @@ export function Home({
       <section className="vd-home__section" aria-labelledby="vd-create-heading">
         <div className="vd-home__section-head">
           <h2 id="vd-create-heading">Tạo mới</h2>
-          <span className="vd-home__count">3 định dạng</span>
+          <span className="vd-home__count">{HOME_CARDS.length} định dạng</span>
         </div>
 
         <div className="vd-cards">
-          {CARDS.map((card) => (
+          {HOME_CARDS.map((card) => (
             <button
               type="button"
               key={card.kind}
@@ -179,7 +147,7 @@ export function Home({
               onClick={() => onCreate(card.kind)}
             >
               <span className="vd-card__glyph" aria-hidden="true">
-                {KIND_GLYPH[card.kind]}
+                {APPS[card.kind].glyph}
               </span>
               <span className="vd-card__title">{card.title}</span>
               <span className="vd-card__desc">{card.description}</span>
@@ -239,6 +207,7 @@ export function Home({
                 entry.kind === "unknown"
                   ? kindFromFileName(entry.name)
                   : entry.kind;
+              const meta = appDisplay(kind);
               const size = formatFileSize(entry.size);
               const missing = entry.path !== null && !entry.exists;
 
@@ -253,12 +222,12 @@ export function Home({
                       className={`vd-recent__badge is-${kind}`}
                       aria-hidden="true"
                     >
-                      {KIND_GLYPH[kind]}
+                      {meta.glyph}
                     </span>
                     <span className="vd-recent__info">
                       <span className="vd-recent__name">{entry.name}</span>
                       <span className="vd-recent__meta">
-                        <span className="vd-recent__kind">{KIND_LABEL[kind]}</span>
+                        <span className="vd-recent__kind">{meta.label}</span>
                         <span>·</span>
                         <span className="vd-recent__path">
                           {entry.path ?? "Chưa lưu vào đĩa"}

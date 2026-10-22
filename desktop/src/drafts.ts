@@ -6,6 +6,7 @@
  * việc*, không phải tài liệu người dùng. Khi đã lưu thành `.vdx`, bản nháp
  * tương ứng bị xoá.
  */
+import { DOCUMENT_KINDS } from "@vietdesk/ipc-contract";
 import type { DocumentType } from "@vietdesk/ipc-contract";
 
 export interface Draft {
@@ -34,7 +35,7 @@ function isDraft(value: unknown): value is Draft {
   const draft = value as Partial<Draft>;
   return (
     typeof draft.id === "string" &&
-    (draft.kind === "writer" || draft.kind === "sheets" || draft.kind === "slides") &&
+    DOCUMENT_KINDS.includes(draft.kind as DocumentType) &&
     typeof draft.name === "string" &&
     typeof draft.updatedAt === "number" &&
     draft.content !== undefined
