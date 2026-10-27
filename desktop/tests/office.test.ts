@@ -295,10 +295,40 @@ describe("luồng mở tệp Office", () => {
     expect(isOfficeDocument("a.xlsx")).toBe(true);
     expect(isOfficeDocument("a.pptx")).toBe(true);
     expect(isOfficeDocument("a.odt")).toBe(true);
+    expect(isOfficeDocument("a.txt")).toBe(true);
+    expect(isOfficeDocument("ghi-chu.md")).toBe(true);
+    expect(isOfficeDocument("so-lieu.csv")).toBe(true);
+    expect(isOfficeDocument("bang.tsv")).toBe(true);
     expect(isOfficeDocument("A.DOCX")).toBe(true);
     expect(isOfficeDocument("a.doc")).toBe(false);
     expect(isOfficeDocument("a.pdf")).toBe(false);
     expect(isOfficeDocument("a.vdx")).toBe(false);
+  });
+
+  it("đọc tệp văn bản thô .txt và .md thành tài liệu Writer", () => {
+    const textBytes = new TextEncoder().encode("Dòng 1\nDòng 2");
+    const result = convertOfficeFile("note.txt", textBytes);
+    expect(result.kind).toBe("writer");
+    const doc = result.content as {
+      type: string;
+      content: { type: string; content?: { text?: string }[] }[];
+    };
+    expect(doc.type).toBe("doc");
+    expect(doc.content[0].content?.[0]?.text).toBe("Dòng 1");
+    expect(doc.content[1].content?.[0]?.text).toBe("Dòng 2");
+  });
+
+  it("đọc tệp bảng tính phân cách .csv thành ô tính Sheets", () => {
+    const csvBytes = new TextEncoder().encode("Mã,Họ tên,Lương\nNV01,Nguyễn Văn An,15000000");
+    const result = convertOfficeFile("bang-luong.csv", csvBytes);
+    expect(result.kind).toBe("sheets");
+    const sheets = result.content as { cells: Record<string, string> };
+    expect(sheets.cells.A1).toBe("Mã");
+    expect(sheets.cells.B1).toBe("Họ tên");
+    expect(sheets.cells.C1).toBe("Lương");
+    expect(sheets.cells.A2).toBe("NV01");
+    expect(sheets.cells.B2).toBe("Nguyễn Văn An");
+    expect(sheets.cells.C2).toBe("15000000");
   });
 
   it("ném lỗi có thông báo khi phần mở rộng không hỗ trợ", () => {

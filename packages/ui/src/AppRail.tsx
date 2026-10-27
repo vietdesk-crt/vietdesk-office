@@ -18,7 +18,7 @@ export interface AppRailProps {
 }
 
 /**
- * Thanh điều hướng dọc kiểu WPS: Trang chủ + ba ứng dụng + tiện ích.
+ * Thanh điều hướng dọc chuẩn bộ ứng dụng văn phòng: Trang chủ + ba ứng dụng + tiện ích.
  * Chỉ trình bày, không giữ state.
  */
 export function AppRail({ items, active, onSelect, footer }: AppRailProps) {

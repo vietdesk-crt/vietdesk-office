@@ -1,7 +1,7 @@
 import { kindFromFileName } from "@vietdesk/ipc-contract";
 import type { RecentEntry } from "@vietdesk/ipc-contract";
 import { normalizeForSearch } from "@vietdesk/vietnamese";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { APPS, APP_IDS, HOME_CARDS, appDisplay } from "./apps";
 import type { AppId } from "./apps";
 import type { Draft } from "./drafts";
@@ -34,11 +34,13 @@ const DATE_FMT = new Intl.DateTimeFormat("vi-VN", {
 });
 
 /**
- * Trang chủ dùng chung (kiểu WPS Start Center / LibreOffice Start Center).
+ * Trang chủ dùng chung cho toàn bộ ứng dụng VietDesk Office.
  *
  * Chỉ trình bày + lọc cục bộ; mọi thao tác đi qua callback để App quyết định
  * điều hướng và ghi lịch sử.
  */
+type RecentFilter = "all" | "pinned" | "writer" | "sheets" | "slides";
+
 export function Home({
   recents,
   loading,
@@ -55,19 +57,30 @@ export function Home({
   onDiscardDraft,
 }: HomeProps) {
   const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<RecentFilter>("all");
   const normalizedQuery = normalizeForSearch(query);
   const weather = useWeather();
 
   const filtered = useMemo(() => {
-    if (!normalizedQuery) {
-      return recents;
+    let list = recents;
+    if (filter === "pinned") {
+      list = list.filter((entry) => entry.pinned);
+    } else if (filter === "writer" || filter === "sheets" || filter === "slides") {
+      list = list.filter((entry) => {
+        const kind = entry.kind === "unknown" ? kindFromFileName(entry.name) : entry.kind;
+        return kind === filter;
+      });
     }
-    return recents.filter((entry) =>
+
+    if (!normalizedQuery) {
+      return list;
+    }
+    return list.filter((entry) =>
       normalizeForSearch(`${entry.name} ${entry.path ?? ""}`).includes(
         normalizedQuery,
       ),
     );
-  }, [recents, normalizedQuery]);
+  }, [recents, filter, normalizedQuery]);
 
   const pinnedCount = recents.filter((entry) => entry.pinned).length;
 
@@ -83,60 +96,49 @@ export function Home({
     return counts;
   }, [recents]);
 
+  const [templateFilter, setTemplateFilter] = useState<"all" | "writer" | "sheets" | "slides">("all");
+  const carouselRef = useRef<HTMLDivElement>(null);
+
+  const filteredTemplates = useMemo(() => {
+    if (templateFilter === "all") return HOME_TEMPLATES;
+    return HOME_TEMPLATES.filter((tpl) => tpl.appId === templateFilter);
+  }, [templateFilter]);
+
+  const scrollTemplates = (direction: "left" | "right") => {
+    if (carouselRef.current) {
+      const offset = direction === "left" ? -380 : 380;
+      carouselRef.current.scrollBy({ left: offset, behavior: "smooth" });
+    }
+  };
+
   return (
     <div className="vd-home">
-      {/* Họa tiết hệ mặt trời trang trí (thuần trang trí, không tương tác) */}
-      <div className="vd-home__orbits" aria-hidden="true">
-        <span className="vd-home__orbit-sun" />
-        <span className="vd-home__orbit vd-home__orbit--1">
-          <i className="vd-home__planet vd-home__planet--n is-writer" />
-        </span>
-        <span className="vd-home__orbit vd-home__orbit--2">
-          <i className="vd-home__planet vd-home__planet--n is-sheets" />
-          <i className="vd-home__planet vd-home__planet--s is-moon" />
-        </span>
-        <span className="vd-home__orbit vd-home__orbit--3">
-          <i className="vd-home__planet vd-home__planet--e is-slides" />
-          <i className="vd-home__planet vd-home__planet--n is-dust" />
-        </span>
-        <span className="vd-home__orbit vd-home__orbit--4">
-          <i className="vd-home__planet vd-home__planet--w is-saturn" />
-          <i className="vd-home__planet vd-home__planet--s is-dust" />
-        </span>
-        <span className="vd-home__orbit vd-home__orbit--5">
-          <i className="vd-home__planet vd-home__planet--e is-moon" />
-          <i className="vd-home__planet vd-home__planet--n is-dust" />
-          <i className="vd-home__planet vd-home__planet--s is-dust is-dust--alt" />
-        </span>
-        <span className="vd-home__orbit vd-home__orbit--6">
-          <i className="vd-home__planet vd-home__planet--n is-cream" />
-          <i className="vd-home__planet vd-home__planet--s is-dust" />
-        </span>
-        {/* Mưa thiên thạch hai bên lề */}
-        <span className="vd-home__meteor vd-home__meteor--1" />
-        <span className="vd-home__meteor vd-home__meteor--2" />
-        <span className="vd-home__meteor vd-home__meteor--3" />
-        <span className="vd-home__meteor vd-home__meteor--4" />
-        <span className="vd-home__meteor vd-home__meteor--5" />
-        <span className="vd-home__meteor vd-home__meteor--6" />
-      </div>
+      {/* Phông nền không gian làm việc tinh gọn (Architectural Canvas Backdrop) */}
+      <div className="vd-home__backdrop" aria-hidden="true" />
       <div className="vd-home__inner">
       <header className="vd-home__hero">
         <div className="vd-home__brand-header">
           <div className="vd-home__brand-badge">
             <VietDeskLogo size={28} theme={theme} aria-hidden="true" />
             <div className="vd-home__brand-meta">
-              <span className="vd-home__eyebrow">VietDesk Office</span>
-              <span className="vd-home__tagline">Bản sắc Việt · Bộ ứng dụng văn phòng</span>
+              <div className="vd-home__brand-row">
+                <span className="vd-home__eyebrow">VietDesk Office</span>
+                <span className="vd-home__enterprise-tag">Enterprise Edition</span>
+              </div>
+              <span className="vd-home__tagline">Bản sắc Việt · Bộ ứng dụng văn phòng doanh nghiệp</span>
             </div>
+          </div>
+          <div className="vd-home__security-badge" title="Tài liệu chỉ lưu trữ cục bộ trên máy, hoàn toàn bảo mật và riêng tư">
+            <span className="vd-home__security-dot" aria-hidden="true" />
+            <span>Bảo mật On-Premise · Chuẩn NĐ 30/2020/NĐ-CP</span>
           </div>
         </div>
         <div className="vd-home__hero-body">
-          <div>
+          <div className="vd-home__hero-text">
             <h1>Hôm nay bạn muốn soạn gì?</h1>
             <p className="vd-home__lead">
-              Một không gian chung cho văn bản, bảng tính và trình chiếu — đầy đủ
-              tiếng Việt, chuẩn văn bản hành chính.
+              Không gian làm việc đồng bộ cho văn bản, bảng tính và trình chiếu — đầy đủ
+              tiếng Việt, chuẩn hóa thể thức hành chính doanh nghiệp.
             </p>
           </div>
           <div className="vd-home__today-wrap">
@@ -166,6 +168,43 @@ export function Home({
             </div>
           </div>
         </div>
+
+        {/* Thanh tìm kiếm tài liệu thông minh Spotlight */}
+        <div className="vd-home__search-row">
+          <div className="vd-home__smart-search-box">
+            <span className="vd-home__smart-search-icon" aria-hidden="true">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+            </span>
+            <input
+              type="search"
+              className="vd-home__smart-search-input"
+              placeholder="Tìm kiếm tài liệu, công văn, bảng tính... (Lọc nhanh theo tên hoặc đường dẫn)"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              aria-label="Tìm kiếm tài liệu"
+            />
+            {query ? (
+              <button
+                type="button"
+                className="vd-home__search-clear"
+                onClick={() => setQuery("")}
+                title="Xóa tìm kiếm"
+              >
+                ×
+              </button>
+            ) : null}
+          </div>
+          <button type="button" className="vd-button is-primary vd-home__quick-open-btn" onClick={onOpenFile}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+            </svg>
+            <span>Mở tệp từ máy…</span>
+          </button>
+        </div>
+
         {recents.length > 0 && !loading ? (
           <div className="vd-home__stats">
             {APP_IDS.map((kind) => (
@@ -248,36 +287,11 @@ export function Home({
               <span className="vd-card__glyph" aria-hidden="true">
                 {APPS[card.kind].glyph}
               </span>
-              <span className="vd-card__title">{card.title}</span>
-              <span className="vd-card__desc">{card.description}</span>
-              <span className="vd-card__formats">{card.formats}</span>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <section className="vd-home__section" aria-labelledby="vd-templates-heading">
-        <div className="vd-home__section-head">
-          <h2 id="vd-templates-heading">Mẫu tài liệu chuẩn Việt</h2>
-          <span className="vd-home__count">{HOME_TEMPLATES.length} mẫu có sẵn</span>
-        </div>
-
-        <div className="vd-templates-grid">
-          {HOME_TEMPLATES.map((tpl) => (
-            <button
-              type="button"
-              key={tpl.id}
-              className={`vd-template-card is-${tpl.appId}`}
-              onClick={() => onCreate(tpl.appId, tpl.getContent(), tpl.documentName)}
-            >
-              <div className="vd-template-card__header">
-                <span className={`vd-template-card__badge is-${tpl.appId}`}>
-                  {APPS[tpl.appId].glyph} {tpl.badge}
-                </span>
-                <span className="vd-template-card__app">{APPS[tpl.appId].label}</span>
+              <div className="vd-card__content">
+                <span className="vd-card__title">{card.title}</span>
+                <span className="vd-card__desc">{card.description}</span>
+                <span className="vd-card__formats">{card.formats}</span>
               </div>
-              <strong className="vd-template-card__title">{tpl.title}</strong>
-              <p className="vd-template-card__desc">{tpl.description}</p>
             </button>
           ))}
         </div>
@@ -308,6 +322,56 @@ export function Home({
             </button>
           </div>
         </div>
+
+        {recents.length > 0 && (
+          <div className="vd-home__filter-bar" role="tablist" aria-label="Bộ lọc tệp gần đây">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={filter === "all"}
+              className={`vd-home__filter-btn${filter === "all" ? " is-active" : ""}`}
+              onClick={() => setFilter("all")}
+            >
+              Tất cả ({recents.length})
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={filter === "pinned"}
+              className={`vd-home__filter-btn${filter === "pinned" ? " is-active" : ""}`}
+              onClick={() => setFilter("pinned")}
+            >
+              Đã ghim ({pinnedCount})
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={filter === "writer"}
+              className={`vd-home__filter-btn${filter === "writer" ? " is-active" : ""}`}
+              onClick={() => setFilter("writer")}
+            >
+              Văn bản ({docStats.writer})
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={filter === "sheets"}
+              className={`vd-home__filter-btn${filter === "sheets" ? " is-active" : ""}`}
+              onClick={() => setFilter("sheets")}
+            >
+              Bảng tính ({docStats.sheets})
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={filter === "slides"}
+              className={`vd-home__filter-btn${filter === "slides" ? " is-active" : ""}`}
+              onClick={() => setFilter("slides")}
+            >
+              Trình chiếu ({docStats.slides})
+            </button>
+          </div>
+        )}
 
         {error ? <p className="vd-home__error">Không đọc được lịch sử: {error}</p> : null}
 
@@ -402,12 +466,150 @@ export function Home({
         )}
 
         {recents.length > 0 && !loading ? (
-          <div className="vd-home__foot">
-            <button type="button" className="vd-link" onClick={onClearAll}>
+          <div className="vd-recents__footer">
+            <span className="vd-recents__hint">
+              <span className="vd-recents__hint-dot" aria-hidden="true" />
+              Lưu trữ cục bộ an toàn trên máy · Chuẩn bảo mật nội bộ
+            </span>
+            <button type="button" className="vd-link vd-recents__clear-btn" onClick={onClearAll}>
               Xoá lịch sử gần đây
             </button>
           </div>
         ) : null}
+      </section>
+
+      <section className="vd-home__section vd-home__templates-section" aria-labelledby="vd-templates-heading">
+        <div className="vd-home__section-head">
+          <div className="vd-home__section-title-wrap">
+            <h2 id="vd-templates-heading">Mẫu tài liệu chuẩn Việt</h2>
+            <span className="vd-home__count">{filteredTemplates.length} / {HOME_TEMPLATES.length} mẫu</span>
+          </div>
+
+          <div className="vd-templates__tabs" role="tablist" aria-label="Lọc mẫu tài liệu">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={templateFilter === "all"}
+              className={`vd-templates__tab${templateFilter === "all" ? " is-active" : ""}`}
+              onClick={() => setTemplateFilter("all")}
+            >
+              Tất cả
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={templateFilter === "writer"}
+              className={`vd-templates__tab is-writer${templateFilter === "writer" ? " is-active" : ""}`}
+              onClick={() => setTemplateFilter("writer")}
+            >
+              Văn bản ({HOME_TEMPLATES.filter((t) => t.appId === "writer").length})
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={templateFilter === "sheets"}
+              className={`vd-templates__tab is-sheets${templateFilter === "sheets" ? " is-active" : ""}`}
+              onClick={() => setTemplateFilter("sheets")}
+            >
+              Bảng tính ({HOME_TEMPLATES.filter((t) => t.appId === "sheets").length})
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={templateFilter === "slides"}
+              className={`vd-templates__tab is-slides${templateFilter === "slides" ? " is-active" : ""}`}
+              onClick={() => setTemplateFilter("slides")}
+            >
+              Trình chiếu ({HOME_TEMPLATES.filter((t) => t.appId === "slides").length})
+            </button>
+          </div>
+
+          <div className="vd-templates__nav-actions">
+            <button
+              type="button"
+              className="vd-templates__nav-btn"
+              onClick={() => scrollTemplates("left")}
+              title="Cuộn sang trái"
+              aria-label="Cuộn mẫu tài liệu sang trái"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="vd-templates__nav-btn"
+              onClick={() => scrollTemplates("right")}
+              title="Cuộn sang phải"
+              aria-label="Cuộn mẫu tài liệu sang phải"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div className="vd-templates-carousel-wrap">
+          <div className="vd-templates-grid is-carousel" ref={carouselRef}>
+            {filteredTemplates.map((tpl) => (
+              <button
+                type="button"
+                key={tpl.id}
+                className={`vd-template-card is-${tpl.appId}`}
+                onClick={() => onCreate(tpl.appId, tpl.getContent(), tpl.documentName)}
+                title={`${tpl.title} — ${tpl.description}`}
+              >
+                {/* Khung xem trước trực quan (Paper / Slide Thumbnail Preview) */}
+                <div className={`vd-template-card__preview is-${tpl.appId}`} aria-hidden="true">
+                  {tpl.appId === "writer" ? (
+                    <div className="vd-template-preview__paper">
+                      <div className="vd-template-preview__line is-header" />
+                      <div className="vd-template-preview__subline" />
+                      <div className="vd-template-preview__divider" />
+                      <div className="vd-template-preview__line is-title" />
+                      <div className="vd-template-preview__body">
+                        <div className="vd-template-preview__line" />
+                        <div className="vd-template-preview__line is-short" />
+                        <div className="vd-template-preview__line" />
+                      </div>
+                      <div className="vd-template-preview__seal" />
+                    </div>
+                  ) : tpl.appId === "sheets" ? (
+                    <div className="vd-template-preview__paper is-sheet">
+                      <div className="vd-template-preview__sheet-header" />
+                      <div className="vd-template-preview__sheet-grid">
+                        <span /><span /><span />
+                        <span /><span /><span />
+                        <span /><span /><span />
+                        <span className="is-total" /><span className="is-total" /><span className="is-total" />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="vd-template-preview__slide">
+                      <div className="vd-template-preview__slide-header" />
+                      <div className="vd-template-preview__slide-body">
+                        <div className="vd-template-preview__slide-card is-primary" />
+                        <div className="vd-template-preview__slide-card is-secondary" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="vd-template-card__info">
+                  <div className="vd-template-card__header">
+                    <span className={`vd-template-card__badge is-${tpl.appId}`}>
+                      {APPS[tpl.appId].glyph} {tpl.badge}
+                    </span>
+                    <span className="vd-template-card__app">{APPS[tpl.appId].label}</span>
+                  </div>
+                  <strong className="vd-template-card__title">{tpl.title}</strong>
+                  <p className="vd-template-card__desc">{tpl.description}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
       </section>
       </div>
     </div>

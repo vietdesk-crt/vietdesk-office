@@ -49,3 +49,81 @@ export function countWords(value: string): number {
   }
   return trimmed.split(/\s+/).length;
 }
+
+const DIGITS = ["không", "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín"];
+
+function readThreeDigits(n: number, showZeroHundred: boolean): string {
+  const hundred = Math.floor(n / 100);
+  const ten = Math.floor((n % 100) / 10);
+  const unit = n % 10;
+  const parts: string[] = [];
+
+  if (hundred > 0 || showZeroHundred) {
+    parts.push(`${DIGITS[hundred]} trăm`);
+  }
+
+  if (ten > 1) {
+    parts.push(`${DIGITS[ten]} mươi`);
+    if (unit === 1) parts.push("mốt");
+    else if (unit === 5) parts.push("lăm");
+    else if (unit > 0) parts.push(DIGITS[unit]);
+  } else if (ten === 1) {
+    parts.push("mười");
+    if (unit === 5) parts.push("lăm");
+    else if (unit > 0) parts.push(DIGITS[unit]);
+  } else {
+    if ((hundred > 0 || showZeroHundred) && unit > 0) {
+      parts.push("lẻ");
+      parts.push(DIGITS[unit]);
+    } else if (unit > 0) {
+      parts.push(DIGITS[unit]);
+    }
+  }
+
+  return parts.join(" ");
+}
+
+/**
+ * Đọc số thành chữ tiếng Việt chuẩn ngữ pháp và kế toán, phục vụ hợp đồng & hoá đơn.
+ * Ví dụ: 15000000 -> "Mười lăm triệu đồng chẵn"
+ */
+export function numberToVietnameseWords(value: number): string {
+  if (isNaN(value) || !Number.isFinite(value)) return "Không hợp lệ";
+  if (value === 0) return "Không đồng";
+  const isNegative = value < 0;
+  let absVal = Math.floor(Math.abs(value));
+  if (absVal === 0) return "Không đồng";
+
+  const GROUPS = ["", "nghìn", "triệu", "tỷ", "nghìn tỷ", "triệu tỷ"];
+  const chunks: number[] = [];
+  while (absVal > 0) {
+    chunks.push(absVal % 1000);
+    absVal = Math.floor(absVal / 1000);
+  }
+
+  const words: string[] = [];
+  for (let i = chunks.length - 1; i >= 0; i--) {
+    const chunk = chunks[i];
+    if (chunk > 0) {
+      const showZero = i < chunks.length - 1;
+      const text = readThreeDigits(chunk, showZero);
+      const unit = GROUPS[i];
+      words.push(unit ? `${text} ${unit}` : text);
+    }
+  }
+
+  let result = words.join(" ").trim();
+  result = result.charAt(0).toUpperCase() + result.slice(1) + " đồng chẵn";
+  return isNegative ? `Âm ${result.toLowerCase()}` : result;
+}
+
+/**
+ * Định dạng tiền tệ Việt Nam (VND) theo chuẩn kế toán.
+ * Ví dụ: 12500000 -> "12.500.000 ₫"
+ */
+export function formatVietnameseCurrency(value: number): string {
+  if (isNaN(value) || !Number.isFinite(value)) return "0 ₫";
+  const parts = Math.round(value).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `${parts} ₫`;
+}
+

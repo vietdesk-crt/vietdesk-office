@@ -67,6 +67,7 @@ import {
   Underline,
   Undo2,
   FileDown,
+  FileCheck,
   AArrowUp,
   AArrowDown,
   X,
@@ -404,6 +405,17 @@ const WRITER_SYMBOLS = [
   "³",
 ];
 
+/** Trường biểu mẫu điền thông tin hành chính chuẩn NĐ 30. */
+const ADMINISTRATIVE_FORM_FIELDS = [
+  { label: "Họ và tên", value: "[ Họ và tên: ............................................ ]" },
+  { label: "Chức vụ / Đơn vị", value: "[ Chức vụ / Phòng ban: .............................. ]" },
+  { label: "Số ký hiệu văn bản", value: "[ Số: ......./QĐ-UBND ]" },
+  { label: "Ngày ban hành", value: "[ Ngày ..... tháng ..... năm 20... ]" },
+  { label: "Hộp kiểm phê duyệt", value: "[ ☑ Đồng ý    ☐ Không đồng ý ]" },
+  { label: "Chữ ký & Họ tên", value: "[ (Ký, ghi rõ họ tên và đóng dấu) ]" },
+  { label: "Nơi nhận văn bản", value: "[ Nơi nhận:\n- Như Điều ...;\n- Lưu: VT, HS. ]" },
+];
+
 const DOCX_MIME =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
@@ -521,16 +533,36 @@ export function WriterEditor({
   const [linkUrl, setLinkUrl] = useState("");
   const [linkError, setLinkError] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
-  /** Bảng chèn phụ đang mở: ngày tháng hoặc ký hiệu. */
-  const [insertPanel, setInsertPanel] = useState<"date" | "symbol" | null>(
+  /** Bảng chèn phụ đang mở: ngày tháng, ký hiệu hoặc biểu mẫu hành chính. */
+  const [insertPanel, setInsertPanel] = useState<"date" | "symbol" | "form" | null>(
     null,
   );
+  /** Chế độ chỉ đọc / bảo vệ văn bản không cho chỉnh sửa ngoài ý muốn. */
+  const [readOnly, setReadOnly] = useState(false);
+  const readOnlyRef = useRef(false);
   /** Bảng thống kê tài liệu (số từ, đoạn, thời gian đọc…). */
   const [statsOpen, setStatsOpen] = useState(false);
   /** Trạng thái xuất PDF: đang chạy / thông báo thành công / thông báo lỗi. */
   const [exportBusy, setExportBusy] = useState(false);
   const [exportNotice, setExportNotice] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [focusMode, setFocusMode] = useState(false);
+  const [ribbonTab, setRibbonTab] = useState<"home" | "insert" | "layout" | "review" | "view">("home");
+  const [pagelessMode, setPagelessMode] = useState(false);
+  const [showRuler, setShowRuler] = useState(true);
+
+  /** Chuẩn hóa trang văn bản 1 chạm theo Nghị định 30/2020/NĐ-CP */
+  const applyNd30Layout = () => {
+    const nd30Setup: PageSetup = {
+      ...pageSetup,
+      showPageNumbers: true,
+    };
+    setPageSetup(nd30Setup);
+    setExportNotice(
+      "Đã chuẩn hóa toàn bộ trang văn bản theo Nghị định 30/2020/NĐ-CP (Khổ A4 đứng, Lề 20-20-30-15mm, Đánh số trang chuẩn).",
+    );
+    setTimeout(() => setExportNotice(null), 4500);
+  };
 
   useEffect(() => {
     onChangeRef.current = onChange;
@@ -642,6 +674,7 @@ export function WriterEditor({
           keymap(baseKeymap),
         ],
       }),
+      editable: () => !readOnlyRef.current,
       nodeViews: {
         task_item: (node, view, getPos) => new TaskItemView(node, view, getPos),
         image: (node, view, getPos) =>
@@ -689,9 +722,15 @@ export function WriterEditor({
       view.destroy();
       viewRef.current = null;
     };
-    // Chỉ khởi tạo một lần: nội dung sau đó do người dùng điều khiển.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    readOnlyRef.current = readOnly;
+    if (viewRef.current) {
+      viewRef.current.setProps({ editable: () => !readOnly });
+    }
+  }, [readOnly]);
 
   const state = viewRef.current?.state;
   const doc = state?.doc;
@@ -1533,9 +1572,16 @@ export function WriterEditor({
       setSearchOpen(true);
       return;
     }
-    if (event.key === "Escape" && searchOpen) {
-      event.preventDefault();
-      closeSearch();
+    if (event.key === "Escape") {
+      if (focusMode) {
+        event.preventDefault();
+        setFocusMode(false);
+        return;
+      }
+      if (searchOpen) {
+        event.preventDefault();
+        closeSearch();
+      }
     }
   };
 
@@ -1635,10 +1681,117 @@ export function WriterEditor({
 
   return (
     <div
-      className={`vd-writer${showMarks ? " is-show-marks" : ""}`}
+      className={`vd-writer${showMarks ? " is-show-marks" : ""}${focusMode ? " is-focus-mode" : ""}`}
       onKeyDown={handleRootKeyDown}
     >
+      {focusMode ? (
+        <button
+          type="button"
+          className="vd-writer__focus-exit"
+          onClick={() => setFocusMode(false)}
+          title="Thoát chế độ tập trung (Esc)"
+          aria-label="Thoát chế độ tập trung"
+        >
+          ✕ Thoát tập trung (Esc)
+        </button>
+      ) : null}
       <div className="vd-writer__toolbar" role="toolbar" aria-label="Định dạng">
+        <div className="vd-writer__tab-strip" role="tablist" aria-label="Nhóm chức năng Writer">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={ribbonTab === "home"}
+            className={`vd-writer__tab-btn${ribbonTab === "home" ? " is-active" : ""}`}
+            onClick={() => setRibbonTab("home")}
+          >
+            Trang chủ
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={ribbonTab === "insert"}
+            className={`vd-writer__tab-btn${ribbonTab === "insert" ? " is-active" : ""}`}
+            onClick={() => {
+              setRibbonTab("insert");
+              setTemplatePickerOpen(true);
+            }}
+          >
+            Chèn & Biểu mẫu
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={ribbonTab === "layout"}
+            className={`vd-writer__tab-btn${ribbonTab === "layout" ? " is-active" : ""}`}
+            onClick={() => {
+              setRibbonTab("layout");
+              setPagePanelOpen(true);
+            }}
+          >
+            Bố cục trang
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={ribbonTab === "review"}
+            className={`vd-writer__tab-btn${ribbonTab === "review" ? " is-active" : ""}`}
+            onClick={() => {
+              setRibbonTab("review");
+              setCommentsOpen(true);
+            }}
+          >
+            Kiểm duyệt
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={ribbonTab === "view"}
+            className={`vd-writer__tab-btn${ribbonTab === "view" ? " is-active" : ""}`}
+            onClick={() => {
+              setRibbonTab("view");
+              setOutlineOpen(true);
+            }}
+          >
+            Hiển thị
+          </button>
+
+          <div className="vd-writer__tab-actions">
+            <button
+              type="button"
+              className={`vd-writer__toggle-btn${pagelessMode ? " is-active" : ""}`}
+              onClick={() => setPagelessMode((prev) => !prev)}
+              title={pagelessMode ? "Chuyển về Chế độ Trang in chuẩn A4" : "Chuyển sang Chế độ Không ngắt trang (Google Docs Pageless Mode)"}
+            >
+              <span>{pagelessMode ? "Trang in A4" : "Không ngắt trang"}</span>
+            </button>
+            <button
+              type="button"
+              className={`vd-writer__toggle-btn${showRuler && !pagelessMode ? " is-active" : ""}`}
+              disabled={pagelessMode}
+              onClick={() => setShowRuler((prev) => !prev)}
+              title="Hiện / Ẩn thước kẻ căn lề tài liệu"
+            >
+              <span>Thước kẻ</span>
+            </button>
+            <button
+              type="button"
+              className={`vd-writer__toggle-btn${readOnly ? " is-active" : ""}`}
+              onClick={() => setReadOnly((prev) => !prev)}
+              title={readOnly ? "Đang khóa chỉnh sửa (Chỉ đọc). Nhấn để bật chế độ Soạn thảo" : "Khóa chỉnh sửa văn bản (Chế độ Chỉ đọc bảo vệ)"}
+            >
+              <span>{readOnly ? "Đang bảo vệ (Chỉ đọc)" : "Chế độ đọc"}</span>
+            </button>
+            <button
+              type="button"
+              className="vd-writer__nd30-btn"
+              onClick={applyNd30Layout}
+              title="Chuẩn hóa toàn bộ trang văn bản theo Nghị định 30/2020/NĐ-CP (Lề 20-20-30-15mm, Khổ A4, Đánh số trang chuẩn)"
+            >
+              <FileCheck size={14} aria-hidden="true" />
+              <span>Chuẩn hóa NĐ 30</span>
+            </button>
+          </div>
+        </div>
         <div className="vd-writer__toolbar-strip">
           <div className="vd-writer__tgroup vd-writer__tgroup--rail">
             <div className="vd-writer__tgroup-line vd-writer__tgroup-line--stack">
@@ -2134,6 +2287,15 @@ export function WriterEditor({
               >
                 <Hash size={17} aria-hidden="true" />
               </ToolbarButton>
+              <ToolbarButton
+                label="Chèn trường biểu mẫu (OFORM)"
+                active={insertPanel === "form"}
+                onClick={() =>
+                  setInsertPanel((open) => (open === "form" ? null : "form"))
+                }
+              >
+                <SquareDashed size={17} aria-hidden="true" />
+              </ToolbarButton>
             </div>
             <span className="vd-writer__tgroup-caption">Chèn</span>
           </div>
@@ -2445,6 +2607,38 @@ export function WriterEditor({
               </button>
             ))}
           </div>
+          <button
+            type="button"
+            className="vd-writer__panel-action"
+            onClick={() => setInsertPanel(null)}
+          >
+            Đóng
+          </button>
+        </div>
+      ) : null}
+
+      {insertPanel === "form" ? (
+        <div
+          className="vd-writer__panel"
+          role="dialog"
+          aria-label="Bảng chèn trường biểu mẫu hành chính"
+        >
+          <SquareDashed size={17} aria-hidden="true" />
+          <span className="vd-writer__panel-hint">Trường biểu mẫu hành chính (OFORM)</span>
+          {ADMINISTRATIVE_FORM_FIELDS.map((field) => (
+            <button
+              key={field.label}
+              type="button"
+              className="vd-writer__panel-action"
+              title={field.label}
+              onClick={() => {
+                insertTextAtCursor(field.value);
+                setInsertPanel(null);
+              }}
+            >
+              {field.label}
+            </button>
+          ))}
           <button
             type="button"
             className="vd-writer__panel-action"
@@ -2818,9 +3012,24 @@ export function WriterEditor({
         </div>
       ) : null}
 
-      <div className="vd-writer__body">
-        <div className="vd-writer__viewport">
-          <div className="vd-writer__page">
+      <div className={`vd-writer__body${pagelessMode ? " is-pageless" : ""}`}>
+        {showRuler && !pagelessMode && (
+          <div className="vd-writer__ruler" aria-label="Thước kẻ căn lề tài liệu">
+            <div className="vd-writer__ruler-track">
+              <div className="vd-writer__ruler-margin-left" title="Lề trái chuẩn NĐ 30: 30mm" />
+              <div className="vd-writer__ruler-scale">
+                {Array.from({ length: 16 }).map((_, i) => (
+                  <span key={i} className="vd-writer__ruler-cm">
+                    <span>{i + 1}</span>
+                  </span>
+                ))}
+              </div>
+              <div className="vd-writer__ruler-margin-right" title="Lề phải chuẩn NĐ 30: 15mm" />
+            </div>
+          </div>
+        )}
+        <div className={`vd-writer__viewport${pagelessMode ? " is-pageless" : ""}`}>
+          <div className={`vd-writer__page${pagelessMode ? " is-pageless" : ""}`}>
             <div className="vd-writer__page-header" aria-label="Đầu trang">
               {pageSetup.header}
             </div>
@@ -2980,17 +3189,35 @@ export function WriterEditor({
       </div>
 
       <div className="vd-writer__status">
-        <span>
-          {stats.words} từ · {stats.characters} ký tự · {stats.paragraphs} đoạn
-        </span>
-        {changeList.length > 0 ? (
+        <div className="vd-writer__status-left">
           <span>
-            {changeList.length} thay đổi đang chờ duyệt
+            {stats.words} từ · {stats.characters} ký tự · {stats.paragraphs} đoạn
           </span>
-        ) : null}
-        <span>
-          A4 · Lề NĐ30 · Trang {pagination.page}/{pagination.total}
-        </span>
+          <span
+            className="vd-writer__status-readtime"
+            title="Thời gian đọc ước tính (tốc độ đọc trung bình 220 từ/phút)"
+          >
+            ~{stats.words > 0 ? Math.max(1, Math.ceil(stats.words / 220)) : 0} phút đọc
+          </span>
+          {changeList.length > 0 ? (
+            <span>
+              {changeList.length} thay đổi đang chờ duyệt
+            </span>
+          ) : null}
+        </div>
+        <div className="vd-writer__status-right">
+          <button
+            type="button"
+            className={`vd-writer__status-focus${focusMode ? " is-active" : ""}`}
+            onClick={() => setFocusMode((f) => !f)}
+            title="Chế độ tập trung soạn thảo (Focus Mode)"
+          >
+            {focusMode ? "✕ Thoát tập trung" : "Chế độ tập trung"}
+          </button>
+          <span>
+            A4 · Lề NĐ30 · Trang {pagination.page}/{pagination.total}
+          </span>
+        </div>
       </div>
     </div>
   );

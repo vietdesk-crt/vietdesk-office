@@ -9,12 +9,15 @@
     "packages/*"
   ],
   "scripts": {
+    "predev": "fuser -k 1420/tcp 2>/dev/null || true",
     "dev": "npm run dev --workspace @vietdesk/desktop",
+    "dev:stop": "fuser -k 1420/tcp 2>/dev/null || true",
     "build": "npm run build --workspace @vietdesk/desktop",
     "typecheck": "npm run typecheck --workspace @vietdesk/desktop",
     "tauri": "npm run tauri --workspace @vietdesk/desktop",
     "test": "npm run test --workspace @vietdesk/desktop",
     "test:core": "node scripts/test-core.mjs",
+    "test:engine": "node scripts/test-core.mjs",
     "test:all": "npm test && node scripts/test-core.mjs",
     "check": "npm run typecheck && npm test && node scripts/test-core.mjs && npm run build"
   },

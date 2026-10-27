@@ -13,6 +13,7 @@
  */
 
 import type { Node as PMNode } from "prosemirror-model";
+import { isRecord } from "@vietdesk/ipc-contract";
 import { writerSchema } from "./schema";
 
 export interface WriterComment {
@@ -36,10 +37,6 @@ export const MAX_COMMENT_QUOTE = 300;
 
 /** Số bình luận tối đa giữ trong một tài liệu. */
 export const MAX_COMMENTS = 500;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 function readText(value: unknown, limit: number): string {
   return typeof value === "string" ? value.slice(0, limit) : "";

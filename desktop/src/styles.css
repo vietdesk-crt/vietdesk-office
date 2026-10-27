@@ -702,7 +702,7 @@ input.vd-tab__name:focus {
 .vd-home {
   flex: 1;
   overflow-y: auto;
-  padding: 32px 40px 56px;
+  padding: 24px 36px 48px;
 }
 
 .vd-home__inner {
@@ -711,338 +711,59 @@ input.vd-tab__name:focus {
   margin-inline: auto;
 }
 
-/* họa tiết "hệ mặt trời": mặt trời + các vòng quỹ đạo với nhiều hành tinh
-   xoay quanh, phủ kín vùng trống phía sau nội dung trang chủ. */
+/* --- Phông nền kiến trúc tinh gọn (Universal Workspace Canvas) --------------- */
 .vd-home {
   position: relative;
 }
 
-.vd-home__orbits {
+.vd-home__backdrop {
   position: absolute;
   inset: 0;
   z-index: -1;
   overflow: hidden;
   pointer-events: none;
-}
-
-.vd-home__orbit,
-.vd-home__orbit-sun {
-  position: absolute;
-  left: 58%;
-  top: 50%;
-}
-
-.vd-home__orbit-sun {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: var(--vd-accent);
-  transform: translate(-50%, -50%);
-  opacity: 0.55;
-  box-shadow:
-    0 0 14px color-mix(in srgb, var(--vd-accent) 55%, transparent),
-    0 0 42px color-mix(in srgb, var(--vd-accent) 32%, transparent),
-    0 0 90px color-mix(in srgb, var(--vd-accent) 20%, transparent);
-}
-
-.vd-home__orbit {
-  border-radius: 50%;
-  border: 1px solid color-mix(in srgb, var(--vd-accent) 20%, transparent);
-  animation: vd-home-orbit linear infinite;
-}
-
-.vd-home__orbit--1 {
-  width: 120px;
-  height: 120px;
-  animation-duration: 12s;
-}
-
-.vd-home__orbit--2 {
-  width: 220px;
-  height: 220px;
-  border-style: dashed;
-  border-color: color-mix(in srgb, var(--vd-accent) 16%, transparent);
-  animation-duration: 20s;
-  animation-direction: reverse;
-}
-
-.vd-home__orbit--3 {
-  width: 340px;
-  height: 340px;
-  animation-duration: 30s;
-}
-
-.vd-home__orbit--4 {
-  width: 480px;
-  height: 480px;
-  animation-duration: 44s;
-  animation-direction: reverse;
-}
-
-.vd-home__orbit--5 {
-  width: 650px;
-  height: 650px;
-  border-color: color-mix(in srgb, var(--vd-accent) 14%, transparent);
-  animation-duration: 60s;
-}
-
-.vd-home__orbit--6 {
-  width: 880px;
-  height: 880px;
-  border-style: dashed;
-  border-color: color-mix(in srgb, var(--vd-accent) 12%, transparent);
-  animation-duration: 84s;
-  animation-direction: reverse;
-}
-
-/* Vị trí hành tinh trên vòng quỹ đạo (bắc / nam / đông / tây).
-   offset dựa trên --sd (sao biến đổi theo kích cỡ từng hành tinh). */
-.vd-home__planet {
-  --sd: 6px;
-  position: absolute;
-  width: var(--sd);
-  height: var(--sd);
-  border-radius: 50%;
-  background: var(--vd-muted);
-  opacity: 0.5;
-  box-shadow: 0 0 8px currentColor;
-}
-
-.vd-home__planet--n {
-  top: calc(var(--sd) / -2);
-  left: calc(50% - var(--sd) / 2);
-}
-
-.vd-home__planet--s {
-  top: calc(100% - var(--sd) / 2);
-  left: calc(50% - var(--sd) / 2);
-}
-
-.vd-home__planet--e {
-  top: calc(50% - var(--sd) / 2);
-  left: calc(100% - var(--sd) / 2);
-}
-
-.vd-home__planet--w {
-  top: calc(50% - var(--sd) / 2);
-  left: calc(var(--sd) / -2);
-}
-
-/* Giống loài:.Writer / Sheets / Slides / vệt bụi / vệ tinh / vàng cream */
-.vd-home__planet.is-writer {
-  --sd: 9px;
-  background: var(--vd-color-writer);
-  opacity: 0.65;
-}
-
-.vd-home__planet.is-sheets {
-  --sd: 7px;
-  background: #1f7a4d;
-  opacity: 0.6;
-}
-
-.vd-home__planet.is-slides {
-  --sd: 8px;
-  background: #b5701a;
-  opacity: 0.6;
-}
-
-.vd-home__planet.is-moon {
-  --sd: 5px;
-  background: var(--vd-text);
-  opacity: 0.3;
-}
-
-.vd-home__planet.is-dust {
-  --sd: 4px;
-  opacity: 0.35;
-}
-
-.vd-home__planet.is-dust--alt {
-  background: var(--vd-accent);
-  opacity: 0.3;
-}
-
-.vd-home__planet.is-cream {
-  --sd: 6px;
-  background: #e8ba6b;
-  opacity: 0.45;
-}
-
-/* "Sao Thổ": hành tinh có vòng đai nghiêng xinh xắn */
-.vd-home__planet.is-saturn {
-  --sd: 12px;
-  width: var(--sd);
-  height: calc(var(--sd) * 0.8);
-  border-radius: 50%;
-  background: #e8ba6b;
-  opacity: 0.65;
-}
-
-.vd-home__planet.is-saturn::after {
-  content: "";
-  position: absolute;
-  left: -48%;
-  right: -48%;
-  top: 32%;
-  bottom: 32%;
-  border: 1px solid color-mix(in srgb, #e8ba6b 75%, transparent);
-  border-radius: 50%;
-  transform: rotate(-18deg);
-}
-
-/* Mưa thiên thạch: vệt sáng chéo bay qua khoảng đen hai bên lề. */
-.vd-home__meteor {
-  --mr: -34deg;
-  position: absolute;
-  width: 120px;
-  height: 2px;
-  border-radius: 999px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in srgb, #fce1a8 85%, transparent),
-    transparent
-  );
-  opacity: 0;
-  animation: vd-meteor 10s linear infinite;
-  pointer-events: none;
-}
-
-.vd-home__meteor--1 {
-  left: 5%;
-  top: 22%;
-  animation-delay: 0s;
-}
-
-.vd-home__meteor--2 {
-  left: 11%;
-  top: 58%;
-  animation-delay: 4.5s;
-  --mr: -26deg;
-  animation-duration: 13s;
-}
-
-.vd-home__meteor--3 {
-  left: 91%;
-  top: 30%;
-  animation-delay: 2s;
-  --mr: -40deg;
-}
-
-.vd-home__meteor--4 {
-  left: 95%;
-  top: 64%;
-  animation-delay: 6s;
-  --mr: -28deg;
-  animation-duration: 14s;
-}
-
-.vd-home__meteor--5 {
-  left: 3%;
-  top: 84%;
-  animation-delay: 8s;
-  --mr: -38deg;
-  animation-duration: 11s;
-}
-
-.vd-home__meteor--6 {
-  left: 88%;
-  top: 8%;
-  animation-delay: 9.5s;
-  animation-duration: 12s;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    color-mix(in srgb, var(--vd-accent) 70%, transparent),
-    transparent
-  );
-}
-
-@keyframes vd-meteor {
-  0% {
-    transform: translate3d(0, 0, 0) rotate(var(--mr, -34deg));
-    opacity: 0;
-  }
-  5% {
-    opacity: 0.85;
-  }
-  30% {
-    opacity: 0.5;
-  }
-  55%,
-  100% {
-    transform: translate3d(-300px, 220px, 0) rotate(var(--mr, -34deg));
-    opacity: 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .vd-home__orbit,
-  .vd-home__meteor {
-    animation: none;
-  }
-}
-
-/* Khoảng lề hẹp không đủ chỗ cho thiên thạch */
-@media (max-width: 1400px) {
-  .vd-home__meteor {
-    display: none;
-  }
-}
-
-@keyframes vd-home-orbit {
-  from {
-    transform: translate(-50%, -50%) rotate(0deg);
-  }
-  to {
-    transform: translate(-50%, -50%) rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .vd-home__orbit {
-    animation: none;
-  }
+  background:
+    radial-gradient(ellipse 90% 45% at 50% -10%, color-mix(in srgb, var(--vd-accent) 4%, transparent), transparent 75%),
+    radial-gradient(circle at 100% 100%, color-mix(in srgb, var(--vd-color-writer) 2%, transparent) 0%, transparent 50%);
 }
 
 .vd-home__hero {
   position: relative;
   overflow: hidden;
-  padding: 26px 30px 26px;
+  padding: 20px 24px 18px;
   border: 1px solid var(--vd-border);
-  border-radius: 16px;
+  border-radius: 14px;
   background:
     radial-gradient(
       560px 220px at 100% 0%,
-      color-mix(in srgb, var(--vd-accent) 12%, transparent),
+      color-mix(in srgb, var(--vd-accent) 8%, transparent),
       transparent 70%
     ),
     linear-gradient(160deg, var(--vd-panel) 0%, var(--vd-panel-alt) 100%);
-  box-shadow: var(--vd-shadow);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03), var(--vd-inner-bevel);
 }
 
-/* họa tiết vòng tròn gợi tấm sa điểm trang trí */
+/* họa tiết viền mờ tối giản tinh xảo */
 .vd-home__hero::before,
 .vd-home__hero::after {
   content: "";
   position: absolute;
-  top: -120px;
-  right: -70px;
-  width: 280px;
-  height: 280px;
-  border: 1px solid color-mix(in srgb, var(--vd-accent) 25%, transparent);
+  top: -80px;
+  right: -40px;
+  width: 200px;
+  height: 200px;
+  border: 1px solid color-mix(in srgb, var(--vd-accent) 15%, transparent);
   border-radius: 50%;
   pointer-events: none;
 }
 
 .vd-home__hero::after {
-  top: -56px;
-  right: -10px;
-  width: 150px;
-  height: 150px;
+  top: -40px;
+  right: 0;
+  width: 110px;
+  height: 110px;
   border-style: dashed;
-  border-color: color-mix(in srgb, var(--vd-accent) 35%, transparent);
+  border-color: color-mix(in srgb, var(--vd-accent) 22%, transparent);
 }
 
 .vd-home__brand-header {
@@ -1050,7 +771,7 @@ input.vd-tab__name:focus {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .vd-home__brand-badge {
@@ -1062,7 +783,13 @@ input.vd-tab__name:focus {
 .vd-home__brand-meta {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
+}
+
+.vd-home__brand-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .vd-home__eyebrow {
@@ -1074,32 +801,64 @@ input.vd-tab__name:focus {
   color: var(--vd-accent);
 }
 
+.vd-home__enterprise-tag {
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 1.5px 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--vd-accent) 15%, transparent);
+  color: var(--vd-accent);
+}
+
 .vd-home__tagline {
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--vd-muted);
 }
 
+.vd-home__security-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 550;
+  color: #107c41;
+  background: color-mix(in srgb, #107c41 10%, transparent);
+  border: 0.5px solid color-mix(in srgb, #107c41 22%, transparent);
+}
+
+.vd-home__security-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #107c41;
+}
+
 .vd-home__hero h1 {
-  margin: 0 0 10px;
-  font-size: clamp(26px, 3vw, 36px);
+  margin: 0 0 3px;
+  font-size: clamp(19px, 2.1vw, 24px);
   font-family: var(--vd-font-serif);
-  line-height: 1.15;
+  line-height: 1.2;
   letter-spacing: -0.01em;
 }
 
 .vd-home__lead {
   margin: 0;
-  max-width: 560px;
+  max-width: 580px;
   color: var(--vd-muted);
-  line-height: 1.6;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .vd-home__hero-body {
   position: relative;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 24px;
+  gap: 20px;
   flex-wrap: wrap;
 }
 
@@ -1108,7 +867,7 @@ input.vd-tab__name:focus {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 34px;
+  margin-top: 0;
 }
 
 .vd-home__today {
@@ -1116,69 +875,170 @@ input.vd-tab__name:focus {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 2px;
-  padding: 10px 18px;
-  border: 0.5px solid color-mix(in srgb, var(--vd-accent) 24%, transparent);
-  border-radius: var(--vd-radius-lg);
-  background: color-mix(in srgb, var(--vd-panel) 82%, transparent);
+  gap: 1px;
+  padding: 6px 14px;
+  border: 0.5px solid color-mix(in srgb, var(--vd-accent) 22%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--vd-panel) 85%, transparent);
   backdrop-filter: var(--vd-glass-blur);
   -webkit-backdrop-filter: var(--vd-glass-blur);
-  box-shadow: var(--vd-shadow-sm), var(--vd-inner-bevel);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
   text-align: right;
-  transition: transform 0.28s var(--vd-spring-bounce), box-shadow 0.28s var(--vd-spring);
+  transition: transform 0.25s var(--vd-spring-bounce), box-shadow 0.25s var(--vd-spring);
 }
 
 .vd-home__today:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--vd-shadow), var(--vd-inner-bevel);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 .vd-home__weather {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  border: 0.5px solid color-mix(in srgb, var(--vd-accent) 24%, transparent);
-  border-radius: var(--vd-radius-lg);
-  background: color-mix(in srgb, var(--vd-panel) 82%, transparent);
+  gap: 6px;
+  padding: 6px 12px;
+  border: 0.5px solid color-mix(in srgb, var(--vd-accent) 22%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--vd-panel) 85%, transparent);
   backdrop-filter: var(--vd-glass-blur);
   -webkit-backdrop-filter: var(--vd-glass-blur);
-  box-shadow: var(--vd-shadow-sm), var(--vd-inner-bevel);
-  font-size: 13px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  font-size: 12px;
   color: var(--vd-muted);
   white-space: nowrap;
-  transition: transform 0.28s var(--vd-spring-bounce), box-shadow 0.28s var(--vd-spring);
+  transition: transform 0.25s var(--vd-spring-bounce), box-shadow 0.25s var(--vd-spring);
 }
 
 .vd-home__weather:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--vd-shadow), var(--vd-inner-bevel);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 .vd-home__weather-icon {
-  font-size: 18px;
+  font-size: 15px;
   line-height: 1;
 }
 
 .vd-home__weather strong {
-  font-size: 15px;
+  font-size: 13.5px;
   color: var(--vd-accent);
   font-weight: 650;
   font-variant-numeric: tabular-nums;
 }
 
 .vd-home__today-weekday {
-  font-size: 11px;
+  font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   color: var(--vd-muted);
 }
 
 .vd-home__today-date {
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--vd-accent);
   font-variant-numeric: tabular-nums;
+}
+
+/* --- Spotlight Smart Search Row -------------------------------------------- */
+.vd-home__search-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.vd-home__smart-search-box {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--vd-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--vd-panel-solid) 92%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.vd-home__smart-search-box:focus-within {
+  border-color: var(--vd-accent);
+  background: var(--vd-panel-solid);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--vd-accent) 18%, transparent), 0 4px 14px rgba(0, 0, 0, 0.06);
+}
+
+.vd-home__smart-search-icon {
+  display: flex;
+  align-items: center;
+  color: var(--vd-muted);
+  flex: none;
+}
+
+.vd-home__smart-search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 13px;
+  color: var(--vd-text);
+  font-family: inherit;
+}
+
+.vd-home__smart-search-input::placeholder {
+  color: var(--vd-muted);
+  opacity: 0.85;
+}
+
+.vd-home__search-clear {
+  border: none;
+  background: color-mix(in srgb, var(--vd-muted) 18%, transparent);
+  color: var(--vd-muted);
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.vd-home__search-clear:hover {
+  background: color-mix(in srgb, var(--vd-accent) 22%, transparent);
+  color: var(--vd-accent);
+}
+
+.vd-home__quick-open-btn {
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex: none;
+  background: linear-gradient(180deg, var(--vd-accent-hover, #b85b49) 0%, var(--vd-accent) 100%) !important;
+  color: #ffffff !important;
+  border: 0.5px solid color-mix(in srgb, var(--vd-accent) 80%, #000) !important;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--vd-accent) 35%, transparent), var(--vd-inner-bevel);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.vd-home__quick-open-btn:hover {
+  background: linear-gradient(180deg, var(--vd-accent-hover, #c46855) 0%, var(--vd-accent, #a8503f) 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--vd-accent) 45%, transparent), var(--vd-inner-bevel) !important;
+  transform: translateY(-1.5px);
+}
+
+.vd-home__quick-open-btn:active {
+  transform: scale(0.97);
 }
 
 .vd-home__stats {
@@ -1186,18 +1046,18 @@ input.vd-tab__name:focus {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 18px;
+  margin-top: 12px;
 }
 
 .vd-home__stat {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 12px;
+  padding: 4px 10px;
   border: 1px solid var(--vd-border);
   border-radius: 999px;
   background: color-mix(in srgb, var(--vd-panel) 75%, transparent);
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--vd-muted);
 }
 
@@ -1207,8 +1067,8 @@ input.vd-tab__name:focus {
 }
 
 .vd-home__stat-dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: var(--vd-accent);
   flex: none;
@@ -1219,15 +1079,15 @@ input.vd-tab__name:focus {
 }
 
 .vd-home__stat.is-sheets .vd-home__stat-dot {
-  background: #1f7a4d;
+  background: #107c41;
 }
 
 .vd-home__stat.is-slides .vd-home__stat-dot {
-  background: #b5701a;
+  background: #d48722;
 }
 
 .vd-home__section {
-  margin-top: 36px;
+  margin-top: 24px;
   max-width: none;
 }
 
@@ -1236,7 +1096,7 @@ input.vd-tab__name:focus {
   align-items: center;
   flex-wrap: wrap;
   gap: 10px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
 .vd-home__section-head h2 {
@@ -1245,7 +1105,7 @@ input.vd-tab__name:focus {
   gap: 8px;
   margin: 0;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 650;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--vd-muted);
@@ -1253,14 +1113,14 @@ input.vd-tab__name:focus {
 
 .vd-home__section-head h2::before {
   content: "";
-  width: 14px;
+  width: 12px;
   height: 3px;
   border-radius: 2px;
   background: var(--vd-accent);
 }
 
 .vd-home__count {
-  padding: 2px 9px;
+  padding: 2px 8px;
   border: 1px solid var(--vd-border);
   border-radius: 999px;
   font-size: 11px;
@@ -1275,25 +1135,25 @@ input.vd-tab__name:focus {
 }
 
 .vd-home__search {
-  width: 260px;
-  padding: 8px 16px;
-  border: 0.5px solid var(--vd-border);
+  width: 240px;
+  padding: 6px 14px;
+  border: 1px solid var(--vd-border);
   border-radius: var(--vd-radius-pill);
-  background: color-mix(in srgb, var(--vd-panel) 80%, transparent);
+  background: color-mix(in srgb, var(--vd-panel) 85%, transparent);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   color: var(--vd-text);
-  font-size: 13px;
-  box-shadow: var(--vd-shadow-sm), var(--vd-inner-bevel);
-  transition: all 0.25s var(--vd-spring);
+  font-size: 12.5px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  transition: all 0.22s var(--vd-spring);
 }
 
 .vd-home__search:focus {
   outline: none;
   border-color: var(--vd-accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--vd-accent) 22%, transparent), var(--vd-inner-bevel);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--vd-accent) 18%, transparent);
   background: var(--vd-panel-solid);
-  width: 290px;
+  width: 270px;
 }
 
 .vd-home__error {
@@ -1308,9 +1168,9 @@ input.vd-tab__name:focus {
 }
 
 .vd-home__empty {
-  padding: 32px;
+  padding: 28px;
   border: 1px dashed var(--vd-border-strong);
-  border-radius: var(--vd-radius-lg);
+  border-radius: 12px;
   text-align: center;
   color: var(--vd-muted);
   background: color-mix(in srgb, var(--vd-panel-alt) 40%, transparent);
@@ -1331,64 +1191,68 @@ input.vd-tab__name:focus {
   text-align: right;
 }
 
-/* --- Thẻ tạo mới (iOS Widget Style) ---------------------------------------- */
+/* --- Thẻ tạo mới (Horizontal Launcher Cards) ------------------------------ */
 
 .vd-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
 }
 
 .vd-card {
   position: relative;
   overflow: hidden;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
-  padding: 22px 20px 20px;
-  border: 0.5px solid var(--vd-border);
-  border-radius: var(--vd-radius-xl);
-  background: color-mix(in srgb, var(--vd-panel) 82%, transparent);
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 18px;
+  min-height: 66px;
+  border: 1px solid var(--vd-border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--vd-panel) 88%, transparent);
   backdrop-filter: var(--vd-glass-blur);
   -webkit-backdrop-filter: var(--vd-glass-blur);
-  box-shadow: var(--vd-shadow), var(--vd-inner-bevel);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03), var(--vd-inner-bevel);
   cursor: pointer;
   text-align: left;
   transition:
-    transform 0.35s var(--vd-spring-bounce),
-    box-shadow 0.35s var(--vd-spring),
-    border-color 0.25s ease;
+    transform 0.24s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.24s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
 }
 
 .vd-card:hover {
   border-color: var(--vd-card-accent, var(--vd-accent));
-  transform: translateY(-4px) scale(1.015);
-  box-shadow: var(--vd-shadow-pop), var(--vd-inner-bevel);
+  transform: translateY(-2px);
+  background: var(--vd-panel-solid);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06), var(--vd-inner-bevel);
 }
 
 .vd-card:active {
-  transform: scale(0.97);
+  transform: scale(0.985);
 }
 
 .vd-card.is-writer {
-  --vd-card-accent: var(--vd-color-writer);
+  --vd-card-accent: #0078d4;
 }
 
 .vd-card.is-sheets {
-  --vd-card-accent: #1f7a4d;
+  --vd-card-accent: #107c41;
 }
 
 .vd-card.is-slides {
-  --vd-card-accent: #b5701a;
+  --vd-card-accent: #d48722;
 }
 
-/* gạch nhấn màu theo ứng dụng, hiện khi lơ chuột */
 .vd-card::before {
   content: "";
   position: absolute;
-  inset: 0 0 auto;
-  height: 3px;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 3.5px;
   background: var(--vd-card-accent, var(--vd-accent));
   opacity: 0;
   transition: opacity 0.2s ease;
@@ -1399,131 +1263,396 @@ input.vd-tab__name:focus {
   opacity: 1;
 }
 
-/* mũi tên "bắt đầu" đươc gợi ý khi lơ chuột */
 .vd-card::after {
-  content: "→";
-  position: absolute;
-  top: 22px;
-  right: 18px;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--vd-muted);
-  opacity: 0;
-  transform: translateX(-6px);
-  transition: all 0.25s var(--vd-spring);
-}
-
-.vd-card:hover::after,
-.vd-card:focus-visible::after {
-  opacity: 1;
-  transform: translateX(0);
-  color: var(--vd-card-accent, var(--vd-accent));
+  content: "";
+  display: none;
 }
 
 .vd-card__glyph {
   display: grid;
   place-items: center;
-  width: 46px;
-  height: 46px;
-  margin-bottom: 8px;
-  border-radius: 13px;
+  width: 42px;
+  height: 42px;
+  min-width: 42px;
+  margin-bottom: 0;
+  border-radius: 11px;
   background: linear-gradient(180deg, var(--vd-accent-hover, #b85b49) 0%, var(--vd-accent) 100%);
   color: #fff;
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 700;
-  box-shadow: 0 6px 18px color-mix(in srgb, var(--vd-accent) 32%, transparent), var(--vd-inner-bevel);
-  transition: transform 0.3s var(--vd-spring-bounce);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--vd-accent) 26%, transparent);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  flex: none;
 }
 
 .vd-card:hover .vd-card__glyph {
-  transform: scale(1.08) rotate(2deg);
+  transform: scale(1.06);
 }
 
 .vd-card.is-writer .vd-card__glyph {
-  background: linear-gradient(180deg, #2b7fff 0%, #185abd 100%);
-  box-shadow: 0 6px 18px color-mix(in srgb, var(--vd-color-writer) 32%, transparent), var(--vd-inner-bevel);
+  background: linear-gradient(180deg, #1886f7 0%, #0078d4 100%);
+  box-shadow: 0 4px 12px rgba(0, 120, 212, 0.28);
 }
 
 .vd-card.is-sheets .vd-card__glyph {
-  background: linear-gradient(180deg, #289e64 0%, #1f7a4d 100%);
-  box-shadow: 0 6px 18px rgb(31 122 77 / 30%), var(--vd-inner-bevel);
+  background: linear-gradient(180deg, #1ca458 0%, #107c41 100%);
+  box-shadow: 0 4px 12px rgba(16, 124, 65, 0.28);
 }
 
 .vd-card.is-slides .vd-card__glyph {
-  background: linear-gradient(180deg, #d48722 0%, #b5701a 100%);
-  box-shadow: 0 6px 18px rgb(181 112 26 / 30%), var(--vd-inner-bevel);
+  background: linear-gradient(180deg, #ea9629 0%, #d48722 100%);
+  box-shadow: 0 4px 12px rgba(212, 135, 34, 0.28);
+}
+
+.vd-card__content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
 }
 
 .vd-card__title {
-  font-size: 16px;
+  font-size: 14.5px;
   font-weight: 650;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.01em;
+  color: var(--vd-text);
 }
 
 .vd-card__desc {
-  font-size: 13px;
-  line-height: 1.55;
+  font-size: 12px;
+  line-height: 1.35;
   color: var(--vd-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .vd-card__formats {
-  margin-top: 10px;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 500;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
   color: var(--vd-muted);
-  opacity: 0.9;
+  opacity: 0.75;
+  margin-top: 1px;
 }
 
-/* --- Mẫu tài liệu chuẩn Việt (iOS Card Collection) ------------------------ */
+/* --- Mẫu tài liệu chuẩn Việt (Templates Gallery & Carousel) ---------------- */
 
-.vd-templates-grid {
+.vd-home__templates-section {
+  margin-top: 28px;
+}
+
+.vd-home__section-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.vd-templates__tabs {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--vd-panel-alt) 80%, transparent);
+  border: 0.5px solid var(--vd-border);
+  margin-left: auto;
+}
+
+.vd-templates__tab {
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 550;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--vd-muted);
+  cursor: pointer;
+  transition: all 0.16s ease;
+  white-space: nowrap;
+}
+
+.vd-templates__tab:hover {
+  color: var(--vd-text);
+}
+
+.vd-templates__tab.is-active {
+  background: var(--vd-panel-solid);
+  color: var(--vd-text);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.vd-templates__nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+}
+
+.vd-templates__nav-btn {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 16px;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--vd-border);
+  background: color-mix(in srgb, var(--vd-panel-solid) 90%, transparent);
+  color: var(--vd-muted);
+  cursor: pointer;
+  transition: all 0.18s ease;
 }
 
+.vd-templates__nav-btn:hover {
+  border-color: var(--vd-accent);
+  color: var(--vd-accent);
+  background: var(--vd-panel-solid);
+  transform: scale(1.05);
+}
+
+.vd-templates__nav-btn:active {
+  transform: scale(0.95);
+}
+
+.vd-templates-carousel-wrap {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+
+.vd-templates-grid.is-carousel {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding: 6px 4px 16px;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+}
+
+.vd-templates-grid.is-carousel::-webkit-scrollbar {
+  height: 5px;
+}
+
+.vd-templates-grid.is-carousel::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--vd-muted) 25%, transparent);
+  border-radius: 999px;
+}
+
+/* Template Card - Paper Thumbnail Preview (Tỷ lệ giấy A4 / Slide 16:9) */
 .vd-template-card {
   position: relative;
+  flex: 0 0 176px;
+  width: 176px;
+  min-width: 176px;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: stretch;
   gap: 10px;
-  padding: 18px;
-  border: 0.5px solid var(--vd-border);
-  border-radius: var(--vd-radius-lg);
-  background: color-mix(in srgb, var(--vd-panel) 82%, transparent);
-  backdrop-filter: var(--vd-glass-blur);
-  -webkit-backdrop-filter: var(--vd-glass-blur);
-  box-shadow: var(--vd-shadow), var(--vd-inner-bevel);
+  padding: 10px;
+  border: 1px solid var(--vd-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--vd-panel-solid) 94%, transparent);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
   cursor: pointer;
   text-align: left;
   transition:
-    transform 0.32s var(--vd-spring-bounce),
-    box-shadow 0.32s var(--vd-spring),
-    border-color 0.2s ease;
+    transform 0.24s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.24s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
 }
 
 .vd-template-card:hover {
-  transform: translateY(-3px) scale(1.012);
+  transform: translateY(-3px);
   border-color: var(--vd-card-accent, var(--vd-accent));
-  box-shadow: var(--vd-shadow-lg), var(--vd-inner-bevel);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.07);
+  background: var(--vd-panel-solid);
 }
 
 .vd-template-card:active {
-  transform: scale(0.97);
+  transform: scale(0.98);
 }
 
 .vd-template-card.is-writer {
-  --vd-card-accent: var(--vd-color-writer);
+  --vd-card-accent: #0078d4;
 }
 
 .vd-template-card.is-sheets {
-  --vd-card-accent: #1f7a4d;
+  --vd-card-accent: #107c41;
 }
 
 .vd-template-card.is-slides {
-  --vd-card-accent: #b5701a;
+  --vd-card-accent: #d48722;
+}
+
+/* Paper / Slide Preview Box */
+.vd-template-card__preview {
+  position: relative;
+  height: 114px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--vd-panel-alt) 80%, transparent);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 0.5px solid var(--vd-border);
+  transition: transform 0.2s ease;
+}
+
+.vd-template-card:hover .vd-template-card__preview {
+  transform: scale(1.02);
+}
+
+/* Writer Paper Thumbnail (Chuẩn công văn NĐ30) */
+.vd-template-preview__paper {
+  position: relative;
+  width: 76px;
+  height: 98px;
+  background: #ffffff;
+  border-radius: 3px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12), 0 0.5px 1px rgba(0, 0, 0, 0.06);
+  padding: 8px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3.5px;
+}
+
+.vd-template-preview__line {
+  height: 2.5px;
+  background: #cbd5e1;
+  border-radius: 1px;
+  width: 100%;
+}
+
+.vd-template-preview__line.is-header {
+  width: 65%;
+  height: 3px;
+  background: #a8503f;
+}
+
+.vd-template-preview__subline {
+  width: 50%;
+  height: 2px;
+  background: #94a3b8;
+}
+
+.vd-template-preview__divider {
+  width: 40%;
+  height: 1px;
+  background: #a8503f;
+  margin-bottom: 2px;
+}
+
+.vd-template-preview__line.is-title {
+  width: 80%;
+  height: 3px;
+  background: #334155;
+  margin-top: 1px;
+}
+
+.vd-template-preview__body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 2px;
+}
+
+.vd-template-preview__line.is-short {
+  width: 70%;
+}
+
+.vd-template-preview__seal {
+  position: absolute;
+  bottom: 8px;
+  right: 6px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid #a8503f;
+  background: rgba(168, 80, 63, 0.12);
+}
+
+/* Sheets Paper Thumbnail */
+.vd-template-preview__paper.is-sheet {
+  padding: 6px 5px;
+}
+
+.vd-template-preview__sheet-header {
+  height: 6px;
+  background: #107c41;
+  border-radius: 2px 2px 0 0;
+  margin-bottom: 2px;
+}
+
+.vd-template-preview__sheet-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5px;
+  background: #e2e8f0;
+  border: 1px solid #cbd5e1;
+  padding: 1px;
+  border-radius: 1px;
+}
+
+.vd-template-preview__sheet-grid span {
+  height: 10px;
+  background: #ffffff;
+  display: block;
+}
+
+.vd-template-preview__sheet-grid span.is-total {
+  background: #d1fae5;
+}
+
+/* Slides 16:9 Thumbnail */
+.vd-template-preview__slide {
+  position: relative;
+  width: 116px;
+  height: 70px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-radius: 4px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12);
+  padding: 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  border: 0.5px solid rgba(0, 0, 0, 0.08);
+}
+
+.vd-template-card.is-slides .vd-template-preview__slide {
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+}
+
+.vd-template-preview__slide-header {
+  height: 5px;
+  width: 55%;
+  background: #d48722;
+  border-radius: 2px;
+}
+
+.vd-template-preview__slide-body {
+  display: flex;
+  gap: 5px;
+  flex: 1;
+}
+
+.vd-template-preview__slide-card {
+  flex: 1;
+  border-radius: 3px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.vd-template-preview__slide-card.is-primary {
+  background: color-mix(in srgb, #d48722 25%, #ffffff);
+}
+
+/* Info Box */
+.vd-template-card__info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
 }
 
 .vd-template-card__header {
@@ -1536,49 +1665,58 @@ input.vd-tab__name:focus {
 .vd-template-card__badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: var(--vd-radius-pill);
-  font-size: 11px;
+  gap: 3.5px;
+  padding: 1.5px 6px;
+  border-radius: 4px;
+  font-size: 9.5px;
   font-weight: 650;
   letter-spacing: 0.02em;
-  box-shadow: var(--vd-inner-bevel);
 }
 
 .vd-template-card__badge.is-writer {
-  background: color-mix(in srgb, var(--vd-color-writer) 15%, transparent);
+  background: color-mix(in srgb, var(--vd-color-writer) 12%, transparent);
   color: var(--vd-color-writer);
 }
 
 .vd-template-card__badge.is-sheets {
-  background: color-mix(in srgb, #1f7a4d 15%, transparent);
-  color: #1f7a4d;
+  background: color-mix(in srgb, #107c41 12%, transparent);
+  color: #107c41;
 }
 
 .vd-template-card__badge.is-slides {
-  background: color-mix(in srgb, #b5701a 15%, transparent);
-  color: #b5701a;
+  background: color-mix(in srgb, #d48722 14%, transparent);
+  color: #d48722;
 }
 
 .vd-template-card__app {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 550;
   color: var(--vd-muted);
 }
 
 .vd-template-card__title {
-  font-size: 15px;
+  font-size: 12.5px;
   font-weight: 650;
   color: var(--vd-text);
   line-height: 1.35;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.01em;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  height: 34px;
 }
 
 .vd-template-card__desc {
   margin: 0;
-  font-size: 12px;
-  line-height: 1.5;
+  font-size: 11px;
+  line-height: 1.35;
   color: var(--vd-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  height: 30px;
 }
 
 /* --- Danh sách gần đây ----------------------------------------------------- */
@@ -1588,16 +1726,17 @@ input.vd-tab__name:focus {
   padding: 0;
   list-style: none;
   border: 1px solid var(--vd-border);
-  border-radius: 10px;
+  border-radius: 12px;
   overflow: hidden;
-  background: linear-gradient(180deg, var(--vd-panel) 0%, var(--vd-panel-alt) 100%);
-  box-shadow: var(--vd-shadow);
+  background: color-mix(in srgb, var(--vd-panel-solid) 95%, transparent);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
 }
 
 .vd-recent {
   display: flex;
   align-items: center;
   border-bottom: 1px solid var(--vd-border);
+  transition: background 0.15s ease;
 }
 
 .vd-recent.is-pinned {
@@ -1609,7 +1748,7 @@ input.vd-tab__name:focus {
 }
 
 .vd-recent:hover {
-  background: var(--vd-panel-alt);
+  background: color-mix(in srgb, var(--vd-accent) 4%, var(--vd-panel-alt));
 }
 
 .vd-recent__open {
@@ -1618,7 +1757,7 @@ input.vd-tab__name:focus {
   align-items: center;
   gap: 12px;
   min-width: 0;
-  padding: 10px 14px;
+  padding: 8px 14px;
   border: none;
   background: transparent;
   cursor: pointer;
@@ -1628,29 +1767,29 @@ input.vd-tab__name:focus {
 .vd-recent__badge {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   border-radius: 8px;
   background: var(--vd-accent-soft);
   color: var(--vd-accent);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   flex: none;
 }
 
 .vd-recent__badge.is-writer {
-  background: color-mix(in srgb, var(--vd-color-writer) 14%, transparent);
-  color: var(--vd-color-writer);
+  background: color-mix(in srgb, #0078d4 14%, transparent);
+  color: #0078d4;
 }
 
 .vd-recent__badge.is-sheets {
-  background: rgb(31 122 77 / 12%);
-  color: #1f7a4d;
+  background: color-mix(in srgb, #107c41 14%, transparent);
+  color: #107c41;
 }
 
 .vd-recent__badge.is-slides {
-  background: rgb(181 112 26 / 14%);
-  color: #b5701a;
+  background: color-mix(in srgb, #d48722 15%, transparent);
+  color: #d48722;
 }
 
 .vd-recent__badge.is-unknown {
@@ -1661,13 +1800,14 @@ input.vd-tab__name:focus {
 .vd-recent__info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1.5px;
   min-width: 0;
 }
 
 .vd-recent__name {
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 550;
+  color: var(--vd-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1684,6 +1824,7 @@ input.vd-tab__name:focus {
 
 .vd-recent__kind {
   flex: none;
+  font-weight: 500;
 }
 
 .vd-recent__path {
@@ -1726,6 +1867,46 @@ input.vd-tab__name:focus {
   color: #b5701a;
 }
 
+/* Recents Footer (Gắn liền với danh sách tệp gần đây, phân tách rõ ràng với Mẫu tài liệu) */
+.vd-recents__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: color-mix(in srgb, var(--vd-panel-alt) 80%, transparent);
+  border: 1px solid var(--vd-border);
+  border-top: none;
+  border-radius: 0 0 12px 12px;
+  margin-top: -1px;
+  margin-bottom: 32px;
+}
+
+.vd-recents__hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--vd-muted);
+}
+
+.vd-recents__hint-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #107c41;
+}
+
+.vd-recents__clear-btn {
+  font-size: 12px;
+  color: var(--vd-muted);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.vd-recents__clear-btn:hover {
+  color: #c0392b;
+}
+
 /* --- Nút & liên kết -------------------------------------------------------- */
 
 .vd-button {
@@ -1750,6 +1931,7 @@ input.vd-tab__name:focus {
 .vd-button:hover:not(:disabled) {
   border-color: var(--vd-border-strong);
   background: var(--vd-panel-solid);
+  color: var(--vd-text);
   transform: translateY(-1px);
   box-shadow: var(--vd-shadow), var(--vd-inner-bevel);
 }
@@ -1764,16 +1946,18 @@ input.vd-tab__name:focus {
 }
 
 .vd-button.is-primary {
-  background: linear-gradient(180deg, var(--vd-accent-hover, #b85b49) 0%, var(--vd-accent) 100%);
-  border: 0.5px solid color-mix(in srgb, var(--vd-accent) 80%, #000);
-  color: #fff;
+  background: linear-gradient(180deg, var(--vd-accent-hover, #b85b49) 0%, var(--vd-accent) 100%) !important;
+  border: 0.5px solid color-mix(in srgb, var(--vd-accent) 80%, #000) !important;
+  color: #ffffff !important;
   font-weight: 600;
   box-shadow: 0 4px 14px color-mix(in srgb, var(--vd-accent) 35%, transparent), var(--vd-inner-bevel);
 }
 
 .vd-button.is-primary:hover:not(:disabled) {
-  filter: brightness(1.06);
-  box-shadow: 0 6px 18px color-mix(in srgb, var(--vd-accent) 45%, transparent), var(--vd-inner-bevel);
+  background: linear-gradient(180deg, var(--vd-accent-hover, #c46855) 0%, var(--vd-accent, #a8503f) 100%) !important;
+  color: #ffffff !important;
+  border-color: color-mix(in srgb, var(--vd-accent) 90%, #000) !important;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--vd-accent) 45%, transparent), var(--vd-inner-bevel) !important;
   transform: translateY(-1.5px);
 }
 
@@ -2263,40 +2447,6 @@ input.vd-tab__name:focus {
 
 [data-theme="light"] .vd-home__hero::after {
   border-color: color-mix(in srgb, var(--vd-accent) 20%, transparent);
-}
-
-[data-theme="light"] .vd-home__orbit {
-  border-color: color-mix(in srgb, var(--vd-accent) 12%, transparent);
-}
-
-[data-theme="light"] .vd-home__orbit--2 {
-  border-color: color-mix(in srgb, var(--vd-accent) 10%, transparent);
-}
-
-[data-theme="light"] .vd-home__orbit--5 {
-  border-color: color-mix(in srgb, var(--vd-accent) 8%, transparent);
-}
-
-[data-theme="light"] .vd-home__orbit--6 {
-  border-color: color-mix(in srgb, var(--vd-accent) 7%, transparent);
-}
-
-[data-theme="light"] .vd-home__orbit-sun {
-  opacity: 0.28;
-  box-shadow:
-    0 0 14px color-mix(in srgb, var(--vd-accent) 28%, transparent),
-    0 0 42px color-mix(in srgb, var(--vd-accent) 15%, transparent),
-    0 0 90px color-mix(in srgb, var(--vd-accent) 8%, transparent);
-}
-
-[data-theme="light"] .vd-home__planet.is-writer {
-  opacity: 0.55;
-  background: var(--vd-color-writer);
-}
-
-[data-theme="light"] .vd-home__planet.is-sheets,
-[data-theme="light"] .vd-home__planet.is-slides {
-  opacity: 0.45;
 }
 
 /* --- Chi tiết kỹ thuật thu gọn -------------------------------------------- */
@@ -3617,11 +3767,87 @@ body.vd-writer__image-resizing {
 .vd-writer__status {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   padding: 4px 16px;
   border-top: 1px solid var(--vd-border);
   background: var(--vd-panel-alt);
   color: var(--vd-muted);
   font-size: 11px;
+}
+
+.vd-writer__status-left,
+.vd-writer__status-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.vd-writer__status-readtime {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(37, 99, 235, 0.08);
+  color: var(--vd-accent);
+  font-weight: 500;
+}
+
+.vd-writer__status-focus {
+  border: 1px solid var(--vd-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--vd-text);
+  font-size: 11px;
+  padding: 1px 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.vd-writer__status-focus:hover {
+  background: var(--vd-hover);
+  border-color: var(--vd-accent);
+}
+
+.vd-writer.is-focus-mode .vd-writer__toolbar,
+.vd-writer.is-focus-mode .vd-writer__sidebar,
+.vd-writer.is-focus-mode .vd-writer__status {
+  display: none !important;
+}
+
+.vd-writer.is-focus-mode {
+  background: #09090b !important;
+}
+
+.vd-writer.is-focus-mode .vd-writer__stage {
+  padding: 40px 0;
+  background: transparent;
+}
+
+.vd-writer.is-focus-mode .vd-writer__page {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.vd-writer__focus-exit {
+  position: fixed;
+  top: 16px;
+  right: 20px;
+  z-index: 1000;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(24, 24, 27, 0.85);
+  backdrop-filter: blur(8px);
+  color: #e4e4e7;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.2s, background 0.2s;
+}
+
+.vd-writer__focus-exit:hover {
+  opacity: 1;
+  background: rgba(39, 39, 42, 0.95);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
 /* --- In / xuất PDF --------------------------------------------------------- */
@@ -3849,6 +4075,50 @@ body.vd-writer__image-resizing {
   font-size: 12px;
 }
 
+.vd-sheets__formula-suggestions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: var(--vd-panel);
+  border-bottom: 1px solid var(--vd-border);
+  overflow-x: auto;
+}
+
+.vd-sheets__formula-hint {
+  font-size: 11px;
+  color: var(--vd-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.vd-sheets__formula-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border: 1px solid var(--vd-border);
+  border-radius: 4px;
+  background: var(--vd-panel-alt);
+  color: var(--vd-text);
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.12s ease;
+}
+
+.vd-sheets__formula-chip:hover {
+  background: var(--vd-hover);
+  border-color: var(--vd-accent);
+  color: var(--vd-accent);
+}
+
+.vd-sheets__formula-chip-desc {
+  font-family: var(--vd-mono);
+  font-size: 10px;
+  color: var(--vd-muted);
+}
+
 .vd-sheets__grid {
   flex: 1;
   overflow: auto;
@@ -3975,12 +4245,46 @@ body.vd-writer__image-resizing {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
+  align-items: center;
   gap: 4px 12px;
   padding: 4px 12px;
   border-top: 1px solid var(--vd-border);
   background: var(--vd-panel-alt);
   color: var(--vd-muted);
   font-size: 11px;
+}
+
+.vd-sheets__status-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.vd-sheets__column-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 1px 8px;
+  border-radius: 4px;
+  background: rgba(37, 99, 235, 0.08);
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  color: var(--vd-text);
+  font-size: 11px;
+}
+
+.vd-sheets__stat-badge {
+  font-weight: 700;
+  color: var(--vd-accent);
+  font-family: var(--vd-mono);
+}
+
+.vd-sheets__stat-item {
+  color: var(--vd-muted);
+}
+
+.vd-sheets__stat-item strong {
+  color: var(--vd-text);
+  font-weight: 600;
 }
 
 .vd-sheets__status-error {
@@ -4506,6 +4810,19 @@ body.vd-writer__image-resizing {
   color: #cbd5e1;
 }
 
+.vd-present__timer {
+  font-family: var(--vd-mono, monospace);
+  font-weight: 600;
+  color: #93c5fd;
+  padding-right: 4px;
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.vd-present__hud button.is-active {
+  color: #f87171 !important;
+  font-weight: 600;
+}
+
 @keyframes vdSlideFadeIn {
   from {
     opacity: 0;
@@ -4555,6 +4872,203 @@ body.vd-writer__image-resizing {
   animation: none;
 }
 
+/* Presentation Outro Screen (Executive Suite) */
+.vd-present-outro {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 32px;
+  box-sizing: border-box;
+}
+
+.vd-present-outro__card {
+  width: min(920px, 94vw);
+  background: rgba(18, 18, 22, 0.85);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 44px 48px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  color: #f4f4f5;
+  text-align: center;
+  animation: vdOutroCardZoom 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes vdOutroCardZoom {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.vd-present-outro__tag {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.2);
+  border: 1px solid rgba(37, 99, 235, 0.4);
+  color: #60a5fa;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.vd-present-outro__title {
+  margin: 0;
+  font-size: 38px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+}
+
+.vd-present-outro__subtitle {
+  margin: -16px 0 0;
+  font-size: 16px;
+  color: #a1a1aa;
+}
+
+.vd-present-outro__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin: 8px 0;
+}
+
+.vd-present-outro__metric {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px 16px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.vd-present-outro__metric-val {
+  font-size: 30px;
+  font-weight: 700;
+  color: #60a5fa;
+  font-family: var(--vd-mono, monospace);
+}
+
+.vd-present-outro__metric-lbl {
+  font-size: 13px;
+  color: #d4d4d8;
+  font-weight: 500;
+}
+
+.vd-present-outro__metric-sub {
+  font-size: 11px;
+  color: #71717a;
+}
+
+.vd-present-outro__key-takeaways {
+  text-align: left;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 16px 20px;
+}
+
+.vd-present-outro__key-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #a1a1aa;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+
+.vd-present-outro__key-list {
+  margin: 0;
+  padding-left: 18px;
+  color: #e4e4e7;
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+.vd-present-outro__actions {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+}
+
+.vd-present-outro__btn {
+  padding: 10px 22px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: none;
+}
+
+.vd-present-outro__btn--primary {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.vd-present-outro__btn--primary:hover {
+  background: #1d4ed8;
+}
+
+.vd-present-outro__btn--secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e4e4e7;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.vd-present-outro__btn--secondary:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.vd-present-outro__footer {
+  font-size: 11px;
+  color: #52525b;
+}
+
+/* Presentation Laser Pointer */
+.vd-present.is-laser-active {
+  cursor: none !important;
+}
+
+.vd-present__laser {
+  position: fixed;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 12px #ef4444, 0 0 24px rgba(239, 68, 68, 0.8), inset 0 0 4px #ffffff;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  z-index: 9999;
+  animation: vdLaserPulse 1s infinite alternate;
+}
+
+@keyframes vdLaserPulse {
+  from {
+    transform: translate(-50%, -50%) scale(1);
+    box-shadow: 0 0 12px #ef4444, 0 0 20px rgba(239, 68, 68, 0.8);
+  }
+  to {
+    transform: translate(-50%, -50%) scale(1.2);
+    box-shadow: 0 0 16px #ef4444, 0 0 28px rgba(239, 68, 68, 1);
+  }
+}
+
 /* --- Hẹp (cửa sổ nhỏ) ------------------------------------------------------ */
 
 @media (max-width: 1000px) {
@@ -4576,7 +5090,7 @@ body.vd-writer__image-resizing {
     display: none;
   }
 
-  .vd-home__orbits {
+  .vd-home__backdrop {
     display: none;
   }
 
@@ -5060,5 +5574,747 @@ body.vd-writer__image-resizing {
     page-break-after: always;
     break-after: page;
   }
+}
+
+/* ==========================================================================
+   VIETDESK MODERN ENTERPRISE RIBBON & PRODUCTIVITY SUITE
+   ========================================================================== */
+
+/* --- Ribbon Tab Strip Chống Nhấp Nháy (Universal Design System) --- */
+.vd-writer__tab-strip,
+.vd-sheets__tab-strip,
+.vd-slides__tab-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 12px;
+  background: var(--vd-panel-bg, #f8fafc);
+  border-bottom: 1px solid var(--vd-border, #e2e8f0);
+  gap: 12px;
+  user-select: none;
+}
+
+.vd-writer__tabs-left,
+.vd-sheets__tabs-left,
+.vd-slides__tabs-left {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.vd-writer__tabs-right,
+.vd-sheets__tabs-right,
+.vd-slides__tabs-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Tab Buttons */
+.vd-writer__tab-btn,
+.vd-sheets__tab-btn,
+.vd-slides__tab-btn {
+  padding: 5px 13px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--vd-text-muted, #64748b);
+  background: transparent;
+  border: none;
+  border-bottom: 2.5px solid transparent;
+  border-radius: 4px 4px 0 0;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+}
+
+.vd-writer__tab-btn:hover,
+.vd-sheets__tab-btn:hover,
+.vd-slides__tab-btn:hover {
+  color: var(--vd-text, #0f172a);
+  background: rgba(0, 0, 0, 0.03);
+}
+
+/* Active tab styles theo màu sắc nhận diện bộ 3 ứng dụng */
+.vd-writer__tab-btn.is-active {
+  color: #0078d4;
+  font-weight: 600;
+  border-bottom-color: #0078d4;
+  background: transparent;
+}
+
+.vd-sheets__tab-btn.is-active {
+  color: #107c41;
+  font-weight: 600;
+  border-bottom-color: #107c41;
+  background: transparent;
+}
+
+.vd-slides__tab-btn.is-active {
+  color: #d83b01;
+  font-weight: 600;
+  border-bottom-color: #d83b01;
+  background: transparent;
+}
+
+/* Nút Chuẩn hóa Nghị định 30 (Word Writer - Độc quyền Vietdesk) */
+.vd-writer__nd30-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #ffffff;
+  background: linear-gradient(135deg, #0078d4, #005a9e);
+  border: none;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 120, 212, 0.35);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.vd-writer__nd30-btn:hover {
+  background: linear-gradient(135deg, #0086ea, #0066b3);
+  transform: translateY(-0.5px);
+  box-shadow: 0 2px 6px rgba(0, 120, 212, 0.45);
+}
+
+/* Nút Đọc Tiền Thành Chữ (Excel Sheets - Độc quyền Vietdesk) */
+.vd-sheets__words-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #ffffff;
+  background: linear-gradient(135deg, #107c41, #0b552d);
+  border: none;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(16, 124, 65, 0.35);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.vd-sheets__words-btn:hover {
+  background: linear-gradient(135deg, #14934d, #0d6334);
+  transform: translateY(-0.5px);
+  box-shadow: 0 2px 6px rgba(16, 124, 65, 0.45);
+}
+
+/* Nút Trình Chiếu Presenter Studio (Slides) */
+.vd-slides__present-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 13px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #ffffff;
+  background: linear-gradient(135deg, #d83b01, #b13100);
+  border: none;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(216, 59, 1, 0.35);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.vd-slides__present-btn:hover {
+  background: linear-gradient(135deg, #eb4202, #c73700);
+  transform: translateY(-0.5px);
+  box-shadow: 0 2px 6px rgba(216, 59, 1, 0.45);
+}
+
+.vd-slides__autoframing-hint {
+  font-size: 12px;
+  color: var(--vd-text-muted, #64748b);
+  margin-left: 8px;
+}
+
+/* Toast Thông Báo Thao Tác (Sheets & Suites) */
+.vd-sheets__toast {
+  position: fixed;
+  bottom: 32px;
+  right: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #0f5132;
+  background: #d1e7dd;
+  border: 1px solid #badbcc;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  z-index: 9999;
+  animation: vdFadeSlideUp 0.25s ease-out;
+}
+
+@keyframes vdFadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Modal Trợ Lý Công Thức Tiếng Việt (Smart Formula Assistant) */
+.vd-sheets__assistant-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9998;
+  animation: vdFadeIn 0.2s ease-out;
+}
+
+.vd-sheets__assistant-modal {
+  width: min(640px, 92vw);
+  max-height: 85vh;
+  background: var(--vd-panel-bg, #ffffff);
+  border-radius: 12px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--vd-border, #e2e8f0);
+}
+
+.vd-sheets__assistant-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--vd-border, #e2e8f0);
+  background: #f8fafc;
+}
+
+.vd-sheets__assistant-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.vd-sheets__assistant-icon {
+  color: #107c41;
+}
+
+.vd-sheets__assistant-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.vd-sheets__assistant-close {
+  background: transparent;
+  border: none;
+  font-size: 22px;
+  color: #64748b;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.vd-sheets__assistant-close:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.vd-sheets__assistant-intro {
+  padding: 12px 20px 4px;
+  font-size: 13px;
+  color: #64748b;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.vd-sheets__assistant-list {
+  padding: 12px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+}
+
+.vd-sheets__assistant-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border: 1px solid var(--vd-border, #e2e8f0);
+  border-radius: 8px;
+  background: #ffffff;
+  transition: all 0.15s ease;
+}
+
+.vd-sheets__assistant-card:hover {
+  border-color: #107c41;
+  box-shadow: 0 2px 8px rgba(16, 124, 65, 0.08);
+}
+
+.vd-sheets__assistant-card--highlight {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.vd-sheets__assistant-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.vd-sheets__assistant-name {
+  font-weight: 600;
+  font-size: 13.5px;
+  color: #0f172a;
+}
+
+.vd-sheets__assistant-syntax {
+  font-size: 12px;
+  color: #047857;
+  background: #ecfdf5;
+  padding: 2px 6px;
+  border-radius: 4px;
+  width: fit-content;
+  font-family: ui-monospace, monospace;
+}
+
+.vd-sheets__assistant-desc {
+  font-size: 12.5px;
+  color: #64748b;
+}
+
+.vd-sheets__assistant-apply-btn {
+  padding: 6px 14px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #107c41;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.vd-sheets__assistant-apply-btn:hover {
+  color: #ffffff;
+  background: #107c41;
+  border-color: #107c41;
+}
+
+@keyframes vdFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ==========================================================================
+   VIETDESK ENTERPRISE WORKSPACE & FILTER SYSTEM
+   ========================================================================== */
+
+/* TopBar Enterprise Badge - Fluent Navy & Glass (Không dùng màu tím) */
+.vd-brand__enterprise-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #ffffff;
+  background: linear-gradient(180deg, #0078d4 0%, #005a9e 100%);
+  padding: 2.5px 8px;
+  border-radius: 6px;
+  border: 0.5px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 1px 3px rgba(0, 90, 158, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  margin-left: 4px;
+  line-height: 1.2;
+}
+
+/* Home Header Enterprise Row */
+.vd-home__brand-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vd-home__enterprise-tag {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #0078d4;
+  background: rgba(0, 120, 212, 0.08);
+  padding: 2.5px 9px;
+  border-radius: 12px;
+  border: 0.5px solid rgba(0, 120, 212, 0.25);
+  box-shadow: 0 1px 2px rgba(0, 120, 212, 0.05);
+}
+
+/* Security & On-Premise Badge - Enterprise Glass */
+.vd-home__security-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 13px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #107c41;
+  background: rgba(16, 124, 65, 0.07);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 0.5px solid rgba(16, 124, 65, 0.22);
+  border-radius: 20px;
+  user-select: none;
+  box-shadow: 0 1px 2px rgba(16, 124, 65, 0.06);
+}
+
+.vd-home__security-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #107c41;
+  box-shadow: 0 0 6px rgba(16, 124, 65, 0.5);
+}
+
+/* Recents Filter Bar (Tab Pills - macOS Segmented Control Hybrid) */
+.vd-home__filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 14px;
+  margin-bottom: 6px;
+  padding: 3.5px;
+  background: color-mix(in srgb, var(--vd-panel-alt, #f1f5f9) 85%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 0.5px solid var(--vd-border, rgba(0, 0, 0, 0.08));
+  border-radius: 10px;
+  width: fit-content;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.vd-home__filter-btn {
+  padding: 5px 13px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--vd-muted, #64748b);
+  background: transparent;
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+}
+
+.vd-home__filter-btn:hover {
+  color: var(--vd-text, #0f172a);
+}
+
+.vd-home__filter-btn.is-active {
+  color: var(--vd-text, #0f172a);
+  background: var(--vd-panel-solid, #ffffff);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 0.5px 1.5px rgba(0, 0, 0, 0.04);
+}
+
+/* Card Elevation & Hover Enhancement */
+.vd-card {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease !important;
+}
+
+.vd-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.vd-template-card {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease !important;
+}
+
+.vd-template-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+}
+
+/* ==========================================================================
+   VIETDESK ADVANCED PRODUCTIVITY TOOLS (RULER, PAGELESS, TABS, SLIDES GRID)
+   ========================================================================== */
+
+/* Toggle Buttons on Ribbon */
+.vd-writer__toggle-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--vd-muted, #64748b);
+  background: transparent;
+  border: 1px solid var(--vd-border, #e2e8f0);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.vd-writer__toggle-btn:hover:not(:disabled) {
+  color: #0078d4;
+  border-color: #0078d4;
+  background: rgba(0, 120, 212, 0.05);
+}
+
+.vd-writer__toggle-btn.is-active {
+  color: #0078d4;
+  font-weight: 600;
+  border-color: #0078d4;
+  background: rgba(0, 120, 212, 0.1);
+}
+
+.vd-writer__toggle-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* --- 1. Google Docs Visual Ruler (Thước căn lề chuẩn NĐ 30) --- */
+.vd-writer__ruler {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  background: color-mix(in srgb, var(--vd-panel-alt, #f8fafc) 90%, transparent);
+  border-bottom: 0.5px solid var(--vd-border, #e2e8f0);
+  padding: 5px 0;
+  user-select: none;
+}
+
+.vd-writer__ruler-track {
+  display: flex;
+  align-items: center;
+  width: min(100%, 794px); /* Chiều rộng trang A4 */
+  height: 20px;
+  background: var(--vd-panel-solid, #ffffff);
+  border: 0.5px solid var(--vd-border, #cbd5e1);
+  border-radius: 6px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.vd-writer__ruler-margin-left {
+  width: 90px; /* Tương ứng lề 30mm */
+  height: 100%;
+  background: rgba(0, 120, 212, 0.12);
+  border-right: 1.5px solid #0078d4;
+}
+
+.vd-writer__ruler-scale {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 6px;
+}
+
+.vd-writer__ruler-cm {
+  font-size: 9px;
+  color: var(--vd-muted, #94a3b8);
+  font-family: ui-monospace, monospace;
+}
+
+.vd-writer__ruler-margin-right {
+  width: 45px; /* Tương ứng lề 15mm */
+  height: 100%;
+  background: rgba(0, 120, 212, 0.12);
+  border-left: 1.5px solid #0078d4;
+}
+
+/* --- 2. Docs Pageless Mode (Chế độ cuộn không ngắt trang) --- */
+.vd-writer__viewport.is-pageless {
+  padding: 24px 0 !important;
+  display: flex;
+  justify-content: center;
+}
+
+.vd-writer__page.is-pageless {
+  width: min(920px, 94vw) !important;
+  min-height: calc(100vh - 240px) !important;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02) !important;
+  border-radius: 12px !important;
+  padding: 40px 56px !important;
+}
+
+.vd-writer__page.is-pageless .vd-writer__page-header,
+.vd-writer__page.is-pageless .vd-writer__page-footer {
+  display: none !important;
+}
+
+/* --- 3. Sheets Multi-Sheet Tab Bar--- */
+.vd-sheets__tabbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 16px;
+  background: color-mix(in srgb, var(--vd-panel-solid, #ffffff) 85%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 0.5px solid var(--vd-border, #e2e8f0);
+  border-bottom: 0.5px solid var(--vd-border, #e2e8f0);
+  overflow-x: auto;
+  user-select: none;
+}
+
+.vd-sheets__add-sheet-btn {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: transparent;
+  border: 0.5px solid var(--vd-border, #cbd5e1);
+  color: var(--vd-text, #0f172a);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  flex: none;
+}
+
+.vd-sheets__add-sheet-btn:hover {
+  background: #107c41;
+  color: #ffffff;
+  border-color: #107c41;
+  transform: scale(1.05);
+}
+
+.vd-sheets__tab-list {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.vd-sheets__sheet-tab {
+  padding: 4px 14px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--vd-muted, #64748b);
+  background: transparent;
+  border: 0.5px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+}
+
+.vd-sheets__sheet-tab:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--vd-text, #0f172a);
+}
+
+.vd-sheets__sheet-tab.is-active {
+  color: #107c41;
+  font-weight: 600;
+  background: var(--vd-panel-solid, #ffffff);
+  border-color: var(--vd-border, #e2e8f0);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 0.5px 1px rgba(0, 0, 0, 0.03);
+}
+
+/* --- 4. Sheets Zebra Striping (Màu xen kẽ dòng) --- */
+.vd-sheets__grid.is-zebra table tbody tr:nth-child(even) td {
+  background: #f8fafc;
+}
+
+[data-theme="dark"] .vd-sheets__grid.is-zebra table tbody tr:nth-child(even) td {
+  background: #1e293b;
+}
+
+/* --- 5. Slides Grid View / Slide Sorter --- */
+.vd-slides__grid-view {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  background: var(--vd-panel-bg, #f1f5f9);
+}
+
+.vd-slides__grid-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+  max-width: 1300px;
+  margin: 0 auto;
+}
+
+.vd-slides__grid-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--vd-panel-solid, #ffffff);
+  border: 0.5px solid var(--vd-border, #e2e8f0);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease, border-color 0.2s ease;
+}
+
+.vd-slides__grid-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.03);
+  border-color: #d83b01;
+}
+
+.vd-slides__grid-card.is-active {
+  border-color: #d83b01;
+  box-shadow: 0 0 0 2px rgba(216, 59, 1, 0.22), 0 6px 18px rgba(216, 59, 1, 0.1);
+}
+
+.vd-slides__grid-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--vd-panel-alt, #f8fafc) 80%, transparent);
+  border-bottom: 0.5px solid var(--vd-border, #e2e8f0);
+}
+
+.vd-slides__grid-num {
+  font-size: 12px;
+  font-weight: 700;
+  color: #d83b01;
+}
+
+.vd-slides__grid-layout {
+  font-size: 11px;
+  color: var(--vd-muted, #64748b);
+}
+
+.vd-slides__grid-preview {
+  aspect-ratio: 16 / 9;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.vd-slides__grid-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vd-slides__grid-body {
+  font-size: 12px;
+  color: var(--vd-muted, #475569);
+  line-height: 1.4;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
 }
 

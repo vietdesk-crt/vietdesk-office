@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { createPortal } from "react-dom";
+import { Play, Sparkles, Printer, Plus } from "lucide-react";
 import {
   SLIDE_LAYOUTS,
   SLIDE_THEMES,
@@ -16,7 +17,7 @@ import {
   layoutSlideBlocks,
   parseMarkdownToAST,
 } from "./autoframing";
-import type { ASTBlock, AutoFrameLayoutResult } from "./autoframing";
+import type { ASTBlock, AutoFrameLayoutResult, SlideArchetype } from "./autoframing";
 
 export interface SlidesEditorProps {
   /** Danh sách slide đã lưu trong tệp `.vdx`. */
@@ -42,7 +43,7 @@ const TRANSITION_LABELS: Record<SlideTransition, string> = {
 
 function backgroundStyle(slide: Slide): CSSProperties {
   if (!slide.background) return {};
-  // Tự động đảo màu chữ theo độ sáng nền (giống WPS khi đổi màu slide).
+  // Tự động đảo màu chữ theo độ sáng nền để đảm bảo độ tương phản cao.
   return { background: slide.background, color: readableTextColor(slide.background) };
 }
 
@@ -209,7 +210,11 @@ function AutoFrameView({ layout }: { layout: AutoFrameLayoutResult }) {
   );
 }
 
-function computeFrameLayoutForSlide(title: string, body: string): AutoFrameLayoutResult {
+function computeFrameLayoutForSlide(
+  title: string,
+  body: string,
+  archetype?: SlideArchetype,
+): AutoFrameLayoutResult {
   const lines = slideBodyLines(body);
   const blocks: ASTBlock[] = [];
   if (title.trim()) {
@@ -221,7 +226,7 @@ function computeFrameLayoutForSlide(title: string, body: string): AutoFrameLayou
   if (blocks.length === 0) {
     blocks.push({ id: "slide-empty-h", type: "heading", level: 1, text: "(Chưa đặt tiêu đề)" });
   }
-  return layoutSlideBlocks(blocks);
+  return layoutSlideBlocks(blocks, archetype);
 }
 
 /** Nội dung slide theo layout — dùng chung cho khung xem và trình chiếu. */
@@ -256,6 +261,139 @@ function SlideContent({ slide }: { slide: Slide }) {
   );
 }
 
+interface PresentationOutroProps {
+  slides: Slide[];
+  elapsedSeconds: number;
+  onRestart: () => void;
+  onBack: () => void;
+  onExit: () => void;
+}
+
+function PresentationOutro({
+  slides,
+  elapsedSeconds,
+  onRestart,
+  onBack,
+  onExit,
+}: PresentationOutroProps) {
+  const [copied, setCopied] = useState(false);
+
+  const archetypesCount = useMemo(() => {
+    let count = 0;
+    const set = new Set<string>();
+    for (const s of slides) {
+      if (s.frameLayout?.archetype) {
+        set.add(s.frameLayout.archetype);
+        count += 1;
+      }
+    }
+    return { unique: set.size, totalFramed: count };
+  }, [slides]);
+
+  const copySummary = () => {
+    const minutes = Math.floor(elapsedSeconds / 60);
+    const seconds = elapsedSeconds % 60;
+    const timeFormatted = `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+    const lines = [
+      `# Báo Cáo Thuyết Trình: ${slides[0]?.title || "Trình chiếu VietDesk"}`,
+      `- Tổng số slide: ${slides.length}`,
+      `- Thời lượng: ${timeFormatted}`,
+      `- Số slide Auto-Framing: ${archetypesCount.totalFramed}/${slides.length}`,
+      `- Danh mục slide:`,
+      ...slides.map((s, idx) => `  ${idx + 1}. ${s.title || "Slide " + (idx + 1)}`),
+      `\n*Tạo bởi VietDesk HyperCanvas Office — Bản sắc Việt, tốc độ 60-120 FPS*`,
+    ].join("\n");
+
+    navigator.clipboard?.writeText(lines).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    }).catch(() => {});
+  };
+
+  const minutes = Math.floor(elapsedSeconds / 60);
+  const seconds = elapsedSeconds % 60;
+  const timeFormatted = `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+
+  return (
+    <div className="vd-present-outro" onClick={(e) => e.stopPropagation()}>
+      <div className="vd-present-outro__glow" aria-hidden="true" />
+      <div className="vd-present-outro__card">
+        <div className="vd-present-outro__badge">
+          <span className="vd-present-outro__badge-dot" aria-hidden="true" />
+          KẾT THÚC BÀI THUYẾT TRÌNH · END OF PRESENTATION
+        </div>
+
+        <h1 className="vd-present-outro__title">
+          Thuyết Trình Hoàn Tất
+        </h1>
+        <p className="vd-present-outro__subtitle">
+          Bài trình chiếu đã được truyền tải trọn vẹn trên không gian Universal Canvas của VietDesk Office.
+        </p>
+
+        <div className="vd-present-outro__grid">
+          <div className="vd-present-outro__metric">
+            <span className="vd-present-outro__metric-value">{slides.length}</span>
+            <span className="vd-present-outro__metric-label">Tổng số Slide</span>
+          </div>
+          <div className="vd-present-outro__metric">
+            <span className="vd-present-outro__metric-value">{timeFormatted}</span>
+            <span className="vd-present-outro__metric-label">Thời gian thuyết trình</span>
+          </div>
+          <div className="vd-present-outro__metric">
+            <span className="vd-present-outro__metric-value">100%</span>
+            <span className="vd-present-outro__metric-label">Tiến độ hoàn thành</span>
+          </div>
+          <div className="vd-present-outro__metric">
+            <span className="vd-present-outro__metric-value">
+              {archetypesCount.unique > 0 ? `${archetypesCount.unique} kiểu` : "Chuẩn"}
+            </span>
+            <span className="vd-present-outro__metric-label">Auto-Framing CSP</span>
+          </div>
+        </div>
+
+        <div className="vd-present-outro__actions">
+          <button
+            type="button"
+            className="vd-button is-primary"
+            onClick={onRestart}
+            title="Bắt đầu lại từ slide đầu tiên (Home hoặc phím R)"
+          >
+            Trình chiếu lại từ đầu (R)
+          </button>
+          <button
+            type="button"
+            className="vd-button"
+            onClick={onBack}
+            title="Quay lại slide trước (‹)"
+          >
+            ‹ Slide trước
+          </button>
+          <button
+            type="button"
+            className="vd-button"
+            onClick={copySummary}
+            title="Sao chép báo cáo tóm tắt bài thuyết trình vào clipboard"
+          >
+            {copied ? "✓ Đã sao chép báo cáo!" : "Sao chép tóm tắt"}
+          </button>
+          <button
+            type="button"
+            className="vd-button"
+            onClick={onExit}
+            title="Thoát chế độ trình chiếu (Esc)"
+          >
+            Thoát (Esc)
+          </button>
+        </div>
+
+        <div className="vd-present-outro__footer">
+          VietDesk HyperCanvas Office · Chuẩn mực 16:9 · Hiệu năng 60–120 FPS
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Trình chiếu: danh sách slide (thêm / nhân đôi / xóa / đổi thứ tự) + khung
  * soạn 16:9 theo layout + màu nền + ghi chú diễn giả + chế độ trình chiếu toàn
@@ -273,6 +411,12 @@ export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
   const [showNotes, setShowNotes] = useState(false);
   const [autoFrameModalOpen, setAutoFrameModalOpen] = useState(false);
   const [markdownInput, setMarkdownInput] = useState("");
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [laserActive, setLaserActive] = useState(false);
+  const [laserPos, setLaserPos] = useState<{ x: number; y: number } | null>(null);
+  const [ribbonTab, setRibbonTab] = useState<"home" | "design" | "autoframing">("home");
+  const [slideViewMode, setSlideViewMode] = useState<"filmstrip" | "grid">("filmstrip");
+  const [notesExpanded, setNotesExpanded] = useState(true);
   const onChangeRef = useRef(onChange);
   const presentRef = useRef<HTMLDivElement>(null);
 
@@ -408,8 +552,27 @@ export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
 
   const stepPresent = (delta: number) => {
     setPresentIndex((index) =>
-      Math.min(Math.max(index + delta, 0), slides.length - 1),
+      Math.min(Math.max(index + delta, 0), slides.length),
     );
+  };
+
+  useEffect(() => {
+    if (!presenting) {
+      setElapsedSeconds(0);
+      setLaserActive(false);
+      setLaserPos(null);
+      return;
+    }
+    const timer = setInterval(() => {
+      setElapsedSeconds((s) => s + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [presenting]);
+
+  const formatTimer = (sec: number) => {
+    const mins = Math.floor(sec / 60);
+    const secs = sec % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
   useEffect(() => {
@@ -425,6 +588,16 @@ export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
       if (event.key === "s" || event.key === "S") {
         event.preventDefault();
         setShowNotes((value) => !value);
+        return;
+      }
+      if (event.key === "l" || event.key === "L") {
+        event.preventDefault();
+        setLaserActive((active) => !active);
+        return;
+      }
+      if (event.key === "r" || event.key === "R") {
+        event.preventDefault();
+        setPresentIndex(0);
         return;
       }
       if (
@@ -450,7 +623,7 @@ export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
       }
       if (event.key === "End") {
         event.preventDefault();
-        setPresentIndex(slides.length - 1);
+        setPresentIndex(slides.length);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -491,6 +664,7 @@ export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [presenting, slides.length, selectedIndex]);
 
+  const isOutro = presentIndex >= slides.length;
   const current = slides[Math.min(presentIndex, slides.length - 1)];
 
   return (
@@ -573,134 +747,255 @@ export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
       </aside>
 
       <section className="vd-slides__stage">
-        <div className="vd-slides__toolbar">
-          <div className="vd-slides__tools">
-            <label className="vd-slides__tool">
-              <span className="vd-slides__tool-label">Bố cục</span>
-              <select
-                className="vd-slides__select"
-                value={selected?.layout ?? "title-content"}
-                onChange={(event) =>
-                  updateSlide({ layout: event.target.value as SlideLayout })
-                }
-                disabled={!selected}
-                aria-label="Kiểu slide"
-              >
-                {SLIDE_LAYOUTS.map((layout) => (
-                  <option key={layout} value={layout}>
-                    {LAYOUT_LABELS[layout]}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="vd-slides__tool">
-              <span className="vd-slides__tool-label">Hiệu ứng</span>
-              <select
-                className="vd-slides__select"
-                value={selected?.transition ?? "fade"}
-                onChange={(event) =>
-                  updateSlide({ transition: event.target.value as SlideTransition })
-                }
-                disabled={!selected}
-                aria-label="Hiệu ứng chuyển slide"
-              >
-                {SLIDE_TRANSITIONS.map((trans) => (
-                  <option key={trans} value={trans}>
-                    {TRANSITION_LABELS[trans]}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <div className="vd-slides__tool" role="group" aria-label="Màu nền slide">
-              <span className="vd-slides__tool-label">Chủ đề & Nền</span>
-              <div className="vd-slides__swatches">
-                {SLIDE_THEMES.map((theme) => (
-                  <button
-                    key={theme.id}
-                    type="button"
-                    className={`vd-slides__swatch${
-                      selected?.background === theme.background ? " is-active" : ""
-                    }`}
-                    style={{ background: theme.background }}
-                    title={`${theme.name} (${theme.background})`}
-                    aria-label={`Đặt nền ${theme.name}`}
-                    disabled={!selected}
-                    onClick={() => updateSlide({ background: theme.background })}
-                  />
-                ))}
-                <input
-                  type="color"
-                  className="vd-slides__color"
-                  value={selected?.background ?? "#ffffff"}
-                  onChange={(event) =>
-                    updateSlide({ background: event.target.value })
-                  }
-                  disabled={!selected}
-                  aria-label="Màu nền tùy chỉnh"
-                />
-                <button
-                  type="button"
-                  className="vd-slides__clear-bg"
-                  disabled={!selected?.background}
-                  onClick={() => updateSlide({ background: null })}
-                >
-                  Xóa nền
-                </button>
-                <button
-                  type="button"
-                  className="vd-slides__apply-all"
-                  title="Áp dụng nền và hiệu ứng cho toàn bộ bài trình chiếu"
-                  disabled={!selected}
-                  onClick={applyThemeToAll}
-                >
-                  Áp dụng tất cả
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="vd-slides__actions-right">
+        {/* --- Slides Ribbon Tab Strip (Chuẩn văn phòng hiện đại) --- */}
+        <div className="vd-slides__tab-strip" role="tablist" aria-label="Thanh tab Slides">
+          <div className="vd-slides__tabs-left">
             <button
               type="button"
-              className="vd-button"
-              onClick={() => {
-                setMarkdownInput(
-                  selected ? `# ${selected.title}\n\n${selected.body}` : ""
-                );
-                setAutoFrameModalOpen(true);
-              }}
-              title="Tự động đóng khung và dàn trang 16:9 theo chuẩn HC-Office"
+              role="tab"
+              aria-selected={ribbonTab === "home"}
+              className={`vd-slides__tab-btn${ribbonTab === "home" ? " is-active" : ""}`}
+              onClick={() => setRibbonTab("home")}
+            >
+              Trang chủ
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={ribbonTab === "design"}
+              className={`vd-slides__tab-btn${ribbonTab === "design" ? " is-active" : ""}`}
+              onClick={() => setRibbonTab("design")}
+            >
+              Thiết kế & Nền
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={ribbonTab === "autoframing"}
+              className={`vd-slides__tab-btn${ribbonTab === "autoframing" ? " is-active" : ""}`}
+              onClick={() => setRibbonTab("autoframing")}
             >
               Auto-Framing 16:9
             </button>
+          </div>
+          <div className="vd-slides__tabs-right">
             <button
               type="button"
-              className="vd-button"
-              onClick={() => window.print()}
-              title="In hoặc xuất PDF toàn bộ bài trình chiếu"
-            >
-              In / Xuất PDF
-            </button>
-            <button
-              type="button"
-              className="vd-button is-primary"
+              className="vd-slides__present-btn"
               onClick={startPresent}
               disabled={slides.length === 0}
+              title="Bắt đầu trình chiếu toàn màn hình với Presenter Studio (Phím F5)"
             >
-              Trình chiếu (F5)
+              <Play size={13} fill="currentColor" aria-hidden="true" />
+              <span>Trình chiếu (F5)</span>
             </button>
           </div>
         </div>
 
-        {selected ? (
+        {/* --- Slides Ribbon Toolbar --- */}
+        <div className="vd-slides__toolbar" role="toolbar" aria-label="Thanh công cụ trình chiếu">
+          {ribbonTab === "home" && (
+            <div className="vd-slides__tools">
+              <label className="vd-slides__tool">
+                <span className="vd-slides__tool-label">Bố cục slide</span>
+                <select
+                  className="vd-slides__select"
+                  value={selected?.layout ?? "title-content"}
+                  onChange={(event) =>
+                    updateSlide({ layout: event.target.value as SlideLayout })
+                  }
+                  disabled={!selected}
+                  aria-label="Kiểu slide"
+                >
+                  {SLIDE_LAYOUTS.map((layout) => (
+                    <option key={layout} value={layout}>
+                      {LAYOUT_LABELS[layout]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="vd-slides__tool-actions">
+                <button
+                  type="button"
+                  className="vd-button"
+                  onClick={addSlide}
+                  title="Thêm slide mới"
+                >
+                  <Plus size={14} aria-hidden="true" />
+                  <span>Thêm slide</span>
+                </button>
+                <button
+                  type="button"
+                  className={`vd-button${slideViewMode === "grid" ? " is-active" : ""}`}
+                  onClick={() => setSlideViewMode((m) => (m === "grid" ? "filmstrip" : "grid"))}
+                  title="Chuyển chế độ xem lưới toàn bộ slide (Google Slides Grid View)"
+                >
+                  <span>{slideViewMode === "grid" ? "Xem đơn" : "Xem lưới"}</span>
+                </button>
+                <button
+                  type="button"
+                  className="vd-button"
+                  onClick={() => window.print()}
+                  title="In hoặc xuất PDF toàn bộ bài trình chiếu"
+                >
+                  <Printer size={14} aria-hidden="true" />
+                  <span>In / Xuất PDF</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {ribbonTab === "design" && (
+            <div className="vd-slides__tools">
+              <label className="vd-slides__tool">
+                <span className="vd-slides__tool-label">Hiệu ứng chuyển</span>
+                <select
+                  className="vd-slides__select"
+                  value={selected?.transition ?? "fade"}
+                  onChange={(event) =>
+                    updateSlide({ transition: event.target.value as SlideTransition })
+                  }
+                  disabled={!selected}
+                  aria-label="Hiệu ứng chuyển slide"
+                >
+                  {SLIDE_TRANSITIONS.map((trans) => (
+                    <option key={trans} value={trans}>
+                      {TRANSITION_LABELS[trans]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="vd-slides__tool" role="group" aria-label="Màu nền slide">
+                <span className="vd-slides__tool-label">Chủ đề & Nền</span>
+                <div className="vd-slides__swatches">
+                  {SLIDE_THEMES.map((theme) => (
+                    <button
+                      key={theme.id}
+                      type="button"
+                      className={`vd-slides__swatch${
+                        selected?.background === theme.background ? " is-active" : ""
+                      }`}
+                      style={{ background: theme.background }}
+                      title={`${theme.name} (${theme.background})`}
+                      aria-label={`Đặt nền ${theme.name}`}
+                      disabled={!selected}
+                      onClick={() => updateSlide({ background: theme.background })}
+                    />
+                  ))}
+                  <input
+                    type="color"
+                    className="vd-slides__color"
+                    value={selected?.background ?? "#ffffff"}
+                    onChange={(event) =>
+                      updateSlide({ background: event.target.value })
+                    }
+                    disabled={!selected}
+                    aria-label="Màu nền tùy chỉnh"
+                  />
+                  <button
+                    type="button"
+                    className="vd-slides__clear-bg"
+                    disabled={!selected?.background}
+                    onClick={() => updateSlide({ background: null })}
+                  >
+                    Xóa nền
+                  </button>
+                  <button
+                    type="button"
+                    className="vd-slides__apply-all"
+                    title="Áp dụng nền và hiệu ứng cho toàn bộ bài trình chiếu"
+                    disabled={!selected}
+                    onClick={applyThemeToAll}
+                  >
+                    Áp dụng tất cả
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {ribbonTab === "autoframing" && (
+            <div className="vd-slides__tools">
+              <button
+                type="button"
+                className="vd-button is-primary"
+                onClick={() => {
+                  setMarkdownInput(
+                    selected ? `# ${selected.title}\n\n${selected.body}` : ""
+                  );
+                  setAutoFrameModalOpen(true);
+                }}
+                title="Tự động đóng khung và dàn trang 16:9 theo chuẩn HC-Office"
+              >
+                <Sparkles size={14} aria-hidden="true" />
+                <span>Kích hoạt Auto-Framing 16:9</span>
+              </button>
+              <span className="vd-slides__autoframing-hint">
+                Tự động bố cục 5 Archetypes (Hero, Split Column, Cards, Timeline, Stats) không cần Internet/Copilot.
+              </span>
+            </div>
+          )}
+        </div>
+
+        {slideViewMode === "grid" ? (
+          <div className="vd-slides__grid-view" role="region" aria-label="Xem lưới slide">
+            <div className="vd-slides__grid-container">
+              {slides.map((s, index) => (
+                <div
+                  key={s.id}
+                  className={`vd-slides__grid-card${s.id === selected?.id ? " is-active" : ""}`}
+                  onClick={() => {
+                    setSelectedId(s.id);
+                    setSlideViewMode("filmstrip");
+                  }}
+                  title="Nhấn để mở và chỉnh sửa slide"
+                >
+                  <div className="vd-slides__grid-card-head">
+                    <span className="vd-slides__grid-num">{index + 1}</span>
+                    <span className="vd-slides__grid-layout">{LAYOUT_LABELS[s.layout]}</span>
+                  </div>
+                  <div
+                    className="vd-slides__grid-preview"
+                    style={s.background ? { background: s.background } : undefined}
+                  >
+                    <strong className="vd-slides__grid-title">{s.title || "(Chưa có tiêu đề)"}</strong>
+                    <p className="vd-slides__grid-body">{s.body}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : selected ? (
           <>
             {selected.frameLayout ? (
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "min(100%, calc((100vh - 380px) * 16 / 9))", alignSelf: "center", marginBottom: 6 }}>
-                <span className="vd-autoframing-badge">
-                  Bố cục: {selected.frameLayout.archetype} | Điểm thị giác: {selected.frameLayout.score}/100
-                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span className="vd-autoframing-badge">
+                    Điểm thị giác: {selected.frameLayout.score}/100
+                  </span>
+                  <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}>
+                    <span style={{ color: "var(--vd-muted)" }}>Archetype:</span>
+                    <select
+                      value={selected.frameLayout.archetype}
+                      onChange={(e) => {
+                        const arch = e.target.value as SlideArchetype;
+                        updateSlide({
+                          frameLayout: computeFrameLayoutForSlide(selected.title, selected.body, arch),
+                        });
+                      }}
+                      className="vd-select"
+                      style={{ padding: "2px 6px", fontSize: 12 }}
+                    >
+                      <option value="HERO_STATEMENT">Hero Statement (Tiêu điểm)</option>
+                      <option value="SPLIT_TWO_COLUMN">Split 2-Column (2 Cột)</option>
+                      <option value="CARD_GRID">Card Grid (Lưới thẻ)</option>
+                      <option value="METRIC_CALLOUT">Metric Callout (Số liệu)</option>
+                      <option value="CLASSIC_STACK">Classic Stack (Xếp tầng)</option>
+                    </select>
+                  </label>
+                </div>
                 <div style={{ display: "flex", gap: 6 }}>
                   <button
                     type="button"
@@ -711,8 +1006,9 @@ export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
                       })
                     }
                     style={{ fontSize: 11, padding: "2px 8px" }}
+                    title="Tự động so khớp CSP tối ưu nhất"
                   >
-                    Tối ưu lại
+                    Tự động (CSP)
                   </button>
                   <button
                     type="button"
@@ -768,18 +1064,30 @@ export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
                   placeholder="Mỗi dòng là một gạch đầu dòng"
                 />
               </label>
-              <label className="vd-slides__field">
-                <span className="vd-slides__field-label">Ghi chú diễn giả</span>
-                <textarea
-                  className="vd-slides__textarea vd-slides__notes"
-                  value={selected.notes}
-                  onChange={(event) => updateSlide({ notes: event.target.value })}
-                  rows={2}
-                  spellCheck
-                  lang="vi"
-                  placeholder="Không hiện khi trình chiếu"
-                />
-              </label>
+              <div className="vd-slides__field">
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                  <span className="vd-slides__field-label" style={{ marginBottom: 0 }}>Ghi chú diễn giả</span>
+                  <button
+                    type="button"
+                    className="vd-button is-small"
+                    style={{ fontSize: 11, padding: "1px 6px" }}
+                    onClick={() => setNotesExpanded((exp) => !exp)}
+                  >
+                    {notesExpanded ? "Thu gọn" : "Mở rộng"}
+                  </button>
+                </div>
+                {notesExpanded && (
+                  <textarea
+                    className="vd-slides__textarea vd-slides__notes"
+                    value={selected.notes}
+                    onChange={(event) => updateSlide({ notes: event.target.value })}
+                    rows={2}
+                    spellCheck
+                    lang="vi"
+                    placeholder="Không hiện khi trình chiếu"
+                  />
+                )}
+              </div>
             </div>
           </>
         ) : null}
@@ -793,32 +1101,58 @@ export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
         </div>
       </section>
 
-      {presenting && current
+      {presenting && (current || isOutro)
         ? createPortal(
             <div
               ref={presentRef}
-              className="vd-present"
+              className={`vd-present${laserActive ? " is-laser-active" : ""}`}
               role="dialog"
               aria-modal="true"
               aria-label="Chế độ trình chiếu"
-              onClick={() => stepPresent(1)}
+              onClick={() => {
+                if (!isOutro) stepPresent(1);
+              }}
+              onMouseMove={(e) => {
+                if (laserActive) {
+                  setLaserPos({ x: e.clientX, y: e.clientY });
+                }
+              }}
             >
               <div
                 className="vd-present__progress"
                 style={{
-                  width: `${((presentIndex + 1) / slides.length) * 100}%`,
+                  width: `${((Math.min(presentIndex + 1, slides.length)) / slides.length) * 100}%`,
                 }}
               />
-              <div
-                key={current.id}
-                className={`vd-present__canvas vd-slide--${current.layout} vd-present__canvas--${
-                  current.transition ?? "fade"
-                }`}
-                style={backgroundStyle(current)}
-              >
-                <SlideContent slide={current} />
-              </div>
-              {showNotes ? (
+
+              {laserActive && laserPos ? (
+                <div
+                  className="vd-present__laser"
+                  style={{ left: laserPos.x, top: laserPos.y }}
+                />
+              ) : null}
+
+              {isOutro ? (
+                <PresentationOutro
+                  slides={slides}
+                  elapsedSeconds={elapsedSeconds}
+                  onRestart={() => setPresentIndex(0)}
+                  onBack={() => setPresentIndex(slides.length - 1)}
+                  onExit={stopPresent}
+                />
+              ) : (
+                <div
+                  key={current.id}
+                  className={`vd-present__canvas vd-slide--${current.layout} vd-present__canvas--${
+                    current.transition ?? "fade"
+                  }`}
+                  style={backgroundStyle(current)}
+                >
+                  <SlideContent slide={current} />
+                </div>
+              )}
+
+              {showNotes && !isOutro ? (
                 <div
                   className="vd-present__notes"
                   onClick={(event) => event.stopPropagation()}
@@ -831,16 +1165,24 @@ export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
                   </div>
                 </div>
               ) : null}
+
               <div
                 className="vd-present__hud"
                 onClick={(event) => event.stopPropagation()}
               >
+                <span className="vd-present__timer" title="Thời gian thuyết trình">
+                  ⏱ {formatTimer(elapsedSeconds)}
+                </span>
                 <span className="vd-present__counter">
-                  {Math.min(presentIndex, slides.length - 1) + 1}/{slides.length}
+                  {isOutro
+                    ? `Kết thúc (${slides.length}/${slides.length})`
+                    : `${presentIndex + 1}/${slides.length}`}
                 </span>
-                <span className="vd-present__badge">
-                  {TRANSITION_LABELS[current.transition ?? "fade"]}
-                </span>
+                {!isOutro && (
+                  <span className="vd-present__badge">
+                    {TRANSITION_LABELS[current.transition ?? "fade"]}
+                  </span>
+                )}
                 <button
                   type="button"
                   onClick={() => stepPresent(-1)}
@@ -852,18 +1194,29 @@ export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
                 <button
                   type="button"
                   onClick={() => stepPresent(1)}
-                  disabled={presentIndex >= slides.length - 1}
+                  disabled={isOutro}
                   aria-label="Slide sau"
                 >
                   Sau ›
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowNotes((v) => !v)}
-                  aria-label="Hiện hoặc ẩn ghi chú diễn giả"
+                  className={laserActive ? "is-active" : ""}
+                  onClick={() => setLaserActive((active) => !active)}
+                  title="Con trỏ Laser (Phím L)"
+                  aria-label="Bật/Tắt con trỏ Laser"
                 >
-                  {showNotes ? "Ẩn ghi chú (S)" : "Ghi chú (S)"}
+                  {laserActive ? "🔴 Tắt Laser" : "⭕ Laser (L)"}
                 </button>
+                {!isOutro && (
+                  <button
+                    type="button"
+                    onClick={() => setShowNotes((v) => !v)}
+                    aria-label="Hiện hoặc ẩn ghi chú diễn giả"
+                  >
+                    {showNotes ? "Ẩn ghi chú (S)" : "Ghi chú (S)"}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={stopPresent}

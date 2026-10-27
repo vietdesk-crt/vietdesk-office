@@ -446,6 +446,32 @@ void test_advanced_functions() {
   expect_number("if neq", sheet, "B13", 88.0);
 }
 
+void test_power_and_absolute_and_shortcircuit() {
+  const Sheet sheet = run({
+      {"A1", "10"},
+      {"A2", "3"},
+      {"B1", "=2 ^ 3"},
+      {"B2", "=2 ^ 3 ^ 2"},
+      {"B3", "=2 * 3 ^ 2"},
+      {"B4", "=(2 * 3) ^ 2"},
+      {"B5", "=$A$1 + A$2"},
+      {"B6", "=SUM($A$1:$A$2)"},
+      {"B7", "=IF(1, 42, 1/0)"},
+      {"B8", "=IF(0, 1/0, 99)"},
+      {"B9", "=IF(A1 > 0, $A$1 ^ A2, 1/0)"},
+  });
+
+  expect_number("power basic", sheet, "B1", 8.0);
+  expect_number("power right-assoc", sheet, "B2", 512.0);
+  expect_number("power precedence", sheet, "B3", 18.0);
+  expect_number("power with parens", sheet, "B4", 36.0);
+  expect_number("absolute cell coords", sheet, "B5", 13.0);
+  expect_number("absolute cell range", sheet, "B6", 13.0);
+  expect_number("short-circuit if true branch", sheet, "B7", 42.0);
+  expect_number("short-circuit if false branch", sheet, "B8", 99.0);
+  expect_number("short-circuit if with power and absolute", sheet, "B9", 1000.0);
+}
+
 } // namespace
 
 int main() {
@@ -458,6 +484,7 @@ int main() {
   test_depth_limit();
   test_abi();
   test_advanced_functions();
+  test_power_and_absolute_and_shortcircuit();
 
   if (g_failures != 0) {
     std::printf("%d/%d kiểm tra thất bại\n", g_failures, g_checks);

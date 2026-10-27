@@ -84,21 +84,38 @@ bool parse_double(const std::string &text, double *out) {
   return true;
 }
 
-/** "A1", "AA10" — đúng như regex `^[A-Z]+[0-9]+$` của bản TS. */
+std::string normalize_cell_id(const std::string &value) {
+  std::string clean;
+  clean.reserve(value.size());
+  for (char c : value) {
+    if (c != '$') {
+      clean.push_back(c);
+    }
+  }
+  return clean;
+}
+
+/** "A1", "$A$1", "A$1", "$A1", "AA10" */
 bool is_cell_id(const std::string &value) {
   size_t index = 0;
+  if (index < value.size() && value[index] == '$') {
+    ++index;
+  }
+  const size_t letter_start = index;
   while (index < value.size() && is_upper_alpha(value[index])) {
     ++index;
   }
-  if (index == 0 || index == value.size()) {
+  if (index == letter_start) {
     return false;
   }
-  for (; index < value.size(); ++index) {
-    if (!is_digit(value[index])) {
-      return false;
-    }
+  if (index < value.size() && value[index] == '$') {
+    ++index;
   }
-  return true;
+  const size_t digit_start = index;
+  while (index < value.size() && is_digit(value[index])) {
+    ++index;
+  }
+  return digit_start < value.size() && index == value.size();
 }
 
 struct CellRef {
@@ -110,18 +127,19 @@ bool parse_cell_ref(const std::string &id, CellRef *out) {
   if (!is_cell_id(id)) {
     return false;
   }
+  const std::string clean = normalize_cell_id(id);
   size_t index = 0;
   long long column = 0;
-  while (index < id.size() && is_upper_alpha(id[index])) {
-    column = column * 26 + (id[index] - 'A' + 1);
+  while (index < clean.size() && is_upper_alpha(clean[index])) {
+    column = column * 26 + (clean[index] - 'A' + 1);
     if (column > 1000000) {
       return false;
     }
     ++index;
   }
   long long row = 0;
-  for (; index < id.size(); ++index) {
-    row = row * 10 + (id[index] - '0');
+  for (; index < clean.size(); ++index) {
+    row = row * 10 + (clean[index] - '0');
     if (row > 1000000) {
       return false;
     }
@@ -200,10 +218,10 @@ std::vector<Token> tokenize(const std::string &source) {
       continue;
     }
 
-    if (is_alpha(c) || c == '_') {
+    if (c == '$' || is_alpha(c) || c == '_') {
       const size_t start = index;
       while (index < source.size() &&
-             (is_alnum(source[index]) || source[index] == '_')) {
+             (is_alnum(source[index]) || source[index] == '_' || source[index] == '$')) {
         ++index;
       }
       const std::string word = source.substr(start, index - start);
@@ -230,8 +248,10 @@ std::vector<Token> tokenize(const std::string &source) {
         push_token(tokens, std::move(token));
       } else if (is_cell_id(upper)) {
         Token token{TokenKind::Ref};
-        token.text = upper;
+        token.text = normalize_cell_id(upper);
         push_token(tokens, std::move(token));
+      } else if (c == '$') {
+        throw FormulaError(std::string("Ký tự không hợp lệ \"") + c + "\"");
       } else {
         throw FormulaError("Không nhận ra \"" + word + "\"");
       }
@@ -242,7 +262,8 @@ std::vector<Token> tokenize(const std::string &source) {
     case '+':
     case '-':
     case '*':
-    case '/': {
+    case '/':
+    case '^': {
       Token token{TokenKind::Op};
       token.op = c;
       push_token(tokens, std::move(token));
@@ -378,7 +399,7 @@ private:
   }
 
   Value multiplicative(int depth) {
-    Value left = unary(depth);
+    Value left = power(depth);
     for (;;) {
       const Token *token = peek();
       if (token == nullptr || token->kind != TokenKind::Op) {
@@ -388,12 +409,24 @@ private:
         break;
       }
       ++cursor_;
-      const Value right = unary(depth);
+      const Value right = power(depth);
       const double divisor = scalar(right);
       if (token->op == '/' && divisor == 0.0) {
         throw FormulaError("Chia cho 0");
       }
       left = token->op == '*' ? scalar(left) * divisor : scalar(left) / divisor;
+    }
+    return left;
+  }
+
+  Value power(int depth) {
+    Value left = unary(depth);
+    const Token *token = peek();
+    if (token != nullptr && token->kind == TokenKind::Op && token->op == '^') {
+      ++cursor_;
+      // Lũy thừa kết hợp phải: 2 ^ 3 ^ 2 = 2 ^ (3 ^ 2) = 512
+      const Value right = power(depth);
+      return std::pow(scalar(left), scalar(right));
     }
     return left;
   }
@@ -407,6 +440,73 @@ private:
       return token->op == '-' ? -value : value;
     }
     return primary(depth);
+  }
+
+  void skip_argument() {
+    int paren_count = 0;
+    while (cursor_ < tokens_.size()) {
+      const Token &t = tokens_[cursor_];
+      if (t.kind == TokenKind::LParen) {
+        ++paren_count;
+        ++cursor_;
+      } else if (t.kind == TokenKind::RParen) {
+        if (paren_count == 0) {
+          break;
+        }
+        --paren_count;
+        ++cursor_;
+      } else if (t.kind == TokenKind::Comma) {
+        if (paren_count == 0) {
+          break;
+        }
+        ++cursor_;
+      } else {
+        ++cursor_;
+      }
+    }
+  }
+
+  Value parse_if_function(int depth) {
+    check_depth(depth);
+    const Token *first = peek();
+    if (first != nullptr && first->kind == TokenKind::RParen) {
+      throw FormulaError("Hàm IF cần ít nhất 2 tham số: IF(điều_kiện, đúng, [sai])");
+    }
+
+    const Value cond_val = comparison(depth + 1);
+    const double cond = scalar(cond_val);
+
+    const Token *sep1 = peek();
+    if (sep1 == nullptr || sep1->kind != TokenKind::Comma) {
+      throw FormulaError("Hàm IF thiếu tham số thứ hai");
+    }
+    ++cursor_;
+
+    double result = 0.0;
+    if (cond != 0.0) {
+      result = scalar(comparison(depth + 1));
+      const Token *sep2 = peek();
+      if (sep2 != nullptr && sep2->kind == TokenKind::Comma) {
+        ++cursor_;
+        skip_argument();
+      }
+    } else {
+      skip_argument();
+      const Token *sep2 = peek();
+      if (sep2 != nullptr && sep2->kind == TokenKind::Comma) {
+        ++cursor_;
+        result = scalar(comparison(depth + 1));
+      } else {
+        result = 0.0;
+      }
+    }
+
+    const Token *close = peek();
+    if (close == nullptr || close->kind != TokenKind::RParen) {
+      throw FormulaError("Thiếu dấu )");
+    }
+    ++cursor_;
+    return result;
   }
 
   Value primary(int depth) {
@@ -457,6 +557,10 @@ private:
         throw FormulaError("Hàm " + name + " thiếu dấu (");
       }
       ++cursor_;
+
+      if (name == "IF") {
+        return parse_if_function(depth);
+      }
 
       std::vector<Value> args;
       const Token *first = peek();
@@ -603,7 +707,9 @@ private:
 
 SheetEngine::SheetEngine(
     const std::unordered_map<std::string, std::string> &cells)
-    : cells_(cells) {}
+    : cells_(cells) {
+  results_.reserve(cells_.size());
+}
 
 const CellResult &SheetEngine::result(const std::string &id) {
   const auto cached = results_.find(id);

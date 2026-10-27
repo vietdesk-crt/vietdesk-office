@@ -23,15 +23,13 @@ export interface CellStyle {
   bg?: string;
 }
 
+import { isRecord } from "@vietdesk/ipc-contract";
+
 export type CellStyleMap = Readonly<Record<string, CellStyle>>;
 
 export interface SheetsContent {
   cells: CellMap;
   styles?: CellStyleMap;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /** Đọc bản đồ ô từ nội dung tài liệu, bỏ mọi giá trị không phải chuỗi. */

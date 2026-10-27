@@ -67,3 +67,11 @@ export async function removeDiacritics(text: string): Promise<string> {
       .replace(/Đ/g, "D"),
   );
 }
+
+/**
+ * Kiểm tra một giá trị có phải là bản ghi (plain object) hay không.
+ * Dùng chung cho toàn bộ quá trình đọc/ghi JSON AST và dữ liệu tài liệu.
+ */
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}

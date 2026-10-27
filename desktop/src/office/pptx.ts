@@ -1,5 +1,5 @@
 /**
- * Chuyển `.pptx` (PowerPoint / Google Slides / LibreOffice Impress) sang nội
+ * Chuyển tệp định dạng trình chiếu `.pptx` sang nội
  * dung Slides `{ slides: [{ id, title, body }] }`.
  *
  * Mô hình Slides của VietDesk là tiêu đề + nhiều dòng chữ, nên chỉ trích văn

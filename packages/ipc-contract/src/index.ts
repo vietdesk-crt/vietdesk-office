@@ -1,5 +1,5 @@
 export { hasNativeCore } from "./env";
-export { composeNfc, coreInfo, removeDiacritics, stripTones } from "./core";
+export { composeNfc, coreInfo, isRecord, removeDiacritics, stripTones } from "./core";
 export type { CoreInfo, CoreRuntime } from "./core";
 export { computeSheetNative } from "./sheet";
 export type { SheetCellMap, SheetCellResult } from "./sheet";

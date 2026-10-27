@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildDependencyDAG,
   cellId,
   columnIndex,
   columnLabel,
   computeSheet,
+  extractCellDependencies,
   formatNumber,
   parseNumber,
+  shuntingYard,
+  topologicalSort,
 } from "../src/editors/sheets";
 
 describe("toạ độ ô", () => {
@@ -156,6 +160,104 @@ describe("engine công thức", () => {
     expect(sheet.B11?.numeric).toBe(0);
     expect(sheet.B12?.numeric).toBe(77);
     expect(sheet.B13?.numeric).toBe(88);
+  });
+
+  it("short-circuit trong hàm IF: không kích hoạt lỗi ở nhánh không thoả điều kiện", () => {
+    // Nếu điều kiện đúng, nhánh sai (1/0) không bao giờ bị tính
+    const sheet1 = computeSheet({ A1: "=IF(1 = 1, 42, 1/0)" });
+    expect(sheet1.A1?.numeric).toBe(42);
+    expect(sheet1.A1?.error).toBeUndefined();
+
+    // Nếu điều kiện sai, nhánh đúng (1/0) không bao giờ bị tính
+    const sheet2 = computeSheet({ A1: "=IF(1 = 0, 1/0, 99)" });
+    expect(sheet2.A1?.numeric).toBe(99);
+    expect(sheet2.A1?.error).toBeUndefined();
+
+    // Lồng nhau
+    const sheet3 = computeSheet({
+      A1: "0",
+      B1: "=IF(A1 = 0, 0, 100 / A1)",
+    });
+    expect(sheet3.B1?.numeric).toBe(0);
+    expect(sheet3.B1?.error).toBeUndefined();
+  });
+
+  it("tính toán toán tử lũy thừa ^ (power operator)", () => {
+    expect(computeSheet({ A1: "=2^3" }).A1?.numeric).toBe(8);
+    expect(computeSheet({ A1: "=2^3*2" }).A1?.numeric).toBe(16);
+    expect(computeSheet({ A1: "=2^(1+2)" }).A1?.numeric).toBe(8);
+  });
+
+  it("nhận dạng toạ độ ô có ký tự tuyệt đối $", () => {
+    const sheet = computeSheet({
+      A1: "10",
+      B1: "=$A$1 + 5",
+      C1: "=A$1 + 2",
+      D1: "=$A1 * 3",
+    });
+    expect(sheet.B1?.numeric).toBe(15);
+    expect(sheet.C1?.numeric).toBe(12);
+    expect(sheet.D1?.numeric).toBe(30);
+  });
+});
+
+describe("đồ thị phụ thuộc DAG & Topological Sort", () => {
+  it("trích xuất chính xác các ô phụ thuộc qua extractCellDependencies", () => {
+    const deps = extractCellDependencies("=SUM(A1:A3) + B1 * 2 + $C$4");
+    expect(deps).toContain("A1");
+    expect(deps).toContain("A2");
+    expect(deps).toContain("A3");
+    expect(deps).toContain("B1");
+    expect(deps).toContain("C4");
+  });
+
+  it("xây dựng DAG và sắp xếp thứ tự tính toán Topo", () => {
+    const cells = {
+      A1: "10",
+      B1: "=A1 * 2",
+      C1: "=B1 + 5",
+    };
+    const { precedents, dependents } = buildDependencyDAG(cells);
+    expect(precedents.get("B1")?.has("A1")).toBe(true);
+    expect(precedents.get("C1")?.has("B1")).toBe(true);
+    expect(dependents.get("A1")?.has("B1")).toBe(true);
+    expect(dependents.get("B1")?.has("C1")).toBe(true);
+
+    const { order, circularCells } = topologicalSort(cells);
+    expect(circularCells.size).toBe(0);
+    // A1 phải được tính trước B1, B1 trước C1
+    expect(order.indexOf("A1")).toBeLessThan(order.indexOf("B1"));
+    expect(order.indexOf("B1")).toBeLessThan(order.indexOf("C1"));
+  });
+
+  it("phát hiện chu trình tham chiếu vòng trong đồ thị DAG", () => {
+    const cells = {
+      A1: "=B1 + 1",
+      B1: "=C1 * 2",
+      C1: "=A1 - 3",
+      D1: "100",
+    };
+    const { circularCells } = topologicalSort(cells);
+    expect(circularCells.has("A1")).toBe(true);
+    expect(circularCells.has("B1")).toBe(true);
+    expect(circularCells.has("C1")).toBe(true);
+    expect(circularCells.has("D1")).toBe(false);
+  });
+});
+
+describe("thuật toán Shunting-Yard (Infix -> RPN)", () => {
+  it("chuyển đổi biểu thức số học sang RPN với đúng độ ưu tiên toán tử", () => {
+    const rpn = shuntingYard("1 + 2 * 3");
+    expect(rpn.map((t) => (t.kind === "number" ? t.value : t.kind === "op" ? t.value : ""))).toEqual([
+      1, 2, 3, "*", "+",
+    ]);
+  });
+
+  it("hỗ trợ dấu ngoặc và hàm trong Shunting-Yard", () => {
+    const rpn = shuntingYard("(1 + 2) * 3");
+    expect(rpn.map((t) => (t.kind === "number" ? t.value : t.kind === "op" ? t.value : ""))).toEqual([
+      1, 2, "+", 3, "*",
+    ]);
   });
 });
 

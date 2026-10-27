@@ -19,6 +19,8 @@
  * chỉ tăng `version` khi thay đổi cấu trúc bao hoặc ngữ nghĩa nội dung.
  */
 
+import { isRecord } from "./core";
+
 export const DOCUMENT_FORMAT = "vietdesk.document";
 export const DOCUMENT_VERSION = 1;
 export const DOCUMENT_EXTENSION = "vdx";
@@ -94,10 +96,6 @@ export function createDocumentEnvelope<Content>(
 
 export function serializeDocument(envelope: DocumentEnvelope): string {
   return `${JSON.stringify(envelope, null, 2)}\n`;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function readTimestamp(value: unknown, fallback: number): number {

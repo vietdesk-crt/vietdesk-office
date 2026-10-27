@@ -13,6 +13,8 @@
  * thử được không cần trình duyệt.
  */
 
+import { isRecord } from "@vietdesk/ipc-contract";
+
 /** 1 mm tính bằng px theo chuẩn CSS (96 dpi). */
 export const MM_TO_PX = 96 / 25.4;
 
@@ -51,10 +53,6 @@ export const DEFAULT_PAGE_SETUP: PageSetup = {
 
 /** Độ dài tối đa của một dòng đầu trang/chân trang. */
 const MAX_SETUP_TEXT = 500;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 /** Đọc cấu hình trang từ JSON tài liệu; dữ liệu lạ thì dùng mặc định. */
 export function normalizePageSetup(value: unknown): PageSetup {

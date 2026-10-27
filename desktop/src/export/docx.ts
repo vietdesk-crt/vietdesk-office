@@ -12,6 +12,7 @@
  * Bình luận chưa mang sang bản DOCX — vẫn giữ nguyên trong `.vdx`.
  */
 import type { Node as PMNode } from "prosemirror-model";
+import { isRecord } from "@vietdesk/ipc-contract";
 import { writerSchema } from "../editors/writer/schema";
 import { base64ToBytes, createZip, type ZipEntryInput } from "./binary";
 
@@ -44,10 +45,6 @@ const HIGHLIGHT_NAMES: Record<string, string> = {
   E1CDF6: "magenta",
   F6CFE1: "pink",
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 function escapeXml(value: string): string {
   return value

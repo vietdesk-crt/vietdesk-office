@@ -4,7 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "predev": "fuser -k 1420/tcp 2>/dev/null || true",
     "dev": "vite",
+    "dev:stop": "fuser -k 1420/tcp 2>/dev/null || true",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",

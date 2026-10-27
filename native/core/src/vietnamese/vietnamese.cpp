@@ -1,8 +1,9 @@
 #include "vietnamese/vietnamese.h"
 #include "common/utf8.h"
 
+#include <algorithm>
 #include <cstddef>
-#include <vector>
+#include <iterator>
 
 namespace vd {
 namespace {
@@ -101,14 +102,45 @@ struct Lookup {
   bool found;
 };
 
+struct VowelEntry {
+  Codepoint cp;
+  uint8_t row;
+  uint8_t tone;
+};
+
+// Bảng 72 nguyên âm đã sắp xếp tăng dần theo codepoint lúc compile time.
+// Giúp tìm kiếm nhị phân O(log N) với 6 phép so sánh CPU, zero-heap, thread-safe tuyệt đối.
+constexpr VowelEntry kSortedVowels[72] = {
+    {0x0061, 0, 0}, {0x0065, 3, 0}, {0x0069, 5, 0}, {0x006F, 6, 0},
+    {0x0075, 9, 0}, {0x0079, 11, 0}, {0x00E0, 0, 2}, {0x00E1, 0, 1},
+    {0x00E2, 2, 0}, {0x00E3, 0, 4}, {0x00E8, 3, 2}, {0x00E9, 3, 1},
+    {0x00EA, 4, 0}, {0x00EC, 5, 2}, {0x00ED, 5, 1}, {0x00F2, 6, 2},
+    {0x00F3, 6, 1}, {0x00F4, 7, 0}, {0x00F5, 6, 4}, {0x00F9, 9, 2},
+    {0x00FA, 9, 1}, {0x00FD, 11, 1}, {0x0103, 1, 0}, {0x0129, 5, 4},
+    {0x0169, 9, 4}, {0x01A1, 8, 0}, {0x01B0, 10, 0}, {0x1EA1, 0, 5},
+    {0x1EA3, 0, 3}, {0x1EA5, 2, 1}, {0x1EA7, 2, 2}, {0x1EA9, 2, 3},
+    {0x1EAB, 2, 4}, {0x1EAD, 2, 5}, {0x1EAF, 1, 1}, {0x1EB1, 1, 2},
+    {0x1EB3, 1, 3}, {0x1EB5, 1, 4}, {0x1EB7, 1, 5}, {0x1EB9, 3, 5},
+    {0x1EBB, 3, 3}, {0x1EBD, 3, 4}, {0x1EBF, 4, 1}, {0x1EC1, 4, 2},
+    {0x1EC3, 4, 3}, {0x1EC5, 4, 4}, {0x1EC7, 4, 5}, {0x1EC9, 5, 3},
+    {0x1ECB, 5, 5}, {0x1ECD, 6, 5}, {0x1ECF, 6, 3}, {0x1ED1, 7, 1},
+    {0x1ED3, 7, 2}, {0x1ED5, 7, 3}, {0x1ED7, 7, 4}, {0x1ED9, 7, 5},
+    {0x1EDB, 8, 1}, {0x1EDD, 8, 2}, {0x1EDF, 8, 3}, {0x1EE1, 8, 4},
+    {0x1EE3, 8, 5}, {0x1EE5, 9, 5}, {0x1EE7, 9, 3}, {0x1EE9, 10, 1},
+    {0x1EEB, 10, 2}, {0x1EED, 10, 3}, {0x1EEF, 10, 4}, {0x1EF1, 10, 5},
+    {0x1EF3, 11, 2}, {0x1EF5, 11, 5}, {0x1EF7, 11, 3}, {0x1EF9, 11, 4},
+};
+
 // Tra một ký tự (đã về chữ thường) xem nó là nguyên âm nào, ở thanh điệu nào.
 Lookup lookup_vowel(Codepoint lower) {
-  for (size_t r = 0; r < kRowCount; ++r) {
-    for (int t = 0; t < 6; ++t) {
-      if (kRows[r].toned[t] == lower) {
-        return {static_cast<int>(r), t, true};
-      }
-    }
+  const auto *begin = std::begin(kSortedVowels);
+  const auto *end = std::end(kSortedVowels);
+  const auto *it = std::lower_bound(
+      begin, end, lower,
+      [](const VowelEntry &entry, Codepoint val) { return entry.cp < val; });
+
+  if (it != end && it->cp == lower) {
+    return {static_cast<int>(it->row), static_cast<int>(it->tone), true};
   }
   return {0, 0, false};
 }

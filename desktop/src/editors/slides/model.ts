@@ -3,12 +3,13 @@
  *
  * Nội dung lưu trong `.vdx` có dạng `{ slides: Slide[] }`. Một slide nay gồm
  * kiểu trình bày (layout), màu nền (background) và ghi chú diễn giả (notes) —
- * lấy cảm hứng từ Google Slides và WPS Presentation nhưng giữ mô hình phẳng để
- * không phụ thuộc engine OOXML. Việc kiểm tra dữ liệu đọc từ đĩa nằm ở đây để
- * editor và vỏ ứng dụng không phải tự lọc lại.
+ * thiết kế theo mô hình phẳng tối ưu để chạy mượt mà độc lập. Việc kiểm tra
+ * dữ liệu đọc từ đĩa nằm ở đây để editor và vỏ ứng dụng không phải tự lọc lại.
  */
 
-/** Các kiểu trình bày có sẵn (map gần đúng layout master của PowerPoint). */
+import { isRecord } from "@vietdesk/ipc-contract";
+
+/** Các kiểu trình bày có sẵn chuẩn hóa theo thể thức trình chiếu chuyên nghiệp. */
 export const SLIDE_LAYOUTS = [
   "title",
   "title-content",
@@ -114,10 +115,6 @@ let slideSequence = 0;
 export function createSlideId(): string {
   slideSequence += 1;
   return `slide-${Date.now().toString(36)}-${slideSequence}`;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function isSlideShape(value: unknown): value is Record<string, unknown> & {

@@ -1013,6 +1013,7 @@ export function App() {
             <VietDeskLogo size={20} theme={theme} />
           </span>
           <span className="vd-brand__name">VietDesk</span>
+          <span className="vd-brand__enterprise-badge">Enterprise</span>
         </div>
 
         <button

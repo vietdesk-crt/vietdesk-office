@@ -7,13 +7,10 @@
  * editor, nên phần còn lại của ứng dụng không phải tự kiểm tra từng trường.
  */
 import type { Node as PMNode } from "prosemirror-model";
+import { isRecord } from "@vietdesk/ipc-contract";
 import { readComments } from "./comments";
 import { DEFAULT_PAGE_SETUP, readPageSetup } from "./page";
 import { writerSchema } from "./schema";
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 /** Nội dung ProseMirror của một văn bản trống (dùng làm mặc định khi lưu). */
 export function createEmptyWriterDocument(): unknown {
