@@ -455,17 +455,18 @@ export function App() {
   }, []);
 
   const createDocument = useCallback(
-    (kind: AppId) => {
+    (kind: AppId, initialContent?: unknown, customName?: string) => {
       const count = untitledCounter.current[kind];
       const name =
-        count === 1
+        customName ??
+        (count === 1
           ? APPS[kind].defaultName
-          : `${APPS[kind].defaultName} ${count}`;
+          : `${APPS[kind].defaultName} ${count}`);
       const created = applyDocument({
         kind,
         name,
         path: null,
-        content: APPS[kind].createDefaultContent(),
+        content: initialContent ?? APPS[kind].createDefaultContent(),
       });
       if (created) {
         untitledCounter.current[kind] = count + 1;
@@ -908,7 +909,7 @@ export function App() {
           return (
             <div
               key={kind}
-              className={`vd-tab${active ? " is-active" : ""}`}
+              className={`vd-tab is-${kind}${active ? " is-active" : ""}`}
             >
               {view === kind ? (
                 <span className="vd-tab__body">

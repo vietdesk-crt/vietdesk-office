@@ -122,6 +122,41 @@ describe("engine công thức", () => {
     expect(sheet.A1?.display).toBe("Doanh thu");
     expect(sheet.A1?.numeric).toBeNull();
   });
+
+  it("tính toán chính xác các hàm nâng cao COUNT, PRODUCT, ROUND, ABS, IF, SQRT", () => {
+    const sheet = computeSheet({
+      A1: "10",
+      A2: "20",
+      A3: "30",
+      B1: "=COUNT(A1:A3)",
+      B2: "=PRODUCT(A1:A2)",
+      B3: "=ROUND(12.3456, 2)",
+      B4: "=ABS(-50)",
+      B5: "=SQRT(25)",
+      B6: "=POWER(2, 4)",
+      B7: "=MOD(10, 3)",
+      B8: "=IF(A1 > 5, 999, 111)",
+      B9: "=IF(A1 < 5, 999, 111)",
+      B10: "=IF(A1 >= 10, 50, 0)",
+      B11: "=IF(A1 <= 9, 50, 0)",
+      B12: "=IF(A1 = 10, 77, 88)",
+      B13: "=IF(A1 <> 10, 77, 88)",
+    });
+
+    expect(sheet.B1?.numeric).toBe(3);
+    expect(sheet.B2?.numeric).toBe(200);
+    expect(sheet.B3?.numeric).toBe(12.35);
+    expect(sheet.B4?.numeric).toBe(50);
+    expect(sheet.B5?.numeric).toBe(5);
+    expect(sheet.B6?.numeric).toBe(16);
+    expect(sheet.B7?.numeric).toBe(1);
+    expect(sheet.B8?.numeric).toBe(999);
+    expect(sheet.B9?.numeric).toBe(111);
+    expect(sheet.B10?.numeric).toBe(50);
+    expect(sheet.B11?.numeric).toBe(0);
+    expect(sheet.B12?.numeric).toBe(77);
+    expect(sheet.B13?.numeric).toBe(88);
+  });
 });
 
 describe("định dạng số", () => {

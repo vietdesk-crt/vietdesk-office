@@ -35,6 +35,7 @@ type Token =
   | { kind: "number"; value: number }
   | { kind: "ref"; id: string }
   | { kind: "op"; value: "+" | "-" | "*" | "/" }
+  | { kind: "compare"; value: ">" | "<" | ">=" | "<=" | "=" | "<>" }
   | { kind: "lparen" }
   | { kind: "rparen" }
   | { kind: "comma" }
@@ -146,6 +147,17 @@ function tokenize(source: string): Token[] {
       continue;
     }
 
+    if (char === ">" || char === "<" || char === "=") {
+      if (rest.startsWith(">=") || rest.startsWith("<=") || rest.startsWith("<>")) {
+        tokens.push({ kind: "compare", value: rest.slice(0, 2) as any });
+        index += 2;
+        continue;
+      }
+      tokens.push({ kind: "compare", value: char as any });
+      index += 1;
+      continue;
+    }
+
     switch (char) {
       case "+":
       case "-":
@@ -187,6 +199,46 @@ function callFunction(name: string, args: Value[]): number {
       return numbers.length === 0
         ? 0
         : numbers.reduce((total, value) => total + value, 0) / numbers.length;
+    case "COUNT":
+      return numbers.length;
+    case "PRODUCT":
+      return numbers.length === 0 ? 0 : numbers.reduce((prod, v) => prod * v, 1);
+    case "ABS":
+      if (args.length === 0) throw new FormulaError("Hàm ABS cần 1 tham số");
+      return Math.abs(scalar(args[0]));
+    case "ROUND": {
+      if (args.length === 0) throw new FormulaError("Hàm ROUND cần ít nhất 1 tham số");
+      const val = scalar(args[0]);
+      const digits = args.length >= 2 ? scalar(args[1]) : 0;
+      const factor = Math.pow(10, digits);
+      return Math.round(val * factor) / factor;
+    }
+    case "INT":
+      if (args.length === 0) throw new FormulaError("Hàm INT cần 1 tham số");
+      return Math.floor(scalar(args[0]));
+    case "SQRT": {
+      if (args.length === 0) throw new FormulaError("Hàm SQRT cần 1 tham số");
+      const val = scalar(args[0]);
+      if (val < 0) throw new FormulaError("Không thể tính căn bậc hai số âm");
+      return Math.sqrt(val);
+    }
+    case "POWER":
+      if (args.length < 2) throw new FormulaError("Hàm POWER cần 2 tham số");
+      return Math.pow(scalar(args[0]), scalar(args[1]));
+    case "MOD": {
+      if (args.length < 2) throw new FormulaError("Hàm MOD cần 2 tham số: MOD(số, số_chia)");
+      const divisor = scalar(args[1]);
+      if (divisor === 0) throw new FormulaError("Chia cho 0");
+      return scalar(args[0]) % divisor;
+    }
+    case "IF": {
+      if (args.length < 2) throw new FormulaError("Hàm IF cần ít nhất 2 tham số: IF(điều_kiện, đúng, [sai])");
+      const cond = scalar(args[0]);
+      if (cond !== 0) {
+        return scalar(args[1]);
+      }
+      return args.length >= 3 ? scalar(args[2]) : 0;
+    }
     default:
       throw new FormulaError(`Chưa hỗ trợ hàm ${name}()`);
   }
@@ -303,11 +355,32 @@ class Parser {
     if (this.tokens.length === 0) {
       throw new FormulaError("Công thức rỗng");
     }
-    const value = this.additive();
+    const value = this.comparison();
     if (this.cursor < this.tokens.length) {
       throw new FormulaError("Công thức thừa ký tự");
     }
     return scalar(value);
+  }
+
+  private comparison(): Value {
+    let left = this.additive();
+    while (this.cursor < this.tokens.length) {
+      const token = this.peek();
+      if (!token || token.kind !== "compare") break;
+      this.cursor += 1;
+      const right = this.additive();
+      const l = scalar(left);
+      const r = scalar(right);
+      switch (token.value) {
+        case ">": left = l > r ? 1 : 0; break;
+        case "<": left = l < r ? 1 : 0; break;
+        case ">=": left = l >= r ? 1 : 0; break;
+        case "<=": left = l <= r ? 1 : 0; break;
+        case "=": left = Math.abs(l - r) < 1e-9 ? 1 : 0; break;
+        case "<>": left = Math.abs(l - r) >= 1e-9 ? 1 : 0; break;
+      }
+    }
+    return left;
   }
 
   private peek(): Token | undefined {
@@ -394,7 +467,7 @@ class Parser {
 
     if (token.kind === "lparen") {
       this.cursor += 1;
-      const value = this.additive();
+      const value = this.comparison();
       const close = this.peek();
       if (!close || close.kind !== "rparen") {
         throw new FormulaError("Thiếu dấu )");
@@ -404,10 +477,11 @@ class Parser {
     }
 
     if (token.kind === "func") {
+      const funcName = token.name;
       this.cursor += 1;
       const open = this.peek();
       if (!open || open.kind !== "lparen") {
-        throw new FormulaError(`Hàm ${token.name} thiếu dấu (`);
+        throw new FormulaError(`Hàm ${funcName} thiếu dấu (`);
       }
       this.cursor += 1;
 
@@ -415,7 +489,7 @@ class Parser {
       const first = this.peek();
       if (!first || first.kind !== "rparen") {
         for (;;) {
-          args.push(this.additive());
+          args.push(this.comparison());
           const separator = this.peek();
           if (separator && separator.kind === "comma") {
             this.cursor += 1;
@@ -430,7 +504,7 @@ class Parser {
         throw new FormulaError("Thiếu dấu )");
       }
       this.cursor += 1;
-      return callFunction(token.name, args);
+      return callFunction(funcName, args);
     }
 
     throw new FormulaError("Công thức không hợp lệ");

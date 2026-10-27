@@ -48,7 +48,7 @@ function findEndOfCentralDirectory(data: Uint8Array): number {
 export class ZipArchive {
   private readonly entries = new Map<string, ZipEntry>();
 
-  private constructor(private readonly data: Uint8Array) {}
+  private constructor() {}
 
   /** true nếu entry tồn tại (đường dẫn không phân biệt hoa/thường). */
   has(path: string): boolean {
@@ -77,7 +77,7 @@ export class ZipArchive {
 
   /** Mở một tệp ZIP từ bytes nguyên bản. */
   static open(data: Uint8Array): ZipArchive {
-    const archive = new ZipArchive(data);
+    const archive = new ZipArchive();
     const bytes = view(data);
     const eocd = findEndOfCentralDirectory(data);
     const entryCount = bytes.getUint16(eocd + 10, true);

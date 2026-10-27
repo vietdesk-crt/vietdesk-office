@@ -148,7 +148,7 @@ std::string cell_id_from(int row, int column) {
 
 // --- Lexer ----------------------------------------------------------------
 
-enum class TokenKind { Number, Ref, Op, LParen, RParen, Comma, Colon, Func };
+enum class TokenKind { Number, Ref, Op, LParen, RParen, Comma, Colon, Func, Compare };
 
 struct Token {
   explicit Token(TokenKind kind) : kind(kind) {}
@@ -248,6 +248,21 @@ std::vector<Token> tokenize(const std::string &source) {
       push_token(tokens, std::move(token));
       break;
     }
+    case '>':
+    case '<':
+    case '=': {
+      Token token{TokenKind::Compare};
+      if (index + 1 < source.size() &&
+          (source[index + 1] == '=' || (c == '<' && source[index + 1] == '>'))) {
+        token.text = source.substr(index, 2);
+        index += 2;
+      } else {
+        token.text = std::string(1, c);
+        index += 1;
+      }
+      push_token(tokens, std::move(token));
+      continue;
+    }
     case '(':
       push_token(tokens, Token{TokenKind::LParen});
       break;
@@ -307,11 +322,29 @@ public:
     if (tokens_.empty()) {
       throw FormulaError("Công thức rỗng");
     }
-    const Value value = additive(0);
+    const Value value = comparison(0);
     if (cursor_ < tokens_.size()) {
       throw FormulaError("Công thức thừa ký tự");
     }
     return scalar(value);
+  }
+
+  Value comparison(int depth) {
+    check_depth(depth);
+    Value left = additive(depth);
+    while (cursor_ < tokens_.size() &&
+           tokens_[cursor_].kind == TokenKind::Compare) {
+      const std::string op = tokens_[cursor_++].text;
+      const double r = scalar(additive(depth + 1));
+      const double l = scalar(left);
+      if (op == ">") left = (l > r) ? 1.0 : 0.0;
+      else if (op == "<") left = (l < r) ? 1.0 : 0.0;
+      else if (op == ">=") left = (l >= r) ? 1.0 : 0.0;
+      else if (op == "<=") left = (l <= r) ? 1.0 : 0.0;
+      else if (op == "=") left = (std::abs(l - r) < 1e-9) ? 1.0 : 0.0;
+      else if (op == "<>") left = (std::abs(l - r) >= 1e-9) ? 1.0 : 0.0;
+    }
+    return left;
   }
 
 private:
@@ -407,7 +440,7 @@ private:
 
     if (token->kind == TokenKind::LParen) {
       ++cursor_;
-      const Value value = additive(depth + 1);
+      const Value value = comparison(depth + 1);
       const Token *close = peek();
       if (close == nullptr || close->kind != TokenKind::RParen) {
         throw FormulaError("Thiếu dấu )");
@@ -429,7 +462,7 @@ private:
       const Token *first = peek();
       if (first != nullptr && first->kind != TokenKind::RParen) {
         for (;;) {
-          args.push_back(additive(depth + 1));
+          args.push_back(comparison(depth + 1));
           const Token *separator = peek();
           if (separator != nullptr && separator->kind == TokenKind::Comma) {
             ++cursor_;
@@ -489,6 +522,76 @@ private:
         total += value;
       }
       return total / static_cast<double>(numbers.size());
+    }
+    if (name == "COUNT") {
+      return static_cast<double>(numbers.size());
+    }
+    if (name == "PRODUCT") {
+      if (numbers.empty()) {
+        return 0.0;
+      }
+      double prod = 1.0;
+      for (const double val : numbers) {
+        prod *= val;
+      }
+      return prod;
+    }
+    if (name == "ABS") {
+      if (args.empty()) {
+        throw FormulaError("Hàm ABS cần 1 tham số");
+      }
+      return std::abs(scalar(args[0]));
+    }
+    if (name == "ROUND") {
+      if (args.empty()) {
+        throw FormulaError("Hàm ROUND cần ít nhất 1 tham số");
+      }
+      double val = scalar(args[0]);
+      double digits = args.size() >= 2 ? scalar(args[1]) : 0.0;
+      double factor = std::pow(10.0, digits);
+      return std::round(val * factor) / factor;
+    }
+    if (name == "INT") {
+      if (args.empty()) {
+        throw FormulaError("Hàm INT cần 1 tham số");
+      }
+      return std::floor(scalar(args[0]));
+    }
+    if (name == "SQRT") {
+      if (args.empty()) {
+        throw FormulaError("Hàm SQRT cần 1 tham số");
+      }
+      double val = scalar(args[0]);
+      if (val < 0.0) {
+        throw FormulaError("Không thể tính căn bậc hai số âm");
+      }
+      return std::sqrt(val);
+    }
+    if (name == "POWER") {
+      if (args.size() < 2) {
+        throw FormulaError("Hàm POWER cần 2 tham số");
+      }
+      return std::pow(scalar(args[0]), scalar(args[1]));
+    }
+    if (name == "MOD") {
+      if (args.size() < 2) {
+        throw FormulaError("Hàm MOD cần 2 tham số: MOD(số, số_chia)");
+      }
+      double divisor = scalar(args[1]);
+      if (divisor == 0.0) {
+        throw FormulaError("Chia cho 0");
+      }
+      return std::fmod(scalar(args[0]), divisor);
+    }
+    if (name == "IF") {
+      if (args.size() < 2) {
+        throw FormulaError("Hàm IF cần ít nhất 2 tham số: IF(điều_kiện, đúng, [sai])");
+      }
+      double cond = scalar(args[0]);
+      if (cond != 0.0) {
+        return scalar(args[1]);
+      }
+      return args.size() >= 3 ? scalar(args[2]) : 0.0;
     }
     throw FormulaError("Chưa hỗ trợ hàm " + name + "()");
   }

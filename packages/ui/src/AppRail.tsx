@@ -30,7 +30,7 @@ export function AppRail({ items, active, onSelect, footer }: AppRailProps) {
             {item.separatorBefore ? <div className="vd-rail__separator" /> : null}
             <button
               type="button"
-              className={`vd-rail__item${active === item.id ? " is-active" : ""}`}
+              className={`vd-rail__item is-${item.id}${active === item.id ? " is-active" : ""}`}
               aria-current={active === item.id ? "page" : undefined}
               title={item.label}
               disabled={item.disabled}

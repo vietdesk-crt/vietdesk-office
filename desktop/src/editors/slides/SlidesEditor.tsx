@@ -1,8 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { createPortal } from "react-dom";
-import { SLIDE_LAYOUTS, createDefaultSlides, createSlideId, slideBodyLines } from "./model";
-import type { Slide, SlideLayout } from "./model";
+import {
+  SLIDE_LAYOUTS,
+  SLIDE_THEMES,
+  SLIDE_TRANSITIONS,
+  createDefaultSlides,
+  createSlideId,
+  slideBodyLines,
+  slideFromFrameLayout,
+} from "./model";
+import type { Slide, SlideLayout, SlideTransition } from "./model";
+import {
+  autoFrameLayoutFromMarkdown,
+  layoutSlideBlocks,
+  parseMarkdownToAST,
+} from "./autoframing";
+import type { ASTBlock, AutoFrameLayoutResult } from "./autoframing";
 
 export interface SlidesEditorProps {
   /** Danh sách slide đã lưu trong tệp `.vdx`. */
@@ -19,17 +33,12 @@ const LAYOUT_LABELS: Record<SlideLayout, string> = {
   blank: "Trống",
 };
 
-/** Bảng màu nhanh lấy cảm hứng từ theme của Google Slides / WPS. */
-const BACKGROUND_PRESETS = [
-  "#ffffff",
-  "#f5f3ce",
-  "#d7e3fc",
-  "#fad2cf",
-  "#c9daf8",
-  "#1e1e3f",
-  "#0f766e",
-  "#3c4043",
-];
+const TRANSITION_LABELS: Record<SlideTransition, string> = {
+  fade: "Mờ dần (Fade)",
+  slide: "Trượt ngang (Slide)",
+  zoom: "Thu phóng (Zoom)",
+  none: "Không hiệu ứng",
+};
 
 function backgroundStyle(slide: Slide): CSSProperties {
   if (!slide.background) return {};
@@ -55,8 +64,172 @@ function readableTextColor(color: string): string {
   return luminance < 0.55 ? "#f7f7f5" : "#1a1a1a";
 }
 
+interface SlideTableData {
+  headers: string[];
+  rows: string[][];
+  hasOverflowLink?: boolean;
+  overflowLabel?: string;
+}
+
+function AutoFrameView({ layout }: { layout: AutoFrameLayoutResult }) {
+  const { archetype, elements } = layout;
+
+  if (archetype === "HERO_STATEMENT") {
+    const heading = elements.find((el) => el.type === "heading");
+    const text = elements.find((el) => el.type === "text");
+    return (
+      <div className="vd-autoframing-hero" data-archetype={archetype}>
+        <div className="vd-autoframing-hero__title">
+          {heading?.content || "(Chưa đặt tiêu đề)"}
+        </div>
+        {text ? (
+          <div className="vd-autoframing-hero__subtitle">{text.content}</div>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (archetype === "SPLIT_TWO_COLUMN") {
+    const heading = elements.find((el) => el.type === "heading");
+    const textEl = elements.find((el) => el.type === "text" && el.x < 900);
+    const rightEl = elements.find((el) => el.x >= 900);
+    let tableData: SlideTableData | null = null;
+    if (rightEl?.type === "table" && rightEl.metadata) {
+      tableData = rightEl.metadata as unknown as SlideTableData;
+    }
+
+    return (
+      <div className="vd-autoframing-split" data-archetype={archetype}>
+        {heading ? (
+          <div className="vd-autoframing-heading">{heading.content}</div>
+        ) : null}
+        <div className="vd-autoframing-split__columns">
+          <div className="vd-autoframing-split__col-left">
+            {textEl?.content}
+          </div>
+          <div className="vd-autoframing-split__col-right">
+            {tableData ? (
+              <div className="vd-autoframing-table-wrap">
+                <table className="vd-autoframing-table">
+                  <thead>
+                    <tr>
+                      {tableData.headers.map((h, i) => (
+                        <th key={i}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tableData.rows.map((row, rIdx) => (
+                      <tr key={rIdx}>
+                        {row.map((cell, cIdx) => (
+                          <td key={cIdx}>{cell}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {tableData.hasOverflowLink ? (
+                  <div className="vd-autoframing-overflow-link">
+                    {tableData.overflowLabel || "Xem bảng dữ liệu chi tiết trên Sheet"}
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div className="vd-autoframing-split__col-left">{rightEl?.content}</div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (archetype === "CARD_GRID") {
+    const heading = elements.find((el) => el.type === "heading");
+    const cards = elements.filter((el) => el.type === "card");
+    return (
+      <div className="vd-autoframing-cards" data-archetype={archetype}>
+        {heading ? (
+          <div className="vd-autoframing-heading">{heading.content}</div>
+        ) : null}
+        <div
+          className="vd-autoframing-cards__grid"
+          style={{ gridTemplateColumns: `repeat(${cards.length || 3}, 1fr)` }}
+        >
+          {cards.map((card, idx) => (
+            <div key={card.id || idx} className="vd-autoframing-card">
+              <div className="vd-autoframing-card__body">{card.content}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (archetype === "METRIC_CALLOUT") {
+    const heading = elements.find((el) => el.type === "heading");
+    const numEls = elements.filter((el) => el.type === "metric_number");
+    const lblEls = elements.filter((el) => el.type === "metric_label");
+
+    return (
+      <div className="vd-autoframing-metric" data-archetype={archetype}>
+        {heading ? (
+          <div className="vd-autoframing-heading">{heading.content}</div>
+        ) : null}
+        <div
+          className="vd-autoframing-metric__row"
+          style={{ gridTemplateColumns: `repeat(${numEls.length || 1}, 1fr)` }}
+        >
+          {numEls.map((num, idx) => {
+            const lbl = lblEls[idx];
+            return (
+              <div key={num.id || idx} className="vd-autoframing-metric__item">
+                <div className="vd-autoframing-metric__number">{num.content}</div>
+                <div className="vd-autoframing-metric__label">
+                  {lbl?.content || ""}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // CLASSIC_STACK fallback
+  const heading = elements.find((el) => el.type === "heading");
+  const bodyText = elements.find((el) => el.type === "text");
+  return (
+    <div className="vd-autoframing-classic" data-archetype={archetype}>
+      {heading ? (
+        <div className="vd-autoframing-heading">{heading.content}</div>
+      ) : null}
+      <div className="vd-autoframing-divider" />
+      <div className="vd-autoframing-body">{bodyText?.content}</div>
+    </div>
+  );
+}
+
+function computeFrameLayoutForSlide(title: string, body: string): AutoFrameLayoutResult {
+  const lines = slideBodyLines(body);
+  const blocks: ASTBlock[] = [];
+  if (title.trim()) {
+    blocks.push({ id: "slide-h", type: "heading", level: 1, text: title.trim() });
+  }
+  lines.forEach((line, idx) => {
+    blocks.push({ id: `slide-p-${idx}`, type: "paragraph", text: line });
+  });
+  if (blocks.length === 0) {
+    blocks.push({ id: "slide-empty-h", type: "heading", level: 1, text: "(Chưa đặt tiêu đề)" });
+  }
+  return layoutSlideBlocks(blocks);
+}
+
 /** Nội dung slide theo layout — dùng chung cho khung xem và trình chiếu. */
 function SlideContent({ slide }: { slide: Slide }) {
+  if (slide.frameLayout) {
+    return <AutoFrameView layout={slide.frameLayout} />;
+  }
+
   const lines = slideBodyLines(slide.body);
   const showBody =
     slide.layout === "title" ||
@@ -98,6 +271,8 @@ export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
   const [presenting, setPresenting] = useState(false);
   const [presentIndex, setPresentIndex] = useState(0);
   const [showNotes, setShowNotes] = useState(false);
+  const [autoFrameModalOpen, setAutoFrameModalOpen] = useState(false);
+  const [markdownInput, setMarkdownInput] = useState("");
   const onChangeRef = useRef(onChange);
   const presentRef = useRef<HTMLDivElement>(null);
 
@@ -120,21 +295,55 @@ export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
     if (!selected) {
       return;
     }
+    const updatedTitle = patch.title !== undefined ? patch.title : selected.title;
+    const updatedBody = patch.body !== undefined ? patch.body : selected.body;
+
+    let nextFrameLayout =
+      patch.frameLayout !== undefined ? patch.frameLayout : selected.frameLayout;
+
+    if (
+      selected.frameLayout &&
+      (patch.title !== undefined || patch.body !== undefined) &&
+      patch.frameLayout === undefined
+    ) {
+      nextFrameLayout = computeFrameLayoutForSlide(updatedTitle, updatedBody);
+    }
+
     commit(
       slides.map((slide) =>
-        slide.id === selected.id ? { ...slide, ...patch } : slide,
+        slide.id === selected.id
+          ? { ...slide, ...patch, frameLayout: nextFrameLayout }
+          : slide,
       ),
     );
   };
 
+  const applyThemeToAll = () => {
+    if (!selected) {
+      return;
+    }
+    const bg = selected.background;
+    const trans = selected.transition;
+    commit(
+      slides.map((slide) => ({
+        ...slide,
+        background: bg,
+        ...(trans !== undefined ? { transition: trans } : {}),
+      })),
+    );
+  };
+
   const addSlide = () => {
+    const title = "Tiêu đề mới";
+    const body = "Nội dung...";
     const slide: Slide = {
       id: createSlideId(),
       layout: "title-content",
-      title: "Tiêu đề mới",
-      body: "Nội dung...",
+      title,
+      body,
       background: null,
       notes: "",
+      frameLayout: computeFrameLayoutForSlide(title, body),
     };
     const at = Math.max(selectedIndex, 0) + 1;
     commit([...slides.slice(0, at), slide, ...slides.slice(at)], slide.id);
@@ -367,7 +576,7 @@ export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
         <div className="vd-slides__toolbar">
           <div className="vd-slides__tools">
             <label className="vd-slides__tool">
-              <span className="vd-slides__tool-label">Kiểu</span>
+              <span className="vd-slides__tool-label">Bố cục</span>
               <select
                 className="vd-slides__select"
                 value={selected?.layout ?? "title-content"}
@@ -384,21 +593,41 @@ export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
                 ))}
               </select>
             </label>
+
+            <label className="vd-slides__tool">
+              <span className="vd-slides__tool-label">Hiệu ứng</span>
+              <select
+                className="vd-slides__select"
+                value={selected?.transition ?? "fade"}
+                onChange={(event) =>
+                  updateSlide({ transition: event.target.value as SlideTransition })
+                }
+                disabled={!selected}
+                aria-label="Hiệu ứng chuyển slide"
+              >
+                {SLIDE_TRANSITIONS.map((trans) => (
+                  <option key={trans} value={trans}>
+                    {TRANSITION_LABELS[trans]}
+                  </option>
+                ))}
+              </select>
+            </label>
+
             <div className="vd-slides__tool" role="group" aria-label="Màu nền slide">
-              <span className="vd-slides__tool-label">Nền</span>
+              <span className="vd-slides__tool-label">Chủ đề & Nền</span>
               <div className="vd-slides__swatches">
-                {BACKGROUND_PRESETS.map((color) => (
+                {SLIDE_THEMES.map((theme) => (
                   <button
-                    key={color}
+                    key={theme.id}
                     type="button"
                     className={`vd-slides__swatch${
-                      selected?.background === color ? " is-active" : ""
+                      selected?.background === theme.background ? " is-active" : ""
                     }`}
-                    style={{ background: color }}
-                    title={color}
-                    aria-label={`Đặt nền ${color}`}
+                    style={{ background: theme.background }}
+                    title={`${theme.name} (${theme.background})`}
+                    aria-label={`Đặt nền ${theme.name}`}
                     disabled={!selected}
-                    onClick={() => updateSlide({ background: color })}
+                    onClick={() => updateSlide({ background: theme.background })}
                   />
                 ))}
                 <input
@@ -419,21 +648,98 @@ export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
                 >
                   Xóa nền
                 </button>
+                <button
+                  type="button"
+                  className="vd-slides__apply-all"
+                  title="Áp dụng nền và hiệu ứng cho toàn bộ bài trình chiếu"
+                  disabled={!selected}
+                  onClick={applyThemeToAll}
+                >
+                  Áp dụng tất cả
+                </button>
               </div>
             </div>
           </div>
-          <button
-            type="button"
-            className="vd-button is-primary"
-            onClick={startPresent}
-            disabled={slides.length === 0}
-          >
-            ▶ Trình chiếu
-          </button>
+
+          <div className="vd-slides__actions-right">
+            <button
+              type="button"
+              className="vd-button"
+              onClick={() => {
+                setMarkdownInput(
+                  selected ? `# ${selected.title}\n\n${selected.body}` : ""
+                );
+                setAutoFrameModalOpen(true);
+              }}
+              title="Tự động đóng khung và dàn trang 16:9 theo chuẩn HC-Office"
+            >
+              Auto-Framing 16:9
+            </button>
+            <button
+              type="button"
+              className="vd-button"
+              onClick={() => window.print()}
+              title="In hoặc xuất PDF toàn bộ bài trình chiếu"
+            >
+              In / Xuất PDF
+            </button>
+            <button
+              type="button"
+              className="vd-button is-primary"
+              onClick={startPresent}
+              disabled={slides.length === 0}
+            >
+              Trình chiếu (F5)
+            </button>
+          </div>
         </div>
 
         {selected ? (
           <>
+            {selected.frameLayout ? (
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "min(100%, calc((100vh - 380px) * 16 / 9))", alignSelf: "center", marginBottom: 6 }}>
+                <span className="vd-autoframing-badge">
+                  Bố cục: {selected.frameLayout.archetype} | Điểm thị giác: {selected.frameLayout.score}/100
+                </span>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button
+                    type="button"
+                    className="vd-button is-small"
+                    onClick={() =>
+                      updateSlide({
+                        frameLayout: computeFrameLayoutForSlide(selected.title, selected.body),
+                      })
+                    }
+                    style={{ fontSize: 11, padding: "2px 8px" }}
+                  >
+                    Tối ưu lại
+                  </button>
+                  <button
+                    type="button"
+                    className="vd-button is-small"
+                    onClick={() => updateSlide({ frameLayout: undefined })}
+                    style={{ fontSize: 11, padding: "2px 8px" }}
+                  >
+                    Bỏ Auto-Framing
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: "flex", justifyContent: "flex-end", width: "min(100%, calc((100vh - 380px) * 16 / 9))", alignSelf: "center", marginBottom: 6 }}>
+                <button
+                  type="button"
+                  className="vd-button is-small is-primary"
+                  onClick={() =>
+                    updateSlide({
+                      frameLayout: computeFrameLayoutForSlide(selected.title, selected.body),
+                    })
+                  }
+                  style={{ fontSize: 11, padding: "2px 10px" }}
+                >
+                  Bật Auto-Framing 16:9
+                </button>
+              </div>
+            )}
             <div
               className={`vd-slides__canvas vd-slide--${selected.layout}`}
               style={backgroundStyle(selected)}
@@ -498,7 +804,16 @@ export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
               onClick={() => stepPresent(1)}
             >
               <div
-                className={`vd-present__canvas vd-slide--${current.layout}`}
+                className="vd-present__progress"
+                style={{
+                  width: `${((presentIndex + 1) / slides.length) * 100}%`,
+                }}
+              />
+              <div
+                key={current.id}
+                className={`vd-present__canvas vd-slide--${current.layout} vd-present__canvas--${
+                  current.transition ?? "fade"
+                }`}
                 style={backgroundStyle(current)}
               >
                 <SlideContent slide={current} />
@@ -509,7 +824,7 @@ export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
                   onClick={(event) => event.stopPropagation()}
                 >
                   <span className="vd-present__notes-label">
-                    Ghi chú diễn giả (S để ẩn)
+                    Ghi chú diễn giả (nhấn phím S để ẩn)
                   </span>
                   <div className="vd-present__notes-text">
                     {current.notes.trim() || "— chưa có ghi chú —"}
@@ -520,8 +835,11 @@ export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
                 className="vd-present__hud"
                 onClick={(event) => event.stopPropagation()}
               >
-                <span>
+                <span className="vd-present__counter">
                   {Math.min(presentIndex, slides.length - 1) + 1}/{slides.length}
+                </span>
+                <span className="vd-present__badge">
+                  {TRANSITION_LABELS[current.transition ?? "fade"]}
                 </span>
                 <button
                   type="button"
@@ -541,6 +859,13 @@ export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
                 </button>
                 <button
                   type="button"
+                  onClick={() => setShowNotes((v) => !v)}
+                  aria-label="Hiện hoặc ẩn ghi chú diễn giả"
+                >
+                  {showNotes ? "Ẩn ghi chú (S)" : "Ghi chú (S)"}
+                </button>
+                <button
+                  type="button"
                   onClick={stopPresent}
                   aria-label="Thoát trình chiếu"
                 >
@@ -551,6 +876,89 @@ export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
             document.body,
           )
         : null}
+
+      {autoFrameModalOpen ? (
+        <div className="vd-modal-overlay" onClick={() => setAutoFrameModalOpen(false)}>
+          <div className="vd-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="vd-modal-header">
+              <h3 className="vd-modal-title">Tự Động Đóng Khung & Dàn Trang 16:9 (Auto-Framing)</h3>
+              <button
+                type="button"
+                className="vd-button is-small"
+                onClick={() => setAutoFrameModalOpen(false)}
+              >
+                Đóng
+              </button>
+            </div>
+            <div className="vd-modal-body">
+              <p style={{ margin: 0, fontSize: 13, color: "var(--vd-muted)" }}>
+                Hệ thống tự động nhận diện ngữ nghĩa, đánh giá ngân sách không gian (1920x1080), khớp 5 Archetype hình học và tính toán cỡ chữ bằng Binary Search.
+              </p>
+
+              {selected ? (
+                <div style={{ padding: 12, background: "rgba(0,0,0,0.03)", borderRadius: 6, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <strong>Slide hiện tại:</strong> {selected.title || "(Chưa đặt tiêu đề)"}
+                  </div>
+                  <button
+                    type="button"
+                    className="vd-button is-primary is-small"
+                    onClick={() => {
+                      const text = `${selected.title}\n\n${selected.body}`;
+                      const blocks = parseMarkdownToAST(text);
+                      const layout = layoutSlideBlocks(blocks);
+                      updateSlide({
+                        frameLayout: layout,
+                        notes: `Auto-Framing 16:9: ${layout.archetype} (Điểm thị giác: ${layout.score}/100)`,
+                      });
+                      setAutoFrameModalOpen(false);
+                    }}
+                  >
+                    Tối ưu Slide hiện tại
+                  </button>
+                </div>
+              ) : null}
+
+              <label className="vd-slides__field">
+                <span className="vd-slides__field-label">
+                  Hoặc nhập văn bản / Markdown để tự động tạo toàn bộ Slide Deck:
+                </span>
+                <textarea
+                  className="vd-slides__textarea"
+                  value={markdownInput}
+                  onChange={(e) => setMarkdownInput(e.target.value)}
+                  rows={6}
+                  placeholder="# Tiêu đề 1&#10;Nội dung văn bản...&#10;&#10;---&#10;&#10;## Thống kê&#10;[Metric: 99.8% | Doanh thu đạt chuẩn]&#10;&#10;---&#10;&#10;## So sánh&#10;| Chỉ tiêu | Quý 1 | Quý 2 |&#10;|---|---|---|&#10;| Doanh thu | 10 tỷ | 15 tỷ |"
+                />
+              </label>
+            </div>
+            <div className="vd-modal-footer">
+              <button
+                type="button"
+                className="vd-button"
+                onClick={() => setAutoFrameModalOpen(false)}
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                className="vd-button is-primary"
+                onClick={() => {
+                  if (markdownInput.trim().length === 0) return;
+                  const deck = autoFrameLayoutFromMarkdown(markdownInput, "Bài thuyết trình");
+                  const newSlides = deck.slides.map((res) => slideFromFrameLayout(res));
+                  if (newSlides.length > 0) {
+                    commit(newSlides, newSlides[0].id);
+                    setAutoFrameModalOpen(false);
+                  }
+                }}
+              >
+                Tạo Slide Deck 16:9
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

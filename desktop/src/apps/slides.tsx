@@ -11,9 +11,9 @@ export const slidesApp: AppDescriptor = {
   glyph: "P",
   defaultName: "Trình chiếu chưa đặt tên",
   home: {
-    title: "Trình chiếu",
-    description: "Bài giảng, báo cáo, khung 16:9.",
-    formats: "Lưu .vdx · PPTX đang phát triển",
+    title: "Trình chiếu Auto-Framing",
+    description: "Tỷ lệ chuẩn 16:9, tự động chọn 5 Archetypes và cân bằng thị giác.",
+    formats: "Lưu .vdx · Chuẩn HC-Office 16:9",
   },
   createDefaultContent: () => normalizeSlidesContent(undefined),
   normalizeContent: normalizeSlidesContent,

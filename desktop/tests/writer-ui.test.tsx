@@ -12,6 +12,29 @@ declare global {
   var IS_REACT_ACT_ENVIRONMENT: boolean;
 }
 
+if (typeof Range !== "undefined") {
+  if (!Range.prototype.getClientRects) {
+    Range.prototype.getClientRects = function () {
+      return [] as unknown as DOMRectList;
+    };
+  }
+  if (!Range.prototype.getBoundingClientRect) {
+    Range.prototype.getBoundingClientRect = function () {
+      return {
+        top: 0,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        width: 0,
+        height: 0,
+        x: 0,
+        y: 0,
+        toJSON: () => {},
+      } as DOMRect;
+    };
+  }
+}
+
 async function flush() {
   await act(async () => {
     await Promise.resolve();

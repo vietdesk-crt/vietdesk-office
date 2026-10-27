@@ -8,6 +8,7 @@ import type { Draft } from "./drafts";
 import { formatFileSize, formatRelativeTime } from "./format";
 import { VietDeskLogo } from "./Logo";
 import { useWeather } from "./weather";
+import { HOME_TEMPLATES } from "./templates";
 
 export interface HomeProps {
   recents: RecentEntry[];
@@ -15,7 +16,7 @@ export interface HomeProps {
   error: string | null;
   theme?: "light" | "dark";
   drafts?: Draft[];
-  onCreate: (kind: AppId) => void;
+  onCreate: (kind: AppId, initialContent?: unknown, customName?: string) => void;
   onOpenRecent: (entry: RecentEntry) => void;
   onOpenFile: () => void;
   onTogglePin: (entry: RecentEntry) => void;
@@ -250,6 +251,33 @@ export function Home({
               <span className="vd-card__title">{card.title}</span>
               <span className="vd-card__desc">{card.description}</span>
               <span className="vd-card__formats">{card.formats}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="vd-home__section" aria-labelledby="vd-templates-heading">
+        <div className="vd-home__section-head">
+          <h2 id="vd-templates-heading">Mẫu tài liệu chuẩn Việt</h2>
+          <span className="vd-home__count">{HOME_TEMPLATES.length} mẫu có sẵn</span>
+        </div>
+
+        <div className="vd-templates-grid">
+          {HOME_TEMPLATES.map((tpl) => (
+            <button
+              type="button"
+              key={tpl.id}
+              className={`vd-template-card is-${tpl.appId}`}
+              onClick={() => onCreate(tpl.appId, tpl.getContent(), tpl.documentName)}
+            >
+              <div className="vd-template-card__header">
+                <span className={`vd-template-card__badge is-${tpl.appId}`}>
+                  {APPS[tpl.appId].glyph} {tpl.badge}
+                </span>
+                <span className="vd-template-card__app">{APPS[tpl.appId].label}</span>
+              </div>
+              <strong className="vd-template-card__title">{tpl.title}</strong>
+              <p className="vd-template-card__desc">{tpl.description}</p>
             </button>
           ))}
         </div>

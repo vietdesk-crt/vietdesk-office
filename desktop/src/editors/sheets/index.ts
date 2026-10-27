@@ -11,5 +11,11 @@ export {
   parseNumber,
 } from "./formula";
 export type { CellResult } from "./formula";
-export { normalizeSheetsContent, readCells } from "./model";
-export type { CellMap } from "./model";
+export { normalizeSheetsContent, readCells, readStyles } from "./model";
+export type {
+  CellMap,
+  CellStyle,
+  CellStyleMap,
+  NumberFormatType,
+  SheetsContent,
+} from "./model";

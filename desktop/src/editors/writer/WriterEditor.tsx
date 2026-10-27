@@ -163,6 +163,7 @@ import { writerDocxBytes } from "../../export/docx";
 import { bytesToBase64 } from "../../export/binary";
 import { downloadBinaryFile } from "../../download";
 import { fileNameFromPath } from "../../format";
+import { ADMINISTRATIVE_TEMPLATES } from "./templates";
 
 /** Tên tệp an toàn cho Windows/macOS (bỏ ký tự cấm). */
 function sanitizeFileName(name: string): string {
@@ -495,6 +496,7 @@ export function WriterEditor({
   const [clipboardNotice, setClipboardNotice] = useState<string | null>(null);
 
   const [tablePickerOpen, setTablePickerOpen] = useState(false);
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const [outlineOpen, setOutlineOpen] = useState(false);
   const [pagePanelOpen, setPagePanelOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -1028,6 +1030,23 @@ export function WriterEditor({
     view.dispatch(view.state.tr.insertText(text).scrollIntoView());
     view.focus();
     forceRender((value) => value + 1);
+  };
+
+  const applyTemplate = (templateId: string) => {
+    const tmpl = ADMINISTRATIVE_TEMPLATES.find((t) => t.id === templateId);
+    const view = viewRef.current;
+    if (!tmpl || !view) return;
+    const newDoc = docFromJSON(tmpl.content);
+    if (newDoc) {
+      view.dispatch(
+        view.state.tr
+          .replaceWith(0, view.state.doc.content.size, newDoc.content)
+          .scrollIntoView(),
+      );
+      view.focus();
+      forceRender((value) => value + 1);
+    }
+    setTemplatePickerOpen(false);
   };
 
   /** Dán văn bản thuần, bỏ mọi định dạng của nguồn. */
@@ -2045,6 +2064,13 @@ export function WriterEditor({
           <div className="vd-writer__tgroup">
             <div className="vd-writer__tgroup-line">
               <ToolbarButton
+                label="Biểu mẫu chuẩn Nghị định 30"
+                active={templatePickerOpen}
+                onClick={() => setTemplatePickerOpen((open) => !open)}
+              >
+                <FileText size={17} aria-hidden="true" />
+              </ToolbarButton>
+              <ToolbarButton
                 label="Chèn bảng"
                 onClick={() => {
                   setTableSize(null);
@@ -2477,6 +2503,39 @@ export function WriterEditor({
           >
             Đóng
           </button>
+        </div>
+      ) : null}
+
+      {templatePickerOpen ? (
+        <div
+          className="vd-writer__panel vd-writer__panel--templates"
+          role="dialog"
+          aria-label="Kho biểu mẫu chuẩn Nghị định 30"
+        >
+          <div className="vd-writer__panel-header">
+            <strong>Kho Biểu Mẫu Chuẩn Nghị Định 30/2020/NĐ-CP</strong>
+            <button
+              type="button"
+              className="vd-writer__panel-close"
+              aria-label="Đóng"
+              onClick={() => setTemplatePickerOpen(false)}
+            >
+              ✕
+            </button>
+          </div>
+          <div className="vd-writer__template-list">
+            {ADMINISTRATIVE_TEMPLATES.map((tmpl) => (
+              <div
+                key={tmpl.id}
+                className="vd-writer__template-card"
+                onClick={() => applyTemplate(tmpl.id)}
+              >
+                <div className="vd-writer__template-title">{tmpl.title}</div>
+                <div className="vd-writer__template-desc">{tmpl.description}</div>
+                <span className="vd-writer__template-tag">{tmpl.category}</span>
+              </div>
+            ))}
+          </div>
         </div>
       ) : null}
 

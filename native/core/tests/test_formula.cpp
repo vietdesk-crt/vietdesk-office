@@ -411,6 +411,41 @@ void test_abi() {
   vd_sheet_result_free(nullptr);
 }
 
+void test_advanced_functions() {
+  const Sheet sheet = run({
+      {"A1", "10"},
+      {"A2", "20"},
+      {"A3", "30"},
+      {"B1", "=COUNT(A1:A3)"},
+      {"B2", "=PRODUCT(A1:A2)"},
+      {"B3", "=ROUND(12.3456, 2)"},
+      {"B4", "=ABS(-50)"},
+      {"B5", "=SQRT(25)"},
+      {"B6", "=POWER(2, 4)"},
+      {"B7", "=MOD(10, 3)"},
+      {"B8", "=IF(A1 > 5, 999, 111)"},
+      {"B9", "=IF(A1 < 5, 999, 111)"},
+      {"B10", "=IF(A1 >= 10, 50, 0)"},
+      {"B11", "=IF(A1 <= 9, 50, 0)"},
+      {"B12", "=IF(A1 = 10, 77, 88)"},
+      {"B13", "=IF(A1 <> 10, 77, 88)"},
+  });
+
+  expect_number("count", sheet, "B1", 3.0);
+  expect_number("product", sheet, "B2", 200.0);
+  expect_number("round", sheet, "B3", 12.35);
+  expect_number("abs", sheet, "B4", 50.0);
+  expect_number("sqrt", sheet, "B5", 5.0);
+  expect_number("power", sheet, "B6", 16.0);
+  expect_number("mod", sheet, "B7", 1.0);
+  expect_number("if true", sheet, "B8", 999.0);
+  expect_number("if false", sheet, "B9", 111.0);
+  expect_number("if gte", sheet, "B10", 50.0);
+  expect_number("if lte", sheet, "B11", 0.0);
+  expect_number("if eq", sheet, "B12", 77.0);
+  expect_number("if neq", sheet, "B13", 88.0);
+}
+
 } // namespace
 
 int main() {
@@ -422,6 +457,7 @@ int main() {
   test_cells_preserved();
   test_depth_limit();
   test_abi();
+  test_advanced_functions();
 
   if (g_failures != 0) {
     std::printf("%d/%d kiểm tra thất bại\n", g_failures, g_checks);

@@ -1,6 +1,7 @@
 import {
   normalizeSheetsContent,
   readCells,
+  readStyles,
   SheetsEditor,
 } from "../editors/sheets";
 import type { AppDescriptor } from "./types";
@@ -20,7 +21,8 @@ export const sheetsApp: AppDescriptor = {
   renderEditor: ({ document, onChange }) => (
     <SheetsEditor
       initialCells={readCells(document.content)}
-      onChange={(cells) => onChange({ cells })}
+      initialStyles={readStyles(document.content)}
+      onChange={onChange}
     />
   ),
 };

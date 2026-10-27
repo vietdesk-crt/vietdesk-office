@@ -86,7 +86,7 @@ describe("theo dõi thay đổi", () => {
     toggleTrackChanges(view.state, view.dispatch);
 
     const handled = view.someProp("handleTextInput", (handler) =>
-      handler(view, 9, 9, " mới"),
+      handler(view, 9, 9, " mới", () => view.state.tr),
     );
     expect(handled).toBe(true);
 
@@ -176,7 +176,7 @@ describe("theo dõi thay đổi", () => {
     const view = createView();
     toggleTrackChanges(view.state, view.dispatch);
     view.someProp("handleTextInput", (handler) =>
-      handler(view, 9, 9, " mới"),
+      handler(view, 9, 9, " mới", () => view.state.tr),
     );
 
     acceptAllChanges(view);
@@ -189,7 +189,7 @@ describe("theo dõi thay đổi", () => {
     const view = createView();
     toggleTrackChanges(view.state, view.dispatch);
     view.someProp("handleTextInput", (handler) =>
-      handler(view, 9, 9, " mới"),
+      handler(view, 9, 9, " mới", () => view.state.tr),
     );
 
     rejectAllChanges(view);
