@@ -2742,7 +2742,9 @@ input.vd-tab__name:focus {
   text-transform: uppercase;
 }
 
-.vd-writer__toolbar button {
+/* Chỉ áp dụng cho nút ribbon; dải tab (tab-strip) có style riêng bên dưới. */
+.vd-writer__toolbar-strip button,
+.vd-writer__toolbar-row button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2757,17 +2759,20 @@ input.vd-tab__name:focus {
   font-size: 14px;
 }
 
-.vd-writer__toolbar button:hover:not(:disabled) {
+.vd-writer__toolbar-strip button:hover:not(:disabled),
+.vd-writer__toolbar-row button:hover:not(:disabled) {
   background: var(--vd-panel);
   border-color: var(--vd-border);
 }
 
-.vd-writer__toolbar button:disabled {
+.vd-writer__toolbar-strip button:disabled,
+.vd-writer__toolbar-row button:disabled {
   opacity: 0.38;
   cursor: default;
 }
 
-.vd-writer__toolbar button.is-active {
+.vd-writer__toolbar-strip button.is-active,
+.vd-writer__toolbar-row button.is-active {
   background: var(--vd-accent-soft);
   border-color: color-mix(in srgb, var(--vd-accent) 35%, transparent);
   color: var(--vd-accent);
@@ -5588,10 +5593,17 @@ body.vd-writer__image-resizing {
   align-items: center;
   justify-content: space-between;
   padding: 4px 12px;
-  background: var(--vd-panel-bg, #f8fafc);
-  border-bottom: 1px solid var(--vd-border, #e2e8f0);
+  background: var(--vd-panel);
+  border-bottom: 1px solid var(--vd-border);
   gap: 12px;
   user-select: none;
+}
+
+.vd-writer__tab-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .vd-writer__tabs-left,
@@ -5617,7 +5629,7 @@ body.vd-writer__image-resizing {
   padding: 5px 13px;
   font-size: 13px;
   font-weight: 500;
-  color: var(--vd-text-muted, #64748b);
+  color: var(--vd-muted);
   background: transparent;
   border: none;
   border-bottom: 2.5px solid transparent;
@@ -5629,29 +5641,29 @@ body.vd-writer__image-resizing {
 .vd-writer__tab-btn:hover,
 .vd-sheets__tab-btn:hover,
 .vd-slides__tab-btn:hover {
-  color: var(--vd-text, #0f172a);
-  background: rgba(0, 0, 0, 0.03);
+  color: var(--vd-text);
+  background: color-mix(in srgb, var(--vd-text) 7%, transparent);
 }
 
 /* Active tab styles theo màu sắc nhận diện bộ 3 ứng dụng */
 .vd-writer__tab-btn.is-active {
-  color: #0078d4;
+  color: var(--vd-color-writer);
   font-weight: 600;
-  border-bottom-color: #0078d4;
+  border-bottom-color: var(--vd-color-writer);
   background: transparent;
 }
 
 .vd-sheets__tab-btn.is-active {
-  color: #107c41;
+  color: var(--vd-color-sheets);
   font-weight: 600;
-  border-bottom-color: #107c41;
+  border-bottom-color: var(--vd-color-sheets);
   background: transparent;
 }
 
 .vd-slides__tab-btn.is-active {
-  color: #d83b01;
+  color: var(--vd-color-slides);
   font-weight: 600;
-  border-bottom-color: #d83b01;
+  border-bottom-color: var(--vd-color-slides);
   background: transparent;
 }
 
@@ -6054,25 +6066,25 @@ body.vd-writer__image-resizing {
   padding: 4px 10px;
   font-size: 12px;
   font-weight: 500;
-  color: var(--vd-muted, #64748b);
+  color: var(--vd-muted);
   background: transparent;
-  border: 1px solid var(--vd-border, #e2e8f0);
+  border: 1px solid var(--vd-border);
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .vd-writer__toggle-btn:hover:not(:disabled) {
-  color: #0078d4;
-  border-color: #0078d4;
-  background: rgba(0, 120, 212, 0.05);
+  color: var(--vd-accent);
+  border-color: var(--vd-accent);
+  background: color-mix(in srgb, var(--vd-accent) 7%, transparent);
 }
 
 .vd-writer__toggle-btn.is-active {
-  color: #0078d4;
+  color: var(--vd-accent);
   font-weight: 600;
-  border-color: #0078d4;
-  background: rgba(0, 120, 212, 0.1);
+  border-color: var(--vd-accent);
+  background: var(--vd-accent-soft);
 }
 
 .vd-writer__toggle-btn:disabled {

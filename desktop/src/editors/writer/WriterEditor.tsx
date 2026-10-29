@@ -1697,63 +1697,65 @@ export function WriterEditor({
       ) : null}
       <div className="vd-writer__toolbar" role="toolbar" aria-label="Định dạng">
         <div className="vd-writer__tab-strip" role="tablist" aria-label="Nhóm chức năng Writer">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={ribbonTab === "home"}
-            className={`vd-writer__tab-btn${ribbonTab === "home" ? " is-active" : ""}`}
-            onClick={() => setRibbonTab("home")}
-          >
-            Trang chủ
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={ribbonTab === "insert"}
-            className={`vd-writer__tab-btn${ribbonTab === "insert" ? " is-active" : ""}`}
-            onClick={() => {
-              setRibbonTab("insert");
-              setTemplatePickerOpen(true);
-            }}
-          >
-            Chèn & Biểu mẫu
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={ribbonTab === "layout"}
-            className={`vd-writer__tab-btn${ribbonTab === "layout" ? " is-active" : ""}`}
-            onClick={() => {
-              setRibbonTab("layout");
-              setPagePanelOpen(true);
-            }}
-          >
-            Bố cục trang
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={ribbonTab === "review"}
-            className={`vd-writer__tab-btn${ribbonTab === "review" ? " is-active" : ""}`}
-            onClick={() => {
-              setRibbonTab("review");
-              setCommentsOpen(true);
-            }}
-          >
-            Kiểm duyệt
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={ribbonTab === "view"}
-            className={`vd-writer__tab-btn${ribbonTab === "view" ? " is-active" : ""}`}
-            onClick={() => {
-              setRibbonTab("view");
-              setOutlineOpen(true);
-            }}
-          >
-            Hiển thị
-          </button>
+          <div className="vd-writer__tabs-left">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={ribbonTab === "home"}
+              className={`vd-writer__tab-btn${ribbonTab === "home" ? " is-active" : ""}`}
+              onClick={() => setRibbonTab("home")}
+            >
+              Trang chủ
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={ribbonTab === "insert"}
+              className={`vd-writer__tab-btn${ribbonTab === "insert" ? " is-active" : ""}`}
+              onClick={() => {
+                setRibbonTab("insert");
+                setTemplatePickerOpen(true);
+              }}
+            >
+              Chèn & Biểu mẫu
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={ribbonTab === "layout"}
+              className={`vd-writer__tab-btn${ribbonTab === "layout" ? " is-active" : ""}`}
+              onClick={() => {
+                setRibbonTab("layout");
+                setPagePanelOpen(true);
+              }}
+            >
+              Bố cục trang
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={ribbonTab === "review"}
+              className={`vd-writer__tab-btn${ribbonTab === "review" ? " is-active" : ""}`}
+              onClick={() => {
+                setRibbonTab("review");
+                setCommentsOpen(true);
+              }}
+            >
+              Kiểm duyệt
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={ribbonTab === "view"}
+              className={`vd-writer__tab-btn${ribbonTab === "view" ? " is-active" : ""}`}
+              onClick={() => {
+                setRibbonTab("view");
+                setOutlineOpen(true);
+              }}
+            >
+              Hiển thị
+            </button>
+          </div>
 
           <div className="vd-writer__tab-actions">
             <button
