@@ -83,6 +83,31 @@ describe("export/docx — đóng gói Writer thành Word", () => {
     expect(documentXml).toContain('<w:pgMar w:top="1134" w:right="850" w:bottom="1134" w:left="1701"/>');
   });
 
+  it("ghi lề trang tuỳ chỉnh và thụt lề dòng đầu", () => {
+    const custom = {
+      type: "doc",
+      pageSetup: {
+        header: "",
+        footer: "",
+        showPageNumbers: true,
+        margins: { top: 10, right: 20, bottom: 25, left: 40 },
+      },
+      content: [
+        {
+          type: "paragraph",
+          attrs: { indent: 1, firstLineIndent: 1 },
+          content: [{ type: "text", text: "Thụt lề" }],
+        },
+      ],
+    };
+    const zip = ZipArchive.open(writerDocxBytes(custom, "Lề"));
+    const documentXml = entryText(zip.read("word/document.xml"));
+    expect(documentXml).toContain(
+      '<w:pgMar w:top="567" w:right="1134" w:bottom="1417" w:left="2268"/>',
+    );
+    expect(documentXml).toContain('w:left="720" w:firstLine="720"');
+  });
+
   it("danh sách và bảng thành numPr/tbl, khối hỏng không làm sập", () => {
     const tableDoc = {
       type: "doc",

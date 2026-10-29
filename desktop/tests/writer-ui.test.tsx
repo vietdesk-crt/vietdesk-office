@@ -483,7 +483,10 @@ describe("WriterEditor", () => {
 
     const outline = outlineContainer.querySelector(".vd-writer__outline");
     expect(outline).not.toBeNull();
-    const items = outline?.querySelectorAll("button") ?? [];
+    const items =
+      outline?.querySelectorAll<HTMLButtonElement>(
+        ".vd-writer__outline-list button",
+      ) ?? [];
     expect(items).toHaveLength(2);
     expect(items[0].textContent).toBe("Mở đầu");
     expect(items[1].textContent).toBe("Chương 1");

@@ -134,6 +134,7 @@ describe("model nội dung Writer", () => {
       header: "Đầu trang",
       footer: "",
       showPageNumbers: false,
+      margins: { top: 20, right: 15, bottom: 20, left: 30 },
     });
     expect(normalized.comments).toHaveLength(1);
     expect(normalized.comments).toMatchObject([

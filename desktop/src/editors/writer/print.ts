@@ -13,7 +13,12 @@
  * một chỗ khác và rất dễ lệch với bản đang soạn.
  */
 
-import { computePageBreaks, pageContentHeightPx } from "./page";
+import {
+  ND30_MARGINS,
+  computePageBreaks,
+  pageContentHeightPx,
+  type PageMargins,
+} from "./page";
 
 /** Lớp CSS của khối “ngắt trang” do schema sinh ra. */
 const PAGE_BREAK_CLASS = "vd-page-break";
@@ -28,6 +33,8 @@ export interface PrintOptions {
   footer: string;
   /** Có in số trang ở góc phải chân trang không. */
   showPageNumbers: boolean;
+  /** Lề trang (mm) — mặc định lề NĐ30. */
+  margins?: PageMargins;
   /** Tên tài liệu — dùng làm tên tệp khi người dùng chọn “Lưu thành PDF”. */
   title?: string;
 }
@@ -116,9 +123,15 @@ export function buildPrintRoot(
   root.className = "vd-print-root";
   root.setAttribute("aria-hidden", "true");
 
+  const margins = options.margins ?? ND30_MARGINS;
+
   pages.forEach((pageBlocks, pageIndex) => {
     const page = document.createElement("div");
     page.className = "vd-writer__page vd-print-page";
+    page.style.setProperty("--vd-page-margin-top", `${margins.top}mm`);
+    page.style.setProperty("--vd-page-margin-right", `${margins.right}mm`);
+    page.style.setProperty("--vd-page-margin-bottom", `${margins.bottom}mm`);
+    page.style.setProperty("--vd-page-margin-left", `${margins.left}mm`);
 
     const header = document.createElement("div");
     header.className = "vd-writer__page-header";
@@ -164,7 +177,7 @@ export function printDocument(request: PrintRequest): number {
   const heights = blocks.map((block) => block.getBoundingClientRect().height);
   const pages = planPages(
     heights,
-    pageContentHeightPx(),
+    pageContentHeightPx(request.margins ?? ND30_MARGINS),
     forcedBreakIndexes(blocks),
   );
 

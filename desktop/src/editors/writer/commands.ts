@@ -190,6 +190,16 @@ export function changeIndent(delta: number): Command {
   };
 }
 
+/** Đặt thụt lề trái tuyệt đối (số cấp) cho vùng chọn — dùng cho thước kẻ. */
+export function setIndent(steps: number): Command {
+  return setBlockAttr("indent", normalizeIndent(steps));
+}
+
+/** Đặt thụt lề dòng đầu tuyệt đối (số cấp) cho vùng chọn — dùng cho thước kẻ. */
+export function setFirstLineIndent(steps: number): Command {
+  return setBlockAttr("firstLineIndent", normalizeIndent(steps));
+}
+
 /** Giãn dòng cho mọi đoạn văn/tiêu đề trong vùng chọn. */
 export function setLineHeight(value: string | null): Command {
   return setBlockAttr(
@@ -211,6 +221,7 @@ export function setBlock(
           align: normalizeAlign(current.align),
           lineHeight: normalizeLineHeight(current.lineHeight),
           indent: normalizeIndent(current.indent),
+          firstLineIndent: normalizeIndent(current.firstLineIndent),
         }
       : attrs;
     return setBlockType(nodeType, nextAttrs)(state, dispatch, view);
@@ -282,7 +293,8 @@ export function clearFormatting(): Command {
       if (
         node.attrs.align == null &&
         node.attrs.lineHeight == null &&
-        normalizeIndent(node.attrs.indent) === 0
+        normalizeIndent(node.attrs.indent) === 0 &&
+        normalizeIndent(node.attrs.firstLineIndent) === 0
       ) {
         return;
       }
@@ -291,6 +303,7 @@ export function clearFormatting(): Command {
         align: null,
         lineHeight: null,
         indent: 0,
+        firstLineIndent: 0,
       });
     };
 

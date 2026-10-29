@@ -137,6 +137,20 @@ function indentFromDOM(dom: HTMLElement): number {
   return Math.min(MAX_INDENT, Math.round(pixels / 25.6));
 }
 
+/** Đọc thụt lề dòng đầu (text-indent) từ DOM, quy đổi px sang cấp. */
+function firstLineIndentFromDOM(dom: HTMLElement): number {
+  const raw = dom.style.textIndent || "";
+  const match = /^(-?\d+(?:\.\d+)?)px$/.exec(raw.trim());
+  if (!match) {
+    return 0;
+  }
+  const pixels = Number(match[1]);
+  if (!Number.isFinite(pixels) || pixels <= 0) {
+    return 0;
+  }
+  return Math.min(MAX_INDENT, Math.round(pixels / (INDENT_STEP_EM * 16)));
+}
+
 /** Chuẩn hoá số cấp thụt lề về khoảng 0..MAX_INDENT. */
 export function normalizeIndent(value: unknown): number {
   const numeric = typeof value === "number" ? value : Number(value);
@@ -160,6 +174,10 @@ function blockStyleAttrs(attrs: Record<string, unknown>): { style?: string } {
   if (indent > 0) {
     styles.push(`margin-left: ${indent * INDENT_STEP_EM}em`);
   }
+  const firstLineIndent = normalizeIndent(attrs.firstLineIndent);
+  if (firstLineIndent > 0) {
+    styles.push(`text-indent: ${firstLineIndent * INDENT_STEP_EM}em`);
+  }
   return styles.length ? { style: styles.join("; ") } : {};
 }
 
@@ -168,6 +186,7 @@ function blockAttrsFromDOM(dom: HTMLElement) {
     align: alignFromDOM(dom),
     lineHeight: normalizeLineHeight(dom.style.lineHeight),
     indent: indentFromDOM(dom),
+    firstLineIndent: firstLineIndentFromDOM(dom),
   };
 }
 
@@ -185,6 +204,7 @@ const paragraphSpec: NodeSpec = {
     align: { default: null },
     lineHeight: { default: null },
     indent: { default: 0 },
+    firstLineIndent: { default: 0 },
   },
   parseDOM: [
     {
@@ -204,6 +224,7 @@ const headingSpec: NodeSpec = {
     align: { default: null },
     lineHeight: { default: null },
     indent: { default: 0 },
+    firstLineIndent: { default: 0 },
   },
   parseDOM: [1, 2, 3, 4, 5, 6].map((level) => ({
     tag: `h${level}`,

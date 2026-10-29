@@ -43,13 +43,67 @@ export interface PageSetup {
   footer: string;
   /** Có hiển thị số trang ở chân trang không. */
   showPageNumbers: boolean;
+  /** Lề trang (mm) — người dùng có thể kéo trên thước kẻ. */
+  margins: PageMargins;
 }
 
 export const DEFAULT_PAGE_SETUP: PageSetup = {
   header: "",
   footer: "",
   showPageNumbers: true,
+  margins: { ...ND30_MARGINS },
 };
+
+/** Giới hạn lề (mm) để vùng nội dung luôn còn chỗ soạn thảo. */
+export const MIN_MARGIN_MM = 5;
+export const MAX_SIDE_MARGIN_MM = 80;
+export const MAX_VERTICAL_MARGIN_MM = 60;
+
+function clampMarginMm(
+  value: unknown,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  const numeric = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(numeric)) {
+    return fallback;
+  }
+  return Math.round(Math.min(max, Math.max(min, numeric)));
+}
+
+/** Chuẩn hoá lề trang từ dữ liệu JSON; giá trị lạ thì dùng lề NĐ30. */
+export function normalizePageMargins(value: unknown): PageMargins {
+  if (!isRecord(value)) {
+    return { ...ND30_MARGINS };
+  }
+  return {
+    top: clampMarginMm(
+      value.top,
+      ND30_MARGINS.top,
+      MIN_MARGIN_MM,
+      MAX_VERTICAL_MARGIN_MM,
+    ),
+    right: clampMarginMm(
+      value.right,
+      ND30_MARGINS.right,
+      MIN_MARGIN_MM,
+      MAX_SIDE_MARGIN_MM,
+    ),
+    bottom: clampMarginMm(
+      value.bottom,
+      ND30_MARGINS.bottom,
+      MIN_MARGIN_MM,
+      MAX_VERTICAL_MARGIN_MM,
+    ),
+    left: clampMarginMm(
+      value.left,
+      ND30_MARGINS.left,
+      MIN_MARGIN_MM,
+      MAX_SIDE_MARGIN_MM,
+    ),
+  };
+}
 
 /** Độ dài tối đa của một dòng đầu trang/chân trang. */
 const MAX_SETUP_TEXT = 500;
@@ -71,6 +125,7 @@ export function normalizePageSetup(value: unknown): PageSetup {
     header,
     footer,
     showPageNumbers: value.showPageNumbers !== false,
+    margins: normalizePageMargins(value.margins),
   };
 }
 

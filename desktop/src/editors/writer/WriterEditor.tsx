@@ -86,7 +86,12 @@ import type { Command } from "prosemirror-state";
 import { EditorView } from "prosemirror-view";
 import { tableEditing } from "prosemirror-tables";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type {
+  CSSProperties,
+  KeyboardEvent as ReactKeyboardEvent,
+  PointerEvent as ReactPointerEvent,
+  ReactNode,
+} from "react";
 import {
   applyFormatting,
   changeCase,
@@ -104,6 +109,8 @@ import {
   removeMarkType,
   setAlign,
   setBlock,
+  setFirstLineIndent,
+  setIndent,
   setLineHeight,
   setLink,
   setMarkAttr,
@@ -118,6 +125,8 @@ import type { CaseMode } from "./commands";
 import { searchHighlightKey, searchHighlightPlugin } from "./highlight";
 import {
   DEFAULT_CHANGE_AUTHOR,
+  INDENT_STEP_EM,
+  MAX_INDENT,
   normalizeAlign,
   normalizeColor,
   normalizeFontFamily,
@@ -150,12 +159,16 @@ import {
 } from "./comments";
 import type { WriterComment } from "./comments";
 import {
+  A4_WIDTH_MM,
+  MAX_SIDE_MARGIN_MM,
+  MIN_MARGIN_MM,
+  ND30_MARGINS,
   computePageBreaks,
   pageContentHeightPx,
   pageOfBlock,
   readPageSetup,
 } from "./page";
-import type { PageSetup } from "./page";
+import type { PageMargins, PageSetup } from "./page";
 import { printDocument } from "./print";
 import { ImageView } from "./image-view";
 import { TaskItemView } from "./task-view";
@@ -165,6 +178,24 @@ import { bytesToBase64 } from "../../export/binary";
 import { downloadBinaryFile } from "../../download";
 import { fileNameFromPath } from "../../format";
 import { ADMINISTRATIVE_TEMPLATES } from "./templates";
+
+/** Một cấp thụt lề (1,6em ở cỡ chữ 16px) quy đổi sang px/mm cho thước kẻ. */
+const INDENT_STEP_PX = INDENT_STEP_EM * 16;
+const MM_TO_PX_CSS = 96 / 25.4;
+const INDENT_STEP_MM = INDENT_STEP_PX / MM_TO_PX_CSS;
+
+/** Tay kéo trên thước: lề trang hoặc thụt lề đoạn văn. */
+type RulerDragKind =
+  | "margin-left"
+  | "margin-right"
+  | "indent"
+  | "first-line";
+
+interface RulerPreview {
+  margins: PageMargins;
+  indent: number;
+  firstLineIndent: number;
+}
 
 /** Tên tệp an toàn cho Windows/macOS (bỏ ký tự cấm). */
 function sanitizeFileName(name: string): string {
@@ -549,13 +580,26 @@ export function WriterEditor({
   const [focusMode, setFocusMode] = useState(false);
   const [ribbonTab, setRibbonTab] = useState<"home" | "insert" | "layout" | "review" | "view">("home");
   const [pagelessMode, setPagelessMode] = useState(false);
-  const [showRuler, setShowRuler] = useState(true);
+  /** Tay kéo đang hoạt động trên thước kẻ (null khi không kéo). */
+  const [rulerDrag, setRulerDrag] = useState<RulerDragKind | null>(null);
+  /** Giá trị xem trước khi kéo — áp dụng thật khi thả tay. */
+  const [rulerPreview, setRulerPreview] = useState<RulerPreview | null>(null);
+  const rulerTrackRef = useRef<HTMLDivElement>(null);
+  const rulerDragRef = useRef<{
+    kind: RulerDragKind;
+    startX: number;
+    baseMargins: PageMargins;
+    baseIndent: number;
+    baseFirstLineIndent: number;
+    preview: RulerPreview;
+  } | null>(null);
 
   /** Chuẩn hóa trang văn bản 1 chạm theo Nghị định 30/2020/NĐ-CP */
   const applyNd30Layout = () => {
     const nd30Setup: PageSetup = {
       ...pageSetup,
       showPageNumbers: true,
+      margins: { ...ND30_MARGINS },
     };
     setPageSetup(nd30Setup);
     setExportNotice(
@@ -601,7 +645,7 @@ export function WriterEditor({
 
     const breaks = computePageBreaks(
       heights,
-      pageContentHeightPx(),
+      pageContentHeightPx(pageSetup.margins),
       forced,
     );
 
@@ -734,6 +778,31 @@ export function WriterEditor({
 
   const state = viewRef.current?.state;
   const doc = state?.doc;
+
+  // Giá trị hiển thị trên thước: ưu tiên bản xem trước khi đang kéo.
+  const selectionAttrs = state?.selection.$from.parent.attrs ?? {};
+  const blockIndent = normalizeIndent(selectionAttrs.indent);
+  const blockFirstLineIndent = normalizeIndent(
+    selectionAttrs.firstLineIndent,
+  );
+  const activeMargins = rulerPreview?.margins ?? pageSetup.margins;
+  const activeIndent = rulerPreview?.indent ?? blockIndent;
+  const activeFirstLineIndent =
+    rulerPreview?.firstLineIndent ?? blockFirstLineIndent;
+  const leftMarginPct = (activeMargins.left / A4_WIDTH_MM) * 100;
+  const rightMarginPct = (activeMargins.right / A4_WIDTH_MM) * 100;
+  const indentPct =
+    ((activeMargins.left + activeIndent * INDENT_STEP_MM) / A4_WIDTH_MM) * 100;
+  const firstLinePct =
+    ((activeMargins.left + activeFirstLineIndent * INDENT_STEP_MM) /
+      A4_WIDTH_MM) *
+    100;
+  const pageStyle = {
+    "--vd-page-margin-top": `${activeMargins.top}mm`,
+    "--vd-page-margin-right": `${activeMargins.right}mm`,
+    "--vd-page-margin-bottom": `${activeMargins.bottom}mm`,
+    "--vd-page-margin-left": `${activeMargins.left}mm`,
+  } as CSSProperties;
   const matches = useMemo(
     () => (doc ? findMatches(doc, query, caseSensitive) : []),
     [doc, query, caseSensitive],
@@ -862,6 +931,7 @@ export function WriterEditor({
       header: pageSetup.header,
       footer: pageSetup.footer,
       showPageNumbers: pageSetup.showPageNumbers,
+      margins: pageSetup.margins,
       title,
     });
   }, [pageSetup, title]);
@@ -924,7 +994,10 @@ export function WriterEditor({
     setExportBusy(true);
     try {
       const base = sanitizeFileName(title || "tai-lieu");
-      const bytes = writerDocxBytes(view.state.doc.toJSON(), title ?? "");
+      const bytes = writerDocxBytes(
+        { ...view.state.doc.toJSON(), pageSetup: pageSetupRef.current },
+        title ?? "",
+      );
       if (hasNativeCore()) {
         const path = await pickExportPath(`${base}.docx`, "Xuất Word", {
           name: "Tài liệu Word",
@@ -1013,6 +1086,132 @@ export function WriterEditor({
     command(view.state, view.dispatch, view);
     view.focus();
     forceRender((value) => value + 1);
+  };
+
+  const clampSideMargin = (value: number) =>
+    Math.min(MAX_SIDE_MARGIN_MM, Math.max(MIN_MARGIN_MM, Math.round(value)));
+
+  const clampIndentSteps = (value: number) =>
+    Math.min(MAX_INDENT, Math.max(0, Math.round(value)));
+
+  /** Bắt đầu kéo tay cầm trên thước kẻ. */
+  const beginRulerDrag =
+    (kind: RulerDragKind) => (event: ReactPointerEvent<HTMLButtonElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
+      event.currentTarget.setPointerCapture(event.pointerId);
+      const attrs = viewRef.current?.state.selection.$from.parent.attrs ?? {};
+      const baseMargins = { ...pageSetupRef.current.margins };
+      const baseIndent = normalizeIndent(attrs.indent);
+      const baseFirstLineIndent = normalizeIndent(attrs.firstLineIndent);
+      const preview: RulerPreview = {
+        margins: { ...baseMargins },
+        indent: baseIndent,
+        firstLineIndent: baseFirstLineIndent,
+      };
+      rulerDragRef.current = {
+        kind,
+        startX: event.clientX,
+        baseMargins,
+        baseIndent,
+        baseFirstLineIndent,
+        preview,
+      };
+      setRulerDrag(kind);
+      setRulerPreview(preview);
+    };
+
+  /** Cập nhật giá trị xem trước trong lúc kéo. */
+  const moveRulerDrag = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const drag = rulerDragRef.current;
+    const track = rulerTrackRef.current;
+    if (!drag || !track) {
+      return;
+    }
+    const trackWidth = track.getBoundingClientRect().width;
+    if (trackWidth <= 0) {
+      return;
+    }
+    const preview: RulerPreview = {
+      margins: { ...drag.baseMargins },
+      indent: drag.baseIndent,
+      firstLineIndent: drag.baseFirstLineIndent,
+    };
+    if (drag.kind === "margin-left" || drag.kind === "margin-right") {
+      const deltaMm = ((event.clientX - drag.startX) / trackWidth) * A4_WIDTH_MM;
+      if (drag.kind === "margin-left") {
+        preview.margins.left = clampSideMargin(drag.baseMargins.left + deltaMm);
+      } else {
+        preview.margins.right = clampSideMargin(drag.baseMargins.right - deltaMm);
+      }
+    } else {
+      const deltaSteps = Math.round(
+        (event.clientX - drag.startX) / INDENT_STEP_PX,
+      );
+      if (drag.kind === "indent") {
+        preview.indent = clampIndentSteps(drag.baseIndent + deltaSteps);
+      } else {
+        preview.firstLineIndent = clampIndentSteps(
+          drag.baseFirstLineIndent + deltaSteps,
+        );
+      }
+    }
+    drag.preview = preview;
+    setRulerPreview(preview);
+  };
+
+  /** Áp dụng giá trị cuối cùng khi thả tay. */
+  const endRulerDrag = () => {
+    const drag = rulerDragRef.current;
+    rulerDragRef.current = null;
+    setRulerDrag(null);
+    setRulerPreview(null);
+    if (!drag) {
+      return;
+    }
+    const { preview } = drag;
+    if (drag.kind === "margin-left" || drag.kind === "margin-right") {
+      updatePageSetup({ ...pageSetupRef.current, margins: preview.margins });
+      requestAnimationFrame(() => measureRef.current?.());
+      return;
+    }
+    if (drag.kind === "indent") {
+      run(setIndent(preview.indent))();
+      return;
+    }
+    run(setFirstLineIndent(preview.firstLineIndent))();
+  };
+
+  /** Điều khiển thước bằng phím mũi tên (1mm hoặc 1 cấp mỗi lần). */
+  const nudgeRuler = (
+    kind: RulerDragKind,
+    event: ReactKeyboardEvent<HTMLButtonElement>,
+  ) => {
+    const direction =
+      event.key === "ArrowLeft" ? -1 : event.key === "ArrowRight" ? 1 : 0;
+    if (direction === 0) {
+      return;
+    }
+    event.preventDefault();
+    const step = event.shiftKey ? 5 : 1;
+    if (kind === "margin-left" || kind === "margin-right") {
+      const margins = { ...pageSetupRef.current.margins };
+      if (kind === "margin-left") {
+        margins.left = clampSideMargin(margins.left + direction * step);
+      } else {
+        margins.right = clampSideMargin(margins.right - direction * step);
+      }
+      updatePageSetup({ ...pageSetupRef.current, margins });
+      requestAnimationFrame(() => measureRef.current?.());
+      return;
+    }
+    const attrs = viewRef.current?.state.selection.$from.parent.attrs ?? {};
+    const base =
+      kind === "indent"
+        ? normalizeIndent(attrs.indent)
+        : normalizeIndent(attrs.firstLineIndent);
+    const next = clampIndentSteps(base + direction * step);
+    run(kind === "indent" ? setIndent(next) : setFirstLineIndent(next))();
   };
 
   /** Cắt/Chép vùng chọn qua lệnh trình duyệt — ProseMirror lo phần nội dung. */
@@ -1765,15 +1964,6 @@ export function WriterEditor({
               title={pagelessMode ? "Chuyển về Chế độ Trang in chuẩn A4" : "Chuyển sang Chế độ Không ngắt trang (Google Docs Pageless Mode)"}
             >
               <span>{pagelessMode ? "Trang in A4" : "Không ngắt trang"}</span>
-            </button>
-            <button
-              type="button"
-              className={`vd-writer__toggle-btn${showRuler && !pagelessMode ? " is-active" : ""}`}
-              disabled={pagelessMode}
-              onClick={() => setShowRuler((prev) => !prev)}
-              title="Hiện / Ẩn thước kẻ căn lề tài liệu"
-            >
-              <span>Thước kẻ</span>
             </button>
             <button
               type="button"
@@ -3015,43 +3205,135 @@ export function WriterEditor({
       ) : null}
 
       <div className={`vd-writer__body${pagelessMode ? " is-pageless" : ""}`}>
-        {showRuler && !pagelessMode && (
-          <div className="vd-writer__ruler" aria-label="Thước kẻ căn lề tài liệu">
-            <div className="vd-writer__ruler-track">
-              <div className="vd-writer__ruler-margin-left" title="Lề trái chuẩn NĐ 30: 30mm" />
-              <div className="vd-writer__ruler-scale">
-                {Array.from({ length: 16 }).map((_, i) => (
-                  <span key={i} className="vd-writer__ruler-cm">
-                    <span>{i + 1}</span>
-                  </span>
-                ))}
-              </div>
-              <div className="vd-writer__ruler-margin-right" title="Lề phải chuẩn NĐ 30: 15mm" />
-            </div>
-          </div>
-        )}
-        <div className={`vd-writer__viewport${pagelessMode ? " is-pageless" : ""}`}>
-          <div className={`vd-writer__page${pagelessMode ? " is-pageless" : ""}`}>
-            <div className="vd-writer__page-header" aria-label="Đầu trang">
-              {pageSetup.header}
-            </div>
-            <div className="vd-writer__page-body">
-              <div ref={hostRef} className="vd-writer__surface" spellCheck lang="vi" />
-              {empty ? (
-                <div className="vd-writer__placeholder" aria-hidden="true">
-                  Bắt đầu nhập văn bản…
+        <div className="vd-writer__main">
+          {!pagelessMode && (
+            <div className="vd-writer__ruler" aria-label="Thước kẻ căn lề tài liệu">
+              <div
+                ref={rulerTrackRef}
+                className={`vd-writer__ruler-track${rulerDrag ? " is-dragging" : ""}`}
+              >
+                <div
+                  className="vd-writer__ruler-shade"
+                  style={{ left: 0, width: `${leftMarginPct}%` }}
+                />
+                <div
+                  className="vd-writer__ruler-shade vd-writer__ruler-shade--right"
+                  style={{ width: `${rightMarginPct}%` }}
+                />
+                <div className="vd-writer__ruler-scale" aria-hidden="true">
+                  {Array.from({ length: 22 }).map((_, cm) => (
+                    <span
+                      key={cm}
+                      className={`vd-writer__ruler-cm${cm % 5 === 0 ? " is-major" : ""}`}
+                      style={{ left: `${(cm * 10 * 100) / A4_WIDTH_MM}%` }}
+                    >
+                      {cm}
+                    </span>
+                  ))}
                 </div>
-              ) : null}
+
+                <button
+                  type="button"
+                  className="vd-writer__ruler-margin-handle vd-writer__ruler-margin-handle--left"
+                  style={{ left: `${leftMarginPct}%` }}
+                  title={`Lề trái: ${activeMargins.left} mm — kéo hoặc dùng ←/→`}
+                  aria-label="Lề trái"
+                  role="slider"
+                  aria-orientation="horizontal"
+                  aria-valuemin={MIN_MARGIN_MM}
+                  aria-valuemax={MAX_SIDE_MARGIN_MM}
+                  aria-valuenow={activeMargins.left}
+                  aria-valuetext={`${activeMargins.left} mm`}
+                  onPointerDown={beginRulerDrag("margin-left")}
+                  onPointerMove={moveRulerDrag}
+                  onPointerUp={endRulerDrag}
+                  onPointerCancel={endRulerDrag}
+                  onKeyDown={(event) => nudgeRuler("margin-left", event)}
+                />
+                <button
+                  type="button"
+                  className="vd-writer__ruler-margin-handle vd-writer__ruler-margin-handle--right"
+                  style={{ right: `${rightMarginPct}%` }}
+                  title={`Lề phải: ${activeMargins.right} mm — kéo hoặc dùng ←/→`}
+                  aria-label="Lề phải"
+                  role="slider"
+                  aria-orientation="horizontal"
+                  aria-valuemin={MIN_MARGIN_MM}
+                  aria-valuemax={MAX_SIDE_MARGIN_MM}
+                  aria-valuenow={activeMargins.right}
+                  aria-valuetext={`${activeMargins.right} mm`}
+                  onPointerDown={beginRulerDrag("margin-right")}
+                  onPointerMove={moveRulerDrag}
+                  onPointerUp={endRulerDrag}
+                  onPointerCancel={endRulerDrag}
+                  onKeyDown={(event) => nudgeRuler("margin-right", event)}
+                />
+
+                <button
+                  type="button"
+                  className="vd-writer__ruler-indent vd-writer__ruler-indent--first"
+                  style={{ left: `${firstLinePct}%` }}
+                  title={`Thụt dòng đầu: ${(activeFirstLineIndent * INDENT_STEP_EM).toFixed(1)} em — kéo hoặc dùng ←/→`}
+                  aria-label="Thụt lề dòng đầu"
+                  role="slider"
+                  aria-orientation="horizontal"
+                  aria-valuemin={0}
+                  aria-valuemax={MAX_INDENT}
+                  aria-valuenow={activeFirstLineIndent}
+                  aria-valuetext={`${(activeFirstLineIndent * INDENT_STEP_EM).toFixed(1)} em`}
+                  onPointerDown={beginRulerDrag("first-line")}
+                  onPointerMove={moveRulerDrag}
+                  onPointerUp={endRulerDrag}
+                  onPointerCancel={endRulerDrag}
+                  onKeyDown={(event) => nudgeRuler("first-line", event)}
+                />
+                <button
+                  type="button"
+                  className="vd-writer__ruler-indent vd-writer__ruler-indent--left"
+                  style={{ left: `${indentPct}%` }}
+                  title={`Thụt lề trái: ${(activeIndent * INDENT_STEP_EM).toFixed(1)} em — kéo hoặc dùng ←/→`}
+                  aria-label="Thụt lề trái"
+                  role="slider"
+                  aria-orientation="horizontal"
+                  aria-valuemin={0}
+                  aria-valuemax={MAX_INDENT}
+                  aria-valuenow={activeIndent}
+                  aria-valuetext={`${(activeIndent * INDENT_STEP_EM).toFixed(1)} em`}
+                  onPointerDown={beginRulerDrag("indent")}
+                  onPointerMove={moveRulerDrag}
+                  onPointerUp={endRulerDrag}
+                  onPointerCancel={endRulerDrag}
+                  onKeyDown={(event) => nudgeRuler("indent", event)}
+                />
+              </div>
             </div>
-            <div className="vd-writer__page-footer" aria-label="Chân trang">
-              <span className="vd-writer__page-footer-text">
-                {pageSetup.footer}
-              </span>
-              {pageSetup.showPageNumbers ? (
-                <span className="vd-writer__page-number">
-                  Trang {pagination.page} / {pagination.total}
+          )}
+          <div className={`vd-writer__viewport${pagelessMode ? " is-pageless" : ""}`}>
+            <div
+              className={`vd-writer__page${pagelessMode ? " is-pageless" : ""}`}
+              style={pageStyle}
+            >
+              <div className="vd-writer__page-header" aria-label="Đầu trang">
+                {pageSetup.header}
+              </div>
+              <div className="vd-writer__page-body">
+                <div ref={hostRef} className="vd-writer__surface" spellCheck lang="vi" />
+                {empty ? (
+                  <div className="vd-writer__placeholder" aria-hidden="true">
+                    Bắt đầu nhập văn bản…
+                  </div>
+                ) : null}
+              </div>
+              <div className="vd-writer__page-footer" aria-label="Chân trang">
+                <span className="vd-writer__page-footer-text">
+                  {pageSetup.footer}
                 </span>
-              ) : null}
+                {pageSetup.showPageNumbers ? (
+                  <span className="vd-writer__page-number">
+                    Trang {pagination.page} / {pagination.total}
+                  </span>
+                ) : null}
+              </div>
             </div>
           </div>
         </div>

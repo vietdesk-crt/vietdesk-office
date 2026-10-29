@@ -14,6 +14,7 @@
 import type { Node as PMNode } from "prosemirror-model";
 import { isRecord } from "@vietdesk/ipc-contract";
 import { writerSchema } from "../editors/writer/schema";
+import { readPageSetup } from "../editors/writer/page";
 import { base64ToBytes, createZip, type ZipEntryInput } from "./binary";
 
 /** 1 mm = 56.6929 twip (đơn vị đo của Word). */
@@ -299,6 +300,7 @@ interface ParagraphAttrs {
   align: unknown;
   lineHeight: unknown;
   indent: number;
+  firstLineIndent: number;
   /** 0 = đoạn thường; 1..6 = tiêu đề. */
   level: number;
 }
@@ -335,8 +337,17 @@ function paragraphPropsXml(
     props.push(
       `<w:ind w:left="${left}" w:hanging="${INDENT_TWIPS_PER_LEVEL}"/>`,
     );
-  } else if (attrs.indent > 0) {
-    props.push(`<w:ind w:left="${attrs.indent * INDENT_TWIPS_PER_LEVEL}"/>`);
+  } else if (attrs.indent > 0 || attrs.firstLineIndent > 0) {
+    const parts: string[] = [];
+    if (attrs.indent > 0) {
+      parts.push(`w:left="${attrs.indent * INDENT_TWIPS_PER_LEVEL}"`);
+    }
+    if (attrs.firstLineIndent > 0) {
+      parts.push(
+        `w:firstLine="${attrs.firstLineIndent * INDENT_TWIPS_PER_LEVEL}"`,
+      );
+    }
+    props.push(`<w:ind ${parts.join(" ")}/>`);
   }
 
   if (typeof attrs.align === "string") {
@@ -363,6 +374,7 @@ function paragraphAttrsOf(node: PMNode): ParagraphAttrs {
     align: attrs.align,
     lineHeight: attrs.lineHeight,
     indent: Number(attrs.indent) || 0,
+    firstLineIndent: Number(attrs.firstLineIndent) || 0,
     level: headingLevelOf(node.type.name, attrs),
   };
 }
@@ -620,6 +632,8 @@ export function buildDocxParts(
     }
   }
 
+  const { margins } = readPageSetup(content);
+
   const emitter = makeEmitter();
   const bodyXml = root && root.childCount > 0 ? blocksXml(root, emitter) : paragraphXml(
     writerSchema.node("paragraph"),
@@ -638,9 +652,8 @@ export function buildDocxParts(
     bodyXml +
     `<w:sectPr>` +
     '<w:pgSz w:w="11906" w:h="16838"/>' +
-    // Lề NĐ30: trên 2 cm, phải 1,5 cm, dưới 2 cm, trái 3 cm.
-    `<w:pgMar w:top="${Math.round(20 * MM_TO_TWIP)}" w:right="${Math.round(15 * MM_TO_TWIP)}"` +
-    ` w:bottom="${Math.round(20 * MM_TO_TWIP)}" w:left="${Math.round(30 * MM_TO_TWIP)}"/>` +
+    `<w:pgMar w:top="${Math.round(margins.top * MM_TO_TWIP)}" w:right="${Math.round(margins.right * MM_TO_TWIP)}"` +
+    ` w:bottom="${Math.round(margins.bottom * MM_TO_TWIP)}" w:left="${Math.round(margins.left * MM_TO_TWIP)}"/>` +
     `</w:sectPr></w:body></w:document>`;
 
   const encoder = new TextEncoder();

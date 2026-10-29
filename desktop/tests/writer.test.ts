@@ -17,6 +17,8 @@ import {
   removeMarkType,
   setAlign,
   setBlock,
+  setFirstLineIndent,
+  setIndent,
   setLineHeight,
   setLink,
   setMarkAttr,
@@ -40,6 +42,7 @@ import {
 } from "../src/editors/writer/outline";
 import {
   computePageBreaks,
+  normalizePageMargins,
   normalizePageSetup,
   pageContentHeightPx,
   pageCount,
@@ -473,6 +476,40 @@ describe("định dạng mở rộng trong Writer", () => {
     expect(state.doc.firstChild?.attrs.indent).toBe(6);
   });
 
+  it("round-trip và render thụt lề dòng đầu", () => {
+    const node = writerSchema.node("paragraph", { firstLineIndent: 2 }, [
+      writerSchema.text("Xin chào"),
+    ]);
+    const restored = writerSchema.nodeFromJSON(node.toJSON());
+    expect(restored.attrs.firstLineIndent).toBe(2);
+
+    const spec = writerSchema.nodes.paragraph.spec.toDOM!(node) as [
+      string,
+      { style?: string },
+      number,
+    ];
+    expect(spec[1].style).toContain("text-indent: 3.2em");
+  });
+
+  it("đặt thụt lề trái và thụt dòng đầu tuyệt đối trong biên 0..6", () => {
+    const document = doc(paragraph("Xin chào"));
+    let state = EditorState.create({
+      schema: writerSchema,
+      doc: document,
+      selection: TextSelection.create(document, 2),
+    });
+
+    state = applyCommand(state, setIndent(3));
+    state = applyCommand(state, setFirstLineIndent(2));
+    expect(state.doc.firstChild?.attrs.indent).toBe(3);
+    expect(state.doc.firstChild?.attrs.firstLineIndent).toBe(2);
+
+    state = applyCommand(state, setIndent(-5));
+    state = applyCommand(state, setFirstLineIndent(99));
+    expect(state.doc.firstChild?.attrs.indent).toBe(0);
+    expect(state.doc.firstChild?.attrs.firstLineIndent).toBe(6);
+  });
+
   it("đổi sang tiêu đề cấp 4..6 và giữ nguyên thuộc tính", () => {
     const document = doc(paragraph("Xin chào"));
     let state = EditorState.create({
@@ -628,6 +665,21 @@ describe("trang A4, đầu trang và chân trang", () => {
     expect(pageOfBlock([2, 5], 9)).toBe(3);
   });
 
+  it("chuẩn hoá lề trang trong biên cho phép", () => {
+    expect(normalizePageMargins(undefined)).toEqual({
+      top: 20,
+      right: 15,
+      bottom: 20,
+      left: 30,
+    });
+    expect(
+      normalizePageMargins({ top: 80, right: 999, bottom: -3, left: 5 }),
+    ).toEqual({ top: 60, right: 80, bottom: 5, left: 5 });
+    expect(
+      normalizePageMargins({ top: "x", right: 15, bottom: 20, left: 30 }),
+    ).toEqual({ top: 20, right: 15, bottom: 20, left: 30 });
+  });
+
   it("đọc cấu hình trang từ tài liệu và bỏ dữ liệu lạ", () => {
     expect(
       readPageSetup({
@@ -638,6 +690,7 @@ describe("trang A4, đầu trang và chân trang", () => {
       header: "Báo cáo",
       footer: "Trang",
       showPageNumbers: false,
+      margins: { top: 20, right: 15, bottom: 20, left: 30 },
     });
 
     // Tài liệu cũ không có cấu hình trang → dùng mặc định.
@@ -645,11 +698,13 @@ describe("trang A4, đầu trang và chân trang", () => {
       header: "",
       footer: "",
       showPageNumbers: true,
+      margins: { top: 20, right: 15, bottom: 20, left: 30 },
     });
     expect(normalizePageSetup({ header: 42, showPageNumbers: "no" })).toEqual({
       header: "",
       footer: "",
       showPageNumbers: true,
+      margins: { top: 20, right: 15, bottom: 20, left: 30 },
     });
   });
 });

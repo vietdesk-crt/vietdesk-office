@@ -14,6 +14,7 @@ import { PDFDocument, rgb, type PDFFont, type PDFImage, type PDFPage } from "pdf
 import {
   ND30_MARGINS,
   computePageBreaks,
+  normalizePageMargins,
   type PageSetup,
 } from "../editors/writer/page";
 import { collectBlocks, forcedBreakIndexes } from "../editors/writer/print";
@@ -433,18 +434,21 @@ interface DrawContext {
   images: Map<string, PDFImage | "failed">;
   /** metric phông Noto Serif (đơn vị font em). */
   fontMetrics: PdfFontMetrics;
+  /** Lề trái của trang (pt). */
+  marginLeftPt: number;
+  /** Bề rộng vùng nội dung (pt). */
+  contentWidthPt: number;
+  /** Gốc toạ độ PDF ở góc trái dưới; y của mép trên vùng nội dung. */
+  contentTopY: number;
 }
 
-/** Gốc toạ độ PDF ở góc trái dưới; y của mép trên vùng nội dung. */
-const CONTENT_TOP_Y = A4_HEIGHT_PT - MARGIN_TOP_PT;
-
 function toX(ctx: DrawContext, viewportX: number): number {
-  return MARGIN_LEFT_PT + (viewportX - ctx.surfaceLeft) * ctx.pxToPt;
+  return ctx.marginLeftPt + (viewportX - ctx.surfaceLeft) * ctx.pxToPt;
 }
 
 function toY(ctx: DrawContext, viewportY: number): number {
   return (
-    CONTENT_TOP_Y -
+    ctx.contentTopY -
     (ctx.topOnPagePx + (viewportY - ctx.blockRectTop)) * ctx.pxToPt
   );
 }
@@ -682,7 +686,7 @@ function drawPageChrome(
   const font = ctx.fonts.regular;
   if (pageSetup.header) {
     ctx.page.drawText(pageSetup.header, {
-      x: MARGIN_LEFT_PT,
+      x: ctx.marginLeftPt,
       y: A4_HEIGHT_PT - 9 * MM_TO_PT - sizePt * 0.75,
       size: sizePt,
       font,
@@ -692,7 +696,7 @@ function drawPageChrome(
   const footerText = pageSetup.footer;
   if (footerText) {
     ctx.page.drawText(footerText, {
-      x: MARGIN_LEFT_PT,
+      x: ctx.marginLeftPt,
       y: 9 * MM_TO_PT + sizePt * 0.3,
       size: sizePt,
       font,
@@ -703,7 +707,7 @@ function drawPageChrome(
     const label = `Trang ${pageIndex + 1} / ${pageCount}`;
     const widthPt = font.widthOfTextAtSize(label, sizePt);
     ctx.page.drawText(label, {
-      x: MARGIN_LEFT_PT + CONTENT_WIDTH_PT - widthPt,
+      x: ctx.marginLeftPt + ctx.contentWidthPt - widthPt,
       y: 9 * MM_TO_PT + sizePt * 0.3,
       size: sizePt,
       font,
@@ -804,8 +808,15 @@ export async function exportWriterPdf(
   if (surfaceRect.width <= 0) {
     throw new Error("Vùng soạn thảo chưa hiển thị để xuất PDF.");
   }
-  const pxToPt = CONTENT_WIDTH_PT / surfaceRect.width;
-  const contentHeightPx = CONTENT_HEIGHT_PT / pxToPt;
+  const margins = normalizePageMargins(request.pageSetup.margins);
+  const marginLeftPt = margins.left * MM_TO_PT;
+  const contentWidthPt =
+    A4_WIDTH_PT - (margins.left + margins.right) * MM_TO_PT;
+  const contentHeightPt =
+    A4_HEIGHT_PT - (margins.top + margins.bottom) * MM_TO_PT;
+  const contentTopY = A4_HEIGHT_PT - margins.top * MM_TO_PT;
+  const pxToPt = contentWidthPt / surfaceRect.width;
+  const contentHeightPx = contentHeightPt / pxToPt;
 
   const blocks = collectBlocks(request.surface);
   const geometries = blocks.map((block, index) => measureBlock(block, index));
@@ -832,6 +843,9 @@ export async function exportWriterPdf(
         topOnPagePx,
         images: imageCache,
         fontMetrics: notoMetrics,
+        marginLeftPt,
+        contentWidthPt,
+        contentTopY,
       };
       drawGeometry(context, geometry);
       topOnPagePx += geometry.rect.height;
@@ -846,6 +860,9 @@ export async function exportWriterPdf(
         topOnPagePx: 0,
         images: imageCache,
         fontMetrics: notoMetrics,
+        marginLeftPt,
+        contentWidthPt,
+        contentTopY,
       },
       request.pageSetup,
       pageIndex,
