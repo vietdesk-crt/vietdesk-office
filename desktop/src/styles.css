@@ -2670,13 +2670,13 @@ input.vd-tab__name:focus {
   background: var(--vd-panel-alt);
 }
 
-/* Dải các nhóm ribbon — cuộn ngang khi màn hình hẹp. */
+/* Dải các nhóm ribbon — tự xuống dòng khi màn hình hẹp, không cần cuộn ngang. */
 .vd-writer__toolbar-strip {
   display: flex;
+  flex-wrap: wrap;
   align-items: stretch;
-  gap: 0;
-  overflow-x: auto;
-  scrollbar-width: thin;
+  gap: 4px 0;
+  overflow: visible;
 }
 
 /* Một nhóm kiểu Word: phần nút phía trên, nhãn nhóm phía dưới. */
@@ -2685,7 +2685,7 @@ input.vd-tab__name:focus {
   flex-direction: column;
   justify-content: space-between;
   gap: 2px;
-  padding: 0 10px;
+  padding: 0 8px;
   border-left: 1px solid var(--vd-border);
 }
 
@@ -2748,9 +2748,9 @@ input.vd-tab__name:focus {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 34px;
+  min-width: 32px;
   height: 34px;
-  padding: 0 8px;
+  padding: 0 6px;
   border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
@@ -3186,6 +3186,10 @@ input.vd-tab__name:focus {
 }
 
 .vd-writer__outline-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
   padding: 0 6px 8px;
   color: var(--vd-muted);
   font-size: 11px;
@@ -3286,7 +3290,8 @@ input.vd-tab__name:focus {
   text-transform: uppercase;
 }
 
-.vd-writer__comments-head button {
+.vd-writer__comments-head button,
+.vd-writer__outline-head button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3300,7 +3305,8 @@ input.vd-tab__name:focus {
   cursor: pointer;
 }
 
-.vd-writer__comments-head button:hover {
+.vd-writer__comments-head button:hover,
+.vd-writer__outline-head button:hover {
   background: var(--vd-panel-alt);
   border-color: var(--vd-border);
 }

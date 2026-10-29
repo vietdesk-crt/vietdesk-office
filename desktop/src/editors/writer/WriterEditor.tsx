@@ -3061,7 +3061,17 @@ export function WriterEditor({
             className="vd-writer__outline"
             aria-label="Điều hướng cấu trúc tài liệu"
           >
-            <div className="vd-writer__outline-head">Cấu trúc tài liệu</div>
+            <div className="vd-writer__outline-head">
+              <span>Cấu trúc tài liệu</span>
+              <button
+                type="button"
+                aria-label="Đóng cấu trúc tài liệu"
+                title="Đóng"
+                onClick={() => setOutlineOpen(false)}
+              >
+                <X size={14} aria-hidden="true" />
+              </button>
+            </div>
             {outline.length === 0 ? (
               <p className="vd-writer__outline-empty">
                 Chưa có tiêu đề nào. Dùng hộp “Kiểu đoạn” để tạo tiêu đề.
