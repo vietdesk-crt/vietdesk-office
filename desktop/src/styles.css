@@ -1636,6 +1636,7 @@ input.vd-tab__name:focus {
   color: var(--vd-muted, #64748b);
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   margin: 0;
@@ -2454,6 +2455,7 @@ input.vd-tab__name:focus {
   color: var(--vd-muted, #64748b);
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -4075,6 +4077,7 @@ input.vd-tab__name:focus {
   cursor: pointer;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -7229,6 +7232,7 @@ body.vd-writer__image-resizing {
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 4;
+  line-clamp: 4;
   -webkit-box-orient: vertical;
 }
 
