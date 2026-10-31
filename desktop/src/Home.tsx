@@ -7,7 +7,14 @@ import type { AppId } from "./apps";
 import type { Draft } from "./drafts";
 import { formatFileSize, formatRelativeTime } from "./format";
 import { HOME_TEMPLATES } from "./templates";
-import { List, LayoutGrid, Search, FileUp } from "lucide-react";
+import { List, LayoutGrid, Search, FileUp, Trash2, X } from "lucide-react";
+
+interface DeleteConfirmTarget {
+  type: "recent" | "draft" | "clear-all";
+  name: string;
+  detail: string;
+  onConfirm: () => void;
+}
 
 export interface HomeProps {
   recents: RecentEntry[];
@@ -44,6 +51,7 @@ export function Home({
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<RecentFilter>("all");
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
+  const [confirmDelete, setConfirmDelete] = useState<DeleteConfirmTarget | null>(null);
   const normalizedQuery = normalizeForSearch(query);
 
   const filtered = useMemo(() => {
@@ -216,7 +224,15 @@ export function Home({
                       className="vd-icon"
                       title="Xoá bản nháp"
                       aria-label={`Xoá bản nháp ${draft.name}`}
-                      onClick={() => onDiscardDraft?.(draft)}
+                      onClick={() =>
+                        setConfirmDelete({
+                          type: "draft",
+                          name: draft.name,
+                          detail:
+                            "Bản nháp này chưa được lưu chính thức. Khi xoá, nội dung tạm thời này sẽ bị mất hoàn toàn và không thể khôi phục lại được.",
+                          onConfirm: () => onDiscardDraft?.(draft),
+                        })
+                      }
                     >
                       ×
                     </button>
@@ -470,7 +486,16 @@ export function Home({
                               type="button"
                               className="vd-icon"
                               title="Xoá khỏi danh sách (không xoá tệp)"
-                              onClick={() => onRemove(entry)}
+                              aria-label={`Xoá ${entry.name} khỏi danh sách gần đây`}
+                              onClick={() =>
+                                setConfirmDelete({
+                                  type: "recent",
+                                  name: entry.name,
+                                  detail:
+                                    "Tệp này sẽ được xoá khỏi danh sách tài liệu mở gần đây. Tệp gốc trên đĩa máy tính của bạn vẫn được giữ nguyên an toàn.",
+                                  onConfirm: () => onRemove(entry),
+                                })
+                              }
                             >
                               ×
                             </button>
@@ -536,7 +561,16 @@ export function Home({
                         type="button"
                         className="vd-icon"
                         title="Xoá khỏi danh sách (không xoá tệp)"
-                        onClick={() => onRemove(entry)}
+                        aria-label={`Xoá ${entry.name} khỏi danh sách gần đây`}
+                        onClick={() =>
+                          setConfirmDelete({
+                            type: "recent",
+                            name: entry.name,
+                            detail:
+                              "Tệp này sẽ được xoá khỏi danh sách tài liệu mở gần đây. Tệp gốc trên đĩa máy tính của bạn vẫn được giữ nguyên an toàn.",
+                            onConfirm: () => onRemove(entry),
+                          })
+                        }
                       >
                         ×
                       </button>
@@ -553,7 +587,19 @@ export function Home({
                 <span className="vd-recents__hint-dot" aria-hidden="true" />
                 Lưu trữ an toàn trên máy bạn · Chuẩn bảo mật nội bộ
               </span>
-              <button type="button" className="vd-link vd-recents__clear-btn" onClick={onClearAll}>
+              <button
+                type="button"
+                className="vd-link vd-recents__clear-btn"
+                onClick={() =>
+                  setConfirmDelete({
+                    type: "clear-all",
+                    name: "toàn bộ lịch sử gần đây",
+                    detail:
+                      "Hành động này sẽ dọn sạch toàn bộ danh sách tài liệu đã mở gần đây. Các tệp gốc trên đĩa máy tính vẫn được giữ nguyên không bị thay đổi.",
+                    onConfirm: () => onClearAll(),
+                  })
+                }
+              >
                 Xoá lịch sử gần đây
               </button>
             </div>
@@ -700,6 +746,75 @@ export function Home({
           </div>
         </div>
       </div>
+
+      {confirmDelete ? (
+        <div
+          className="vd-confirm-modal__backdrop"
+          role="presentation"
+          onClick={() => setConfirmDelete(null)}
+        >
+          <div
+            className="vd-confirm-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="vd-confirm-modal-title"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") setConfirmDelete(null);
+            }}
+          >
+            <div className="vd-confirm-modal__header">
+              <div className="vd-confirm-modal__icon-wrap" aria-hidden="true">
+                <Trash2 size={22} className="vd-confirm-modal__icon" />
+              </div>
+              <div className="vd-confirm-modal__title-box">
+                <h3 id="vd-confirm-modal-title" className="vd-confirm-modal__title">
+                  {confirmDelete.type === "draft"
+                    ? "Xác nhận xoá bản nháp"
+                    : confirmDelete.type === "clear-all"
+                      ? "Xác nhận xoá toàn bộ lịch sử"
+                      : "Xác nhận xoá tệp gần đây"}
+                </h3>
+                <span className="vd-confirm-modal__target-name" title={confirmDelete.name}>
+                  {confirmDelete.name}
+                </span>
+              </div>
+              <button
+                type="button"
+                className="vd-confirm-modal__close-btn"
+                onClick={() => setConfirmDelete(null)}
+                aria-label="Đóng hộp thoại"
+              >
+                <X size={18} aria-hidden="true" />
+              </button>
+            </div>
+
+            <p className="vd-confirm-modal__detail">{confirmDelete.detail}</p>
+
+            <div className="vd-confirm-modal__actions">
+              <button
+                type="button"
+                className="vd-confirm-modal__btn vd-confirm-modal__btn--cancel"
+                onClick={() => setConfirmDelete(null)}
+                autoFocus
+              >
+                Huỷ bỏ
+              </button>
+              <button
+                type="button"
+                className="vd-confirm-modal__btn vd-confirm-modal__btn--danger"
+                onClick={() => {
+                  const action = confirmDelete.onConfirm;
+                  setConfirmDelete(null);
+                  action();
+                }}
+              >
+                Xác nhận xoá
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

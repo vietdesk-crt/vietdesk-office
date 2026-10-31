@@ -179,7 +179,6 @@ export function App() {
   const [docs, setDocs] = useState<Record<AppId, DocState>>(emptyDocs);
   /** Các ứng dụng đã mở trong phiên — vẽ thành tab kiểu web trên đầu trình soạn. */
   const [openTabs, setOpenTabs] = useState<AppId[]>([]);
-  const [plusOpen, setPlusOpen] = useState(false);
 
   const [recents, setRecents] = useState<RecentEntry[]>([]);
   const [recentsLoading, setRecentsLoading] = useState(true);
@@ -463,9 +462,13 @@ export function App() {
     [applyDocument, notify],
   );
 
-  const discardDraft = useCallback((draft: Draft) => {
-    setDrafts(removeDraft(draft.id));
-  }, []);
+  const discardDraft = useCallback(
+    (draft: Draft) => {
+      setDrafts(removeDraft(draft.id));
+      notify(`Đã xoá bản nháp “${draft.name}”.`);
+    },
+    [notify],
+  );
 
   const createDocument = useCallback(
     (kind: AppId, initialContent?: unknown, customName?: string) => {
@@ -905,16 +908,15 @@ export function App() {
   const removeRecent = useCallback(
     (entry: RecentEntry) => {
       updateRecents(forgetFile(entry.id));
+      notify(`Đã xoá “${entry.name}” khỏi danh sách gần đây.`);
     },
-    [updateRecents],
+    [notify, updateRecents],
   );
 
   const clearRecents = useCallback(() => {
-    if (!window.confirm("Xoá toàn bộ lịch sử gần đây? Tệp trên đĩa không bị ảnh hưởng.")) {
-      return;
-    }
     updateRecents(clearRecentFiles());
-  }, [updateRecents]);
+    notify("Đã xoá toàn bộ lịch sử tệp gần đây.");
+  }, [notify, updateRecents]);
 
   const runTool = useCallback(
     async (action: ToolAction) => {
@@ -945,20 +947,6 @@ export function App() {
       setView("home");
     }
   };
-
-  /** Đóng menu "+" khi bấm ra ngoài. */
-  useEffect(() => {
-    if (!plusOpen) {
-      return;
-    }
-    const close = (event: MouseEvent) => {
-      if (!(event.target as HTMLElement | null)?.closest(".vd-plus")) {
-        setPlusOpen(false);
-      }
-    };
-    window.addEventListener("mousedown", close);
-    return () => window.removeEventListener("mousedown", close);
-  }, [plusOpen]);
 
   /** Đóng menu công cụ tiếng Việt khi bấm ra ngoài. */
   useEffect(() => {
@@ -1115,55 +1103,6 @@ export function App() {
         </button>
 
         {tabsBar}
-
-        <div className="vd-plus">
-          <button
-            type="button"
-            className={`vd-plus__btn${plusOpen ? " is-open" : ""}`}
-            onClick={() => setPlusOpen((open) => !open)}
-            aria-haspopup="menu"
-            aria-expanded={plusOpen}
-            title="Tạo mới hoặc mở tệp"
-          >
-            +
-          </button>
-          {plusOpen ? (
-            <div className="vd-plus__menu" role="menu">
-              {APP_IDS.map((kind) => (
-                <button
-                  type="button"
-                  key={kind}
-                  role="menuitem"
-                  className="vd-plus__item"
-                  onClick={() => {
-                    setPlusOpen(false);
-                    createDocument(kind);
-                  }}
-                >
-                  <span className={`vd-tab__badge is-${kind}`} aria-hidden="true">
-                    {APPS[kind].glyph}
-                  </span>
-                  <span>{APPS[kind].label}</span>
-                </button>
-              ))}
-              <div className="vd-plus__divider" role="separator" />
-              <button
-                type="button"
-                role="menuitem"
-                className="vd-plus__item"
-                onClick={() => {
-                  setPlusOpen(false);
-                  void openFile();
-                }}
-              >
-                <span className="vd-plus__item-glyph" aria-hidden="true">
-                  ▤
-                </span>
-                <span>Mở tệp…</span>
-              </button>
-            </div>
-          ) : null}
-        </div>
 
         {activeApp ? (
           <div className="vd-app__tellme-search" role="search" title="Tìm kiếm lệnh, tính năng hoặc trợ giúp (Alt+Q)">
