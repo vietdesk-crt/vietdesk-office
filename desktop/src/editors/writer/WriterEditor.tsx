@@ -507,6 +507,7 @@ export function WriterEditor({
   const painterMarksRef = useRef<readonly Mark[] | null>(null);
   /** Đo lại phân trang sau mỗi thay đổi — hàm được gọi từ effect cũ. */
   const measureRef = useRef<(() => void) | null>(null);
+  const measureRafRef = useRef<number>(0);
   /** Cấu hình trang hiện tại — effect tạo EditorView chỉ đọc một lần nên cần ref. */
   const pageSetupRef = useRef<PageSetup>(readPageSetup(initialContent));
   /** Danh sách bình luận — effect tạo EditorView chỉ đọc một lần nên cần ref. */
@@ -744,7 +745,8 @@ export function WriterEditor({
             charactersNoSpaces: text.replace(/\s/g, "").length,
             paragraphs: countParagraphs(next.doc),
           });
-          setEmpty(text.trim() === "");
+          const isTextEmpty = text.trim() === "";
+          setEmpty((previous) => (previous !== isTextEmpty ? isTextEmpty : previous));
           onChangeRef.current?.({
             text,
             doc: {
@@ -753,7 +755,13 @@ export function WriterEditor({
               comments: commentsRef.current,
             },
           });
-          measureRef.current?.();
+          if (measureRafRef.current) {
+            cancelAnimationFrame(measureRafRef.current);
+          }
+          measureRafRef.current = requestAnimationFrame(() => {
+            measureRafRef.current = 0;
+            measureRef.current?.();
+          });
         }
         forceRender((value) => value + 1);
       },
@@ -770,6 +778,10 @@ export function WriterEditor({
     const frame = requestAnimationFrame(() => measureRef.current?.());
 
     return () => {
+      if (measureRafRef.current) {
+        cancelAnimationFrame(measureRafRef.current);
+        measureRafRef.current = 0;
+      }
       cancelAnimationFrame(frame);
       window.removeEventListener("resize", handleResize);
       view.destroy();

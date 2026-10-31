@@ -14,11 +14,17 @@ body,
   margin: 0;
 }
 
+html {
+  scroll-behavior: smooth;
+  text-rendering: optimizeLegibility;
+}
+
 body {
   font-family: var(--vd-font);
   color: var(--vd-text);
   background: var(--vd-bg);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   font-size: 14px;
 }
 
@@ -1068,6 +1074,7 @@ input.vd-tab__name:focus {
 .vd-home__hero {
   position: relative;
   overflow: hidden;
+  contain: paint;
   padding: 24px 28px 20px;
   border: 1px solid var(--vd-home-hero-border, #f3e5d8);
   border-radius: 16px;
@@ -1082,7 +1089,8 @@ input.vd-tab__name:focus {
   position: absolute;
   right: -35px;
   top: 50%;
-  transform: translateY(-50%);
+  transform: translateY(-50%) translateZ(0);
+  will-change: transform;
   width: 420px;
   height: 420px;
   background-image: url("/trong-dong.png");
@@ -1098,10 +1106,10 @@ input.vd-tab__name:focus {
 
 @keyframes vd-spin-drum {
   from {
-    transform: translateY(-50%) rotate(0deg);
+    transform: translateY(-50%) rotate(0deg) translateZ(0);
   }
   to {
-    transform: translateY(-50%) rotate(360deg);
+    transform: translateY(-50%) rotate(360deg) translateZ(0);
   }
 }
 
@@ -2663,10 +2671,11 @@ input.vd-tab__name:focus {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  contain: layout;
 }
 
 .vd-app__workspace[hidden] {
-  display: none;
+  display: none !important;
 }
 
 .vd-app__status {
@@ -3863,6 +3872,8 @@ input.vd-tab__name:focus {
   min-height: 0;
   overflow-y: auto;
   overflow-x: auto;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
   padding: 24px 20px 48px;
   background: var(--vd-bg);
   display: flex;
@@ -4834,6 +4845,8 @@ body.vd-writer__image-resizing {
 .vd-sheets__grid {
   flex: 1;
   overflow: auto;
+  overscroll-behavior: contain;
+  contain: layout;
 }
 
 .vd-sheets__grid table {
@@ -5126,6 +5139,7 @@ body.vd-writer__image-resizing {
   border-right: 1px solid var(--vd-border);
   background: var(--vd-panel);
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .vd-slides__thumb {

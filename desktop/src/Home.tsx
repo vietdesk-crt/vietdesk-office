@@ -75,7 +75,10 @@ export function Home({
     );
   }, [recents, filter, normalizedQuery]);
 
-  const pinnedCount = recents.filter((entry) => entry.pinned).length;
+  const pinnedCount = useMemo(
+    () => recents.filter((entry) => entry.pinned).length,
+    [recents],
+  );
 
   const docStats = useMemo(() => {
     const counts = { writer: 0, sheets: 0, slides: 0 };

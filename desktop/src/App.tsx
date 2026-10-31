@@ -885,16 +885,52 @@ export function App() {
     return () => {
       window.removeEventListener("beforeunload", flush);
       document.removeEventListener("visibilitychange", handleVisibility);
+      Object.values(contentDebounceRef.current).forEach((timer) => {
+        if (timer) window.clearTimeout(timer);
+      });
     };
   }, []);
 
+  const contentDebounceRef = useRef<Record<AppId, number | undefined>>({
+    writer: undefined,
+    sheets: undefined,
+    slides: undefined,
+  });
+
   const handleContentChange = useCallback((kind: AppId, content: unknown) => {
+    // Luôn cập nhật docsRef tức thì để Ctrl+S hoặc lưu nháp lập tức có dữ liệu mới nhất
+    docsRef.current = {
+      ...docsRef.current,
+      [kind]: { ...docsRef.current[kind], content, dirty: true },
+    };
+
     setDocs((previous) => {
       const doc = previous[kind];
       if (doc.content === content) {
         return previous;
       }
-      return { ...previous, [kind]: { ...doc, content, dirty: true } };
+      // Lần sửa đầu tiên: cập nhật ngay để hiện dấu "chưa lưu" trên tab và kích hoạt nút Lưu
+      if (!doc.dirty) {
+        return { ...previous, [kind]: { ...doc, content, dirty: true } };
+      }
+      // Các lần gõ phím tiếp theo: hoãn re-render App để trải nghiệm gõ phím đạt 60fps mượt mà
+      if (contentDebounceRef.current[kind]) {
+        window.clearTimeout(contentDebounceRef.current[kind]);
+      }
+      contentDebounceRef.current[kind] = window.setTimeout(() => {
+        contentDebounceRef.current[kind] = undefined;
+        setDocs((latest) => {
+          const currentDoc = docsRef.current[kind];
+          if (latest[kind].content === currentDoc.content) {
+            return latest;
+          }
+          return {
+            ...latest,
+            [kind]: { ...latest[kind], content: currentDoc.content },
+          };
+        });
+      }, 150);
+      return previous;
     });
   }, []);
 

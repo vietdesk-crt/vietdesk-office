@@ -171,14 +171,17 @@ export function SheetsEditor({
 
   useEffect(() => {
     let cancelled = false;
-    void computeSheetEngine(cells).then((next) => {
-      if (!cancelled) {
-        setComputed(next.results);
-        setRuntime(next.runtime);
-      }
-    });
+    const timer = setTimeout(() => {
+      void computeSheetEngine(cells).then((next) => {
+        if (!cancelled) {
+          setComputed(next.results);
+          setRuntime(next.runtime);
+        }
+      });
+    }, 50);
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
   }, [cells]);
 
