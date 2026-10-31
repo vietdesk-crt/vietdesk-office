@@ -1,5 +1,5 @@
 /**
- * Chuyển `.docx` (Word / Google Docs / LibreOffice) sang ProseMirror JSON.
+ * Chuyển `.docx` (chuẩn OpenXML WordprocessingML) sang ProseMirror JSON.
  *
  * Phạm vi: đoạn văn, tiêu đề, in đậm/nghiêng/gạch chân/gạch ngang, chỉ số
  * trên/dưới, màu chữ, cỡ chữ, liên kết, danh sách (gạch đầu dòng/đánh số),

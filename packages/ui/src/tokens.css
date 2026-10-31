@@ -1,144 +1,115 @@
-/* Design tokens dùng chung cho Writer / Sheets / Slides.
-   Kế thừa tư tưởng thiết kế Apple iOS / iPadOS:
-   - Vật liệu kính mờ (Frosted Glass / Vibrancy).
-   - Đường cong Squircle liên tục (Continuous curvature).
-   - Đổ bóng khuếch tán đa lớp (Multi-layer diffuse shadows).
-   - Chuyển động đàn hồi lò xo (Fluid spring physics).
-   - Màu sắc điểm nhấn mang bản sắc văn hóa Việt Nam sang trọng. */
+/* Design tokens chuẩn cho VietDesk Office Suite (Writer / Sheets / Slides).
+   Hệ thống thiết kế chuẩn bộ ứng dụng văn phòng VietDesk:
+   - Màu sắc nhận diện Office: Writer Xanh dương (#185abd), Sheets Xanh lá (#107c41), Slides Đỏ gạch (#c43e1c).
+   - Panel đặc chắc, chống lóa và hiển thị sắc nét.
+   - Bo góc và đổ bóng phân tầng theo chuẩn hiện đại. */
 
 :root {
-  --vd-bg: #f8f6f0;
-  --vd-bg-subtle: #f0ede4;
-  --vd-panel: rgba(255, 255, 255, 0.78);
-  --vd-panel-alt: rgba(246, 244, 238, 0.72);
-  --vd-panel-solid: #ffffff;
-  --vd-border: rgba(0, 0, 0, 0.07);
-  --vd-border-strong: rgba(0, 0, 0, 0.15);
-  --vd-border-glass: rgba(255, 255, 255, 0.65);
-  --vd-text: #1d1d1f;
-  --vd-muted: #6e6e73;
-  --vd-accent: #a8503f;
-  --vd-accent-hover: #b85b49;
-  --vd-accent-soft: rgba(168, 80, 63, 0.1);
-  --vd-color-writer: #185abd;
-  --vd-color-writer-hover: #124796;
-  --vd-color-writer-soft: rgba(24, 90, 189, 0.12);
-  --vd-color-sheets: #1f7a4d;
-  --vd-color-sheets-hover: #16603c;
-  --vd-color-sheets-soft: rgba(31, 122, 77, 0.12);
-  --vd-color-slides: #b5701a;
-  --vd-color-slides-hover: #965a12;
-  --vd-color-slides-soft: rgba(181, 112, 26, 0.14);
-  --vd-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
-  --vd-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.05), 0 1px 4px -1px rgba(0, 0, 0, 0.03);
-  --vd-shadow-lg: 0 12px 36px -4px rgba(0, 0, 0, 0.08), 0 4px 12px -2px rgba(0, 0, 0, 0.04);
-  --vd-shadow-pop: 0 20px 48px -8px rgba(0, 0, 0, 0.12), 0 8px 20px -4px rgba(0, 0, 0, 0.06);
-  --vd-inner-bevel: inset 0 1px 0.5px rgba(255, 255, 255, 0.8);
-  --vd-radius-xs: 6px;
-  --vd-radius-sm: 8px;
-  --vd-radius: 12px;
-  --vd-radius-md: 14px;
-  --vd-radius-lg: 18px;
-  --vd-radius-xl: 22px;
-  --vd-radius-pill: 9999px;
-  --vd-font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "SF Pro", "Inter", "Segoe UI", system-ui, sans-serif;
-  --vd-font-serif: "Noto Serif", "Times New Roman", Times, serif;
-  --vd-mono: "SF Mono", "JetBrains Mono", "Cascadia Code", ui-monospace, "SFMono-Regular", monospace;
-  --vd-spring: cubic-bezier(0.32, 0.72, 0, 1);
-  --vd-spring-bounce: cubic-bezier(0.34, 1.4, 0.64, 1);
-  --vd-glass-blur: blur(24px) saturate(190%);
-}
+  /* COLOR SYSTEM (Designe_ag.md) */
+  --vd-primary: #1a56db;
+  --vd-primary-hover: #1e429f;
+  --vd-primary-soft: rgba(26, 86, 219, 0.1);
+  --vd-secondary: #059669;
+  --vd-secondary-hover: #047857;
+  --vd-secondary-soft: rgba(5, 150, 105, 0.1);
+  --vd-accent: #dc2626;
+  --vd-accent-hover: #b91c1c;
+  --vd-accent-soft: rgba(220, 38, 38, 0.1);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --vd-bg: #000000;
-    --vd-bg-subtle: #121214;
-    --vd-panel: rgba(28, 28, 30, 0.78);
-    --vd-panel-alt: rgba(38, 38, 42, 0.72);
-    --vd-panel-solid: #1c1c1e;
-    --vd-border: rgba(255, 255, 255, 0.1);
-    --vd-border-strong: rgba(255, 255, 255, 0.2);
-    --vd-border-glass: rgba(255, 255, 255, 0.12);
-    --vd-text: #f5f5f7;
-    --vd-muted: #86868b;
-    --vd-accent: #e0505f;
-    --vd-accent-hover: #e86371;
-    --vd-accent-soft: rgba(224, 80, 95, 0.18);
-    --vd-color-writer: #2b7fff;
-    --vd-color-writer-hover: #4893ff;
-    --vd-color-writer-soft: rgba(43, 127, 255, 0.18);
-    --vd-color-sheets: #289e64;
-    --vd-color-sheets-hover: #32b574;
-    --vd-color-sheets-soft: rgba(40, 158, 100, 0.18);
-    --vd-color-slides: #d48722;
-    --vd-color-slides-hover: #e09736;
-    --vd-color-slides-soft: rgba(212, 135, 34, 0.18);
-    --vd-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
-    --vd-shadow: 0 4px 18px -2px rgba(0, 0, 0, 0.45), 0 2px 6px -1px rgba(0, 0, 0, 0.3);
-    --vd-shadow-lg: 0 16px 40px -4px rgba(0, 0, 0, 0.6), 0 6px 16px -2px rgba(0, 0, 0, 0.4);
-    --vd-shadow-pop: 0 24px 54px -8px rgba(0, 0, 0, 0.7), 0 10px 24px -4px rgba(0, 0, 0, 0.5);
-    --vd-inner-bevel: inset 0 1px 0.5px rgba(255, 255, 255, 0.15);
-  }
+  --vd-bg: #f8fafc;
+  --vd-bg-subtle: #f1f5f9;
+  --vd-panel: #ffffff;
+  --vd-panel-alt: #f8fafc;
+  --vd-panel-solid: #ffffff;
+  --vd-panel-bg: #f8fafc;
+  --vd-surface: #ffffff;
+  --vd-border: #e2e8f0;
+  --vd-border-strong: #cbd5e1;
+  --vd-border-glass: rgba(0, 0, 0, 0.06);
+
+  --vd-text: #1e293b;
+  --vd-muted: #64748b;
+  --vd-text-muted: #64748b;
+  --vd-hover: rgba(0, 0, 0, 0.04);
+  --vd-card-accent: #1a56db;
+
+  /* Màu nhận diện bộ 3 ứng dụng */
+  --vd-color-writer: #1a56db;
+  --vd-color-writer-hover: #1e429f;
+  --vd-color-writer-soft: rgba(26, 86, 219, 0.12);
+
+  --vd-color-sheets: #059669;
+  --vd-color-sheets-hover: #047857;
+  --vd-color-sheets-soft: rgba(5, 150, 105, 0.12);
+
+  --vd-color-slides: #dc2626;
+  --vd-color-slides-hover: #b91c1c;
+  --vd-color-slides-soft: rgba(220, 38, 38, 0.12);
+
+  /* Đổ bóng & Bo góc */
+  --vd-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --vd-shadow: 0 4px 12px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.03);
+  --vd-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04);
+  --vd-shadow-pop: 0 16px 36px rgba(0, 0, 0, 0.1), 0 4px 12px rgba(0, 0, 0, 0.05);
+  --vd-inner-bevel: inset 0 1px 0.5px rgba(255, 255, 255, 0.8);
+
+  --vd-radius-xs: 4px;
+  --vd-radius-sm: 6px;
+  --vd-radius: 8px;
+  --vd-radius-md: 10px;
+  --vd-radius-lg: 14px;
+  --vd-radius-xl: 18px;
+  --vd-radius-pill: 9999px;
+
+  /* TYPOGRAPHY (Designe_ag.md: Inter, Headings 24-32px, Body 14-16px) */
+  --vd-font: "Inter", system-ui, "Segoe UI", Roboto, sans-serif;
+  --vd-font-serif: "Times New Roman", "Noto Serif", Times, serif;
+  --vd-serif: "Times New Roman", "Noto Serif", Times, serif;
+  --vd-mono: "Cascadia Code", "SF Mono", "Consolas", "Courier New", monospace;
+  --vd-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --vd-spring-bounce: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --vd-glass-blur: blur(16px);
 }
 
 [data-theme="light"] {
   color-scheme: light;
-  --vd-bg: #f8f6f0;
-  --vd-bg-subtle: #f0ede4;
-  --vd-panel: rgba(255, 255, 255, 0.78);
-  --vd-panel-alt: rgba(246, 244, 238, 0.72);
+  --vd-bg: #f8fafc;
+  --vd-bg-subtle: #f1f5f9;
+  --vd-panel: #ffffff;
+  --vd-panel-alt: #f8fafc;
   --vd-panel-solid: #ffffff;
-  --vd-border: rgba(0, 0, 0, 0.07);
-  --vd-border-strong: rgba(0, 0, 0, 0.15);
-  --vd-border-glass: rgba(255, 255, 255, 0.65);
-  --vd-text: #1d1d1f;
-  --vd-muted: #6e6e73;
-  --vd-accent: #a8503f;
-  --vd-accent-hover: #b85b49;
-  --vd-accent-soft: rgba(168, 80, 63, 0.1);
-  --vd-color-writer: #185abd;
-  --vd-color-writer-hover: #124796;
-  --vd-color-writer-soft: rgba(24, 90, 189, 0.12);
-  --vd-color-sheets: #1f7a4d;
-  --vd-color-sheets-hover: #16603c;
-  --vd-color-sheets-soft: rgba(31, 122, 77, 0.12);
-  --vd-color-slides: #b5701a;
-  --vd-color-slides-hover: #965a12;
-  --vd-color-slides-soft: rgba(181, 112, 26, 0.14);
-  --vd-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
-  --vd-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.05), 0 1px 4px -1px rgba(0, 0, 0, 0.03);
-  --vd-shadow-lg: 0 12px 36px -4px rgba(0, 0, 0, 0.08), 0 4px 12px -2px rgba(0, 0, 0, 0.04);
-  --vd-shadow-pop: 0 20px 48px -8px rgba(0, 0, 0, 0.12), 0 8px 20px -4px rgba(0, 0, 0, 0.06);
+  --vd-panel-bg: #f8fafc;
+  --vd-surface: #ffffff;
+  --vd-border: #e2e8f0;
+  --vd-border-strong: #cbd5e1;
+  --vd-border-glass: rgba(0, 0, 0, 0.06);
+  --vd-text: #1e293b;
+  --vd-muted: #64748b;
+  --vd-text-muted: #64748b;
+  --vd-hover: rgba(0, 0, 0, 0.04);
+  --vd-accent: #dc2626;
+  --vd-accent-hover: #b91c1c;
+  --vd-accent-soft: rgba(220, 38, 38, 0.1);
+  --vd-primary: #1a56db;
+  --vd-card-accent: #1a56db;
+
+  --vd-color-writer: #1a56db;
+  --vd-color-writer-hover: #1e429f;
+  --vd-color-writer-soft: rgba(26, 86, 219, 0.12);
+
+  --vd-color-sheets: #059669;
+  --vd-color-sheets-hover: #047857;
+  --vd-color-sheets-soft: rgba(5, 150, 105, 0.12);
+
+  --vd-color-slides: #dc2626;
+  --vd-color-slides-hover: #b91c1c;
+  --vd-color-slides-soft: rgba(220, 38, 38, 0.12);
+
+  --vd-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --vd-shadow: 0 4px 12px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.03);
+  --vd-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04);
+  --vd-shadow-pop: 0 16px 36px rgba(0, 0, 0, 0.1), 0 4px 12px rgba(0, 0, 0, 0.05);
   --vd-inner-bevel: inset 0 1px 0.5px rgba(255, 255, 255, 0.8);
 }
 
-[data-theme="dark"] {
-  color-scheme: dark;
-  --vd-bg: #000000;
-  --vd-bg-subtle: #121214;
-  --vd-panel: rgba(28, 28, 30, 0.78);
-  --vd-panel-alt: rgba(38, 38, 42, 0.72);
-  --vd-panel-solid: #1c1c1e;
-  --vd-border: rgba(255, 255, 255, 0.1);
-  --vd-border-strong: rgba(255, 255, 255, 0.2);
-  --vd-border-glass: rgba(255, 255, 255, 0.12);
-  --vd-text: #f5f5f7;
-  --vd-muted: #86868b;
-  --vd-accent: #e0505f;
-  --vd-accent-hover: #e86371;
-  --vd-accent-soft: rgba(224, 80, 95, 0.18);
-  --vd-color-writer: #2b7fff;
-  --vd-color-writer-hover: #4893ff;
-  --vd-color-writer-soft: rgba(43, 127, 255, 0.18);
-  --vd-color-sheets: #289e64;
-  --vd-color-sheets-hover: #32b574;
-  --vd-color-sheets-soft: rgba(40, 158, 100, 0.18);
-  --vd-color-slides: #d48722;
-  --vd-color-slides-hover: #e09736;
-  --vd-color-slides-soft: rgba(212, 135, 34, 0.18);
-  --vd-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
-  --vd-shadow: 0 4px 18px -2px rgba(0, 0, 0, 0.45), 0 2px 6px -1px rgba(0, 0, 0, 0.3);
-  --vd-shadow-lg: 0 16px 40px -4px rgba(0, 0, 0, 0.6), 0 6px 16px -2px rgba(0, 0, 0, 0.4);
-  --vd-shadow-pop: 0 24px 54px -8px rgba(0, 0, 0, 0.7), 0 10px 24px -4px rgba(0, 0, 0, 0.5);
-  --vd-inner-bevel: inset 0 1px 0.5px rgba(255, 255, 255, 0.15);
-}
+

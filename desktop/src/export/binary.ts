@@ -2,7 +2,7 @@
  * Tiện ích nhị phân dùng chung cho xuất DOCX/PDF.
  *
  * DOCX là một tệp ZIP; chúng ta không cần nén — ZIP cho phép lưu các mục ở
- * chế độ "stored" (không nén) và mọi bộ đọc (Word, Google Docs) đều chấp
+ * chế độ "stored" (không nén) và mọi bộ đọc đều chấp
  * nhận. Nên viết riêng bộ tạo ZIP tối thiểu này thay vì thêm thư viện.
  */
 

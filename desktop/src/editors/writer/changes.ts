@@ -1,5 +1,5 @@
 /**
- * Theo dõi thay đổi (track changes) — giống Google Docs và Word.
+ * Theo dõi thay đổi (track changes) chuẩn văn phòng.
  *
  * Khi bật chế độ này, mọi thao tác ghi vào tài liệu không sửa thẳng nội dung
  * mà được ghi lại thành “đề xuất thay đổi”:
@@ -212,7 +212,7 @@ export function toggleTrackChanges(
  * Liệt kê các thay đổi đang chờ trong tài liệu.
  *
  * Các đoạn chữ liền nhau cùng loại thay đổi được gộp lại thành một thay đổi,
- * đúng như cách Word và Google Docs hiển thị.
+ * theo đúng quy ước văn phòng.
  */
 export function collectChanges(doc: PMNode): ChangeRange[] {
   const changes: ChangeRange[] = [];

@@ -1,8 +1,8 @@
 /**
  * Xuất tài liệu Writer sang `.docx` (WordprocessingML).
  *
- * Điểm mấu chót: người dùng nhận được tệp mở trực tiếp được trong MS Word và
- * Google Docs. Tệp là một ZIP gồm vài phần XML tối thiểu; chúng ta không nén
+ * Điểm mấu chót: người dùng nhận được tệp mở trực tiếp được trong các bộ
+ * ứng dụng văn phòng chuẩn OpenXML. Tệp là một ZIP gồm vài phần XML tối thiểu; chúng ta không nén
  * (chế độ "stored" của ZIP) nên không cần thêm thư viện nén.
  *
  * Giữ được: đoạn văn, tiêu đề (định dạng trực tiếp), in đậm/nghiêng/gạch dưới/

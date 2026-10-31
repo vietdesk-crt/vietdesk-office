@@ -45,6 +45,10 @@ export interface PageSetup {
   showPageNumbers: boolean;
   /** Lề trang (mm) — người dùng có thể kéo trên thước kẻ. */
   margins: PageMargins;
+  /** Hướng trang: đứng (portrait) hoặc ngang (landscape). */
+  orientation?: "portrait" | "landscape";
+  /** Khổ giấy: a4 (210x297), letter (215.9x279.4), legal (215.9x355.6). */
+  paperSize?: "a4" | "letter" | "legal";
 }
 
 export const DEFAULT_PAGE_SETUP: PageSetup = {
@@ -121,12 +125,23 @@ export function normalizePageSetup(value: unknown): PageSetup {
     typeof value.footer === "string"
       ? value.footer.slice(0, MAX_SETUP_TEXT)
       : "";
-  return {
+  const setup: PageSetup = {
     header,
     footer,
     showPageNumbers: value.showPageNumbers !== false,
     margins: normalizePageMargins(value.margins),
   };
+  if (value.orientation === "landscape" || value.orientation === "portrait") {
+    setup.orientation = value.orientation;
+  }
+  if (
+    value.paperSize === "letter" ||
+    value.paperSize === "legal" ||
+    value.paperSize === "a4"
+  ) {
+    setup.paperSize = value.paperSize;
+  }
+  return setup;
 }
 
 /** Lấy cấu hình trang ra khỏi nội dung tài liệu Writer. */

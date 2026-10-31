@@ -100,7 +100,7 @@ fn safe_file_name(file_name: &str) -> String {
         }
     }
 
-    // Tên tệp không được bắt đầu bằng dấu chấm (ẩn trên Windows/macOS).
+    // Tên tệp không được bắt đầu bằng dấu chấm (tệp ẩn).
     let cleaned = cleaned.trim_start_matches('.').to_string();
     if cleaned.is_empty() {
         return "anh".to_string();

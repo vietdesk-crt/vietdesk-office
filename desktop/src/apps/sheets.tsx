@@ -14,7 +14,7 @@ export const sheetsApp: AppDescriptor = {
   home: {
     title: "Bảng tính",
     description: "Bảng lương, dự toán, công thức và số tiền VND.",
-    formats: "Lưu .vdx · XLSX đang phát triển",
+    formats: "Lưu .xlsx / .vdx / .csv",
   },
   createDefaultContent: () => normalizeSheetsContent(undefined),
   normalizeContent: normalizeSheetsContent,
@@ -22,6 +22,10 @@ export const sheetsApp: AppDescriptor = {
     <SheetsEditor
       initialCells={readCells(document.content)}
       initialStyles={readStyles(document.content)}
+      title={document.name}
+      documentPath={document.path}
+      saveStatus={document.saveStatus}
+      dirty={document.dirty}
       onChange={onChange}
     />
   ),

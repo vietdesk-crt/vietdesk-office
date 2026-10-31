@@ -48,32 +48,55 @@ export async function pickDocument(): Promise<string | null> {
 
 /**
  * Hộp thoại “Lưu thành…”. Chỉ trả đường dẫn, không tự ghi tệp.
- * Mặc định đề nghị định dạng Word (.docx) để tệp mở được trong MS Word và
- * Google Docs; vẫn cho phép chọn .vdx (định dạng gốc đầy đủ của VietDesk).
+ * Đề nghị định dạng mở OpenXML chuẩn văn phòng:
+ * - Writer: Tài liệu văn bản (.docx)
+ * - Sheets: Bảng tính (.xlsx) / CSV (.csv)
+ * - Slides: Bản trình chiếu (.pptx)
+ * Vẫn cho phép chọn .vdx (định dạng mở của VietDesk).
  * Trả null khi huỷ hoặc khi chạy ngoài Tauri (UI chuyển sang tải tệp).
  */
 export async function pickSavePath(
   defaultName: string,
+  kind?: "writer" | "sheets" | "slides",
 ): Promise<string | null> {
   if (!hasNativeCore()) {
     return null;
   }
-  const base = defaultName.replace(/\.(vdx|docx?|odt|odp|xlsx)$/i, "");
+  const base = defaultName.replace(/\.(vdx|docx?|odt|odp|xlsx|csv|pptx|ppt)$/i, "");
+
+  let defaultExt = "docx";
+  let filters = [
+    { name: "Word (.docx)", extensions: ["docx"] },
+    { name: "Tài liệu VietDesk (.vdx)", extensions: ["vdx"] },
+  ];
+
+  if (kind === "sheets" || /\.(xlsx|xls|csv)$/i.test(defaultName)) {
+    defaultExt = "xlsx";
+    filters = [
+      { name: "Excel (.xlsx)", extensions: ["xlsx"] },
+      { name: "Bảng tính CSV (.csv)", extensions: ["csv"] },
+      { name: "Tài liệu VietDesk (.vdx)", extensions: ["vdx"] },
+    ];
+  } else if (kind === "slides" || /\.(pptx|ppt|odp)$/i.test(defaultName)) {
+    defaultExt = "pptx";
+    filters = [
+      { name: "PowerPoint (.pptx)", extensions: ["pptx"] },
+      { name: "Tài liệu VietDesk (.vdx)", extensions: ["vdx"] },
+    ];
+  }
+
   const selected = await save({
     title: "Lưu tài liệu",
-    defaultPath: `${base}.docx`,
-    filters: [
-      { name: "Word (.docx)", extensions: ["docx"] },
-      { name: "Tài liệu VietDesk (.vdx)", extensions: ["vdx"] },
-    ],
+    defaultPath: `${base}.${defaultExt}`,
+    filters,
   });
   if (typeof selected !== "string") {
     return null;
   }
-  if (/\.(vdx|docx|doc)$/i.test(selected)) {
+  if (/\.(vdx|docx|doc|xlsx|xls|csv|pptx|ppt)$/i.test(selected)) {
     return selected;
   }
-  return `${selected}.docx`;
+  return `${selected}.${defaultExt}`;
 }
 
 /**

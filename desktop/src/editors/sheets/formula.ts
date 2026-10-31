@@ -863,3 +863,99 @@ export function shuntingYard(rawFormula: string): RPNToken[] {
 
   return output;
 }
+
+/**
+ * Lớp Đồ thị Phụ thuộc (Dependency DAG) cho bảng tính:
+ * Quản lý quan hệ precedents, dependents, phát hiện chu trình (Cycle Detection),
+ * và tính toán thứ tự Topo (Topological Sort).
+ */
+export class DependencyDAG {
+  private precedents = new Map<string, Set<string>>();
+  private dependents = new Map<string, Set<string>>();
+
+  constructor(cells?: CellMap) {
+    if (cells) {
+      this.rebuild(cells);
+    }
+  }
+
+  rebuild(cells: CellMap): void {
+    const dag = buildDependencyDAG(cells);
+    this.precedents = dag.precedents;
+    this.dependents = dag.dependents;
+  }
+
+  getPrecedents(id: string): string[] {
+    return Array.from(this.precedents.get(id) ?? []);
+  }
+
+  getDependents(id: string): string[] {
+    return Array.from(this.dependents.get(id) ?? []);
+  }
+
+  /**
+   * Lấy danh sách toàn bộ các ô bị ảnh hưởng khi một tập ô thay đổi (Dirty Transitive Closure).
+   */
+  getAffectedCells(changedIds: string[]): string[] {
+    const affected = new Set<string>();
+    const queue = [...changedIds];
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      const deps = this.dependents.get(current);
+      if (deps) {
+        for (const dep of deps) {
+          if (!affected.has(dep)) {
+            affected.add(dep);
+            queue.push(dep);
+          }
+        }
+      }
+    }
+    return Array.from(affected);
+  }
+
+  topologicalOrder(cells: CellMap): { order: string[]; circularCells: Set<string> } {
+    return topologicalSort(cells);
+  }
+}
+
+/**
+ * Lớp Bộ giải cú pháp & Ký pháp Ba Lan Ngược Shunting-Yard (RPN Engine).
+ */
+export class ShuntingYardEngine {
+  tokenize(formula: string): Token[] {
+    const trimmed = formula.trim();
+    const source = trimmed.startsWith("=") ? trimmed.slice(1) : trimmed;
+    return tokenize(source);
+  }
+
+  toRPN(formula: string): RPNToken[] {
+    return shuntingYard(formula);
+  }
+}
+
+/**
+ * Lớp Động cơ Tính toán Công thức Bảng tính (OOP Formula Engine).
+ */
+export class FormulaEngine {
+  private readonly dag: DependencyDAG;
+  private readonly engine: SheetEngine;
+
+  constructor(private readonly cells: CellMap) {
+    this.dag = new DependencyDAG(cells);
+    this.engine = new SheetEngine(cells);
+  }
+
+  evaluate(id: string): CellResult {
+    return this.engine.result(id);
+  }
+
+  evaluateAll(): Record<string, CellResult> {
+    return computeSheet(this.cells);
+  }
+
+  getDAG(): DependencyDAG {
+    return this.dag;
+  }
+}
+

@@ -1,14 +1,13 @@
 import { kindFromFileName } from "@vietdesk/ipc-contract";
 import type { RecentEntry } from "@vietdesk/ipc-contract";
 import { normalizeForSearch } from "@vietdesk/vietnamese";
-import { useMemo, useRef, useState } from "react";
-import { APPS, APP_IDS, HOME_CARDS, appDisplay } from "./apps";
+import { useMemo, useState } from "react";
+import { APPS, HOME_CARDS, appDisplay } from "./apps";
 import type { AppId } from "./apps";
 import type { Draft } from "./drafts";
 import { formatFileSize, formatRelativeTime } from "./format";
-import { VietDeskLogo } from "./Logo";
-import { useWeather } from "./weather";
 import { HOME_TEMPLATES } from "./templates";
+import { List, LayoutGrid, Search, FileUp } from "lucide-react";
 
 export interface HomeProps {
   recents: RecentEntry[];
@@ -26,26 +25,12 @@ export interface HomeProps {
   onDiscardDraft?: (draft: Draft) => void;
 }
 
-const WEEKDAY_FMT = new Intl.DateTimeFormat("vi-VN", { weekday: "long" });
-const DATE_FMT = new Intl.DateTimeFormat("vi-VN", {
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-});
-
-/**
- * Trang chủ dùng chung cho toàn bộ ứng dụng VietDesk Office.
- *
- * Chỉ trình bày + lọc cục bộ; mọi thao tác đi qua callback để App quyết định
- * điều hướng và ghi lịch sử.
- */
 type RecentFilter = "all" | "pinned" | "writer" | "sheets" | "slides";
 
 export function Home({
   recents,
   loading,
   error,
-  theme = "light",
   drafts = [],
   onCreate,
   onOpenRecent,
@@ -58,8 +43,8 @@ export function Home({
 }: HomeProps) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<RecentFilter>("all");
+  const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const normalizedQuery = normalizeForSearch(query);
-  const weather = useWeather();
 
   const filtered = useMemo(() => {
     let list = recents;
@@ -97,520 +82,623 @@ export function Home({
   }, [recents]);
 
   const [templateFilter, setTemplateFilter] = useState<"all" | "writer" | "sheets" | "slides">("all");
-  const carouselRef = useRef<HTMLDivElement>(null);
 
   const filteredTemplates = useMemo(() => {
     if (templateFilter === "all") return HOME_TEMPLATES;
     return HOME_TEMPLATES.filter((tpl) => tpl.appId === templateFilter);
   }, [templateFilter]);
 
-  const scrollTemplates = (direction: "left" | "right") => {
-    if (carouselRef.current) {
-      const offset = direction === "left" ? -380 : 380;
-      carouselRef.current.scrollBy({ left: offset, behavior: "smooth" });
-    }
-  };
-
   return (
     <div className="vd-home">
-      {/* Phông nền không gian làm việc tinh gọn (Architectural Canvas Backdrop) */}
       <div className="vd-home__backdrop" aria-hidden="true" />
       <div className="vd-home__inner">
-      <header className="vd-home__hero">
-        <div className="vd-home__brand-header">
-          <div className="vd-home__brand-badge">
-            <VietDeskLogo size={28} theme={theme} aria-hidden="true" />
-            <div className="vd-home__brand-meta">
-              <div className="vd-home__brand-row">
-                <span className="vd-home__eyebrow">VietDesk Office</span>
-                <span className="vd-home__enterprise-tag">Enterprise Edition</span>
+        {/* HERO SECTION - Thiết kế đồng bộ theo ảnh mẫu bản sắc Việt */}
+        <header className="vd-home__hero">
+          <div className="vd-home__hero-trong-dong" aria-hidden="true" />
+          <div className="vd-home__hero-body">
+            <div className="vd-home__hero-text">
+              {/* Eyebrow badge từ ảnh mẫu */}
+              <div className="vd-home__eyebrow-wrap">
+                <span className="vd-home__eyebrow-pill">
+                  <span className="vd-home__eyebrow-dot" aria-hidden="true">●</span>
+                  Miễn phí · Không quảng cáo · Không cần đăng ký
+                </span>
               </div>
-              <span className="vd-home__tagline">Bản sắc Việt · Bộ ứng dụng văn phòng doanh nghiệp</span>
-            </div>
-          </div>
-          <div className="vd-home__security-badge" title="Tài liệu chỉ lưu trữ cục bộ trên máy, hoàn toàn bảo mật và riêng tư">
-            <span className="vd-home__security-dot" aria-hidden="true" />
-            <span>Bảo mật On-Premise · Chuẩn NĐ 30/2020/NĐ-CP</span>
-          </div>
-        </div>
-        <div className="vd-home__hero-body">
-          <div className="vd-home__hero-text">
-            <h1>Hôm nay bạn muốn soạn gì?</h1>
-            <p className="vd-home__lead">
-              Không gian làm việc đồng bộ cho văn bản, bảng tính và trình chiếu — đầy đủ
-              tiếng Việt, chuẩn hóa thể thức hành chính doanh nghiệp.
-            </p>
-          </div>
-          <div className="vd-home__today-wrap">
-            {weather ? (
-              <span
-                className="vd-home__weather"
-                title={
-                  weather.place
-                    ? `${weather.description} · ${weather.place}`
-                    : weather.description
-                }
-              >
-                <span className="vd-home__weather-icon" aria-hidden="true">
-                  {weather.icon}
-                </span>
-                <strong>{weather.temperatureC}°C</strong>
-                <span>{weather.description}</span>
-              </span>
-            ) : null}
-            <div className="vd-home__today" aria-label="Ngày hôm nay">
-              <span className="vd-home__today-weekday">
-                {WEEKDAY_FMT.format(new Date())}
-              </span>
-              <strong className="vd-home__today-date">
-                {DATE_FMT.format(new Date())}
-              </strong>
-            </div>
-          </div>
-        </div>
 
-        {/* Thanh tìm kiếm tài liệu thông minh Spotlight */}
-        <div className="vd-home__search-row">
-          <div className="vd-home__smart-search-box">
-            <span className="vd-home__smart-search-icon" aria-hidden="true">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-            </span>
-            <input
-              type="search"
-              className="vd-home__smart-search-input"
-              placeholder="Tìm kiếm tài liệu, công văn, bảng tính... (Lọc nhanh theo tên hoặc đường dẫn)"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              aria-label="Tìm kiếm tài liệu"
-            />
-            {query ? (
-              <button
-                type="button"
-                className="vd-home__search-clear"
-                onClick={() => setQuery("")}
-                title="Xóa tìm kiếm"
-              >
-                ×
-              </button>
-            ) : null}
-          </div>
-          <button type="button" className="vd-button is-primary vd-home__quick-open-btn" onClick={onOpenFile}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-            </svg>
-            <span>Mở tệp từ máy…</span>
-          </button>
-        </div>
+              {/* Tiêu đề 2 dòng chuẩn chữ và màu ảnh mẫu */}
+              <h1 className="vd-home__hero-title">
+                Viết, tính toán, thuyết trình –<br />
+                <span className="vd-home__hero-accent">miễn phí cho người Việt</span>
+              </h1>
 
-        {recents.length > 0 && !loading ? (
-          <div className="vd-home__stats">
-            {APP_IDS.map((kind) => (
-              <span className={`vd-home__stat is-${kind}`} key={kind}>
-                <span className="vd-home__stat-dot" aria-hidden="true" />
-                <strong>{docStats[kind]}</strong>
-                <span>{APPS[kind].label}</span>
-              </span>
-            ))}
-          </div>
-        ) : null}
-      </header>
-
-      {drafts.length > 0 ? (
-        <section
-          className="vd-home__section vd-drafts"
-          aria-labelledby="vd-drafts-heading"
-        >
-          <div className="vd-home__section-head">
-            <h2 id="vd-drafts-heading">Bản nháp chưa lưu</h2>
-            <span className="vd-home__count">{drafts.length} bản</span>
-          </div>
-          <ul className="vd-draft-list">
-            {drafts.map((draft) => (
-              <li className="vd-draft" key={draft.id}>
-                <span
-                  className={`vd-recent__badge is-${draft.kind}`}
-                  aria-hidden="true"
-                >
-                  {APPS[draft.kind].glyph}
-                </span>
-                <span className="vd-draft__info">
-                  <span className="vd-draft__name">{draft.name}</span>
-                  <span className="vd-draft__meta">
-                    <span>{APPS[draft.kind].label}</span>
-                    <span>·</span>
-                    <span>{draft.path ?? "chưa lưu vào đĩa"}</span>
-                    <span>·</span>
-                    <span>{formatRelativeTime(draft.updatedAt)}</span>
-                  </span>
-                </span>
-                <span className="vd-draft__actions">
-                  <button
-                    type="button"
-                    className="vd-button"
-                    onClick={() => onRestoreDraft?.(draft)}
-                  >
-                    Khôi phục
-                  </button>
-                  <button
-                    type="button"
-                    className="vd-icon"
-                    title="Xoá bản nháp"
-                    aria-label={`Xoá bản nháp ${draft.name}`}
-                    onClick={() => onDiscardDraft?.(draft)}
-                  >
-                    ×
-                  </button>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      <section className="vd-home__section" aria-labelledby="vd-create-heading">
-        <div className="vd-home__section-head">
-          <h2 id="vd-create-heading">Tạo mới</h2>
-          <span className="vd-home__count">{HOME_CARDS.length} định dạng</span>
-        </div>
-
-        <div className="vd-cards">
-          {HOME_CARDS.map((card) => (
-            <button
-              type="button"
-              key={card.kind}
-              className={`vd-card is-${card.kind}`}
-              onClick={() => onCreate(card.kind)}
-            >
-              <span className="vd-card__glyph" aria-hidden="true">
-                {APPS[card.kind].glyph}
-              </span>
-              <div className="vd-card__content">
-                <span className="vd-card__title">{card.title}</span>
-                <span className="vd-card__desc">{card.description}</span>
-                <span className="vd-card__formats">{card.formats}</span>
-              </div>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <section
-        className="vd-home__section"
-        id="vd-recents"
-        aria-labelledby="vd-recent-heading"
-      >
-        <div className="vd-home__section-head">
-          <h2 id="vd-recent-heading">Gần đây</h2>
-          <span className="vd-home__count">
-            {recents.length} tệp{pinnedCount > 0 ? ` · ${pinnedCount} đã ghim` : ""}
-          </span>
-
-          <div className="vd-home__section-actions">
-            <input
-              type="search"
-              className="vd-home__search"
-              placeholder="Lọc theo tên hoặc đường dẫn…"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              aria-label="Lọc tệp gần đây"
-            />
-            <button type="button" className="vd-button is-primary" onClick={onOpenFile}>
-              Mở tệp…
-            </button>
-          </div>
-        </div>
-
-        {recents.length > 0 && (
-          <div className="vd-home__filter-bar" role="tablist" aria-label="Bộ lọc tệp gần đây">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={filter === "all"}
-              className={`vd-home__filter-btn${filter === "all" ? " is-active" : ""}`}
-              onClick={() => setFilter("all")}
-            >
-              Tất cả ({recents.length})
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={filter === "pinned"}
-              className={`vd-home__filter-btn${filter === "pinned" ? " is-active" : ""}`}
-              onClick={() => setFilter("pinned")}
-            >
-              Đã ghim ({pinnedCount})
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={filter === "writer"}
-              className={`vd-home__filter-btn${filter === "writer" ? " is-active" : ""}`}
-              onClick={() => setFilter("writer")}
-            >
-              Văn bản ({docStats.writer})
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={filter === "sheets"}
-              className={`vd-home__filter-btn${filter === "sheets" ? " is-active" : ""}`}
-              onClick={() => setFilter("sheets")}
-            >
-              Bảng tính ({docStats.sheets})
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={filter === "slides"}
-              className={`vd-home__filter-btn${filter === "slides" ? " is-active" : ""}`}
-              onClick={() => setFilter("slides")}
-            >
-              Trình chiếu ({docStats.slides})
-            </button>
-          </div>
-        )}
-
-        {error ? <p className="vd-home__error">Không đọc được lịch sử: {error}</p> : null}
-
-        {loading ? (
-          <p className="vd-home__placeholder">Đang tải danh sách…</p>
-        ) : filtered.length === 0 ? (
-          <div className="vd-home__empty">
-            <p>
-              {recents.length === 0
-                ? "Chưa có tệp nào. Hãy tạo mới hoặc mở một tệp để bắt đầu."
-                : "Không có tệp nào khớp với từ khoá."}
-            </p>
-            {recents.length === 0 ? (
-              <p className="vd-home__empty-hint">
-                Tệp bạn mở sẽ xuất hiện ở đây, kể cả sau khi khởi động lại ứng dụng.
+              {/* Lời dẫn văn bản chuẩn theo ảnh mẫu */}
+              <p className="vd-home__lead">
+                VietDesk là bộ văn phòng gồm <strong>Writer</strong> (viết văn bản), <strong>Sheets</strong> (bảng tính) và <strong>Slides</strong> (slide thuyết trình), gói gọn trong một ứng dụng duy nhất trên máy tính của bạn. Mở là làm việc ngay — không tốn tiền, không quảng cáo, không cần Internet.
               </p>
-            ) : null}
-          </div>
-        ) : (
-          <ul className="vd-recents">
-            {filtered.map((entry) => {
-              const kind =
-                entry.kind === "unknown"
-                  ? kindFromFileName(entry.name)
-                  : entry.kind;
-              const meta = appDisplay(kind);
-              const size = formatFileSize(entry.size);
-              const missing = entry.path !== null && !entry.exists;
 
-              return (
-                <li
-                  className={`vd-recent${entry.pinned ? " is-pinned" : ""}`}
-                  key={entry.id}
+              {/* Hai nút hành động CTA theo ảnh mẫu */}
+              <div className="vd-home__cta-row">
+                <button
+                  type="button"
+                  className="vd-button is-primary vd-home__quick-open-btn vd-home__btn-primary"
+                  onClick={onOpenFile}
                 >
-                  <button
-                    type="button"
-                    className="vd-recent__open"
-                    onClick={() => onOpenRecent(entry)}
-                  >
-                    <span
-                      className={`vd-recent__badge is-${kind}`}
-                      aria-hidden="true"
-                    >
-                      {meta.glyph}
-                    </span>
-                    <span className="vd-recent__info">
-                      <span className="vd-recent__name">{entry.name}</span>
-                      <span className="vd-recent__meta">
-                        <span className="vd-recent__kind">{meta.label}</span>
-                        <span>·</span>
-                        <span className="vd-recent__path">
-                          {entry.path ?? "Chưa lưu vào đĩa"}
-                        </span>
-                        {size ? (
-                          <>
-                            <span>·</span>
-                            <span>{size}</span>
-                          </>
-                        ) : null}
-                        <span>·</span>
-                        <span>{formatRelativeTime(entry.openedAt)}</span>
-                        {missing ? (
-                          <span className="vd-recent__missing">không tìm thấy</span>
-                        ) : null}
-                      </span>
-                    </span>
-                  </button>
+                  <FileUp size={16} strokeWidth={2} aria-hidden="true" />
+                  <span>Dùng thử miễn phí</span>
+                </button>
+                <button
+                  type="button"
+                  className="vd-home__btn-secondary"
+                  onClick={() => {
+                    document.getElementById("vd-create-heading")?.scrollIntoView({ behavior: "smooth" });
+                  }}
+                >
+                  Xem làm được gì
+                </button>
+              </div>
+            </div>
+          </div>
 
-                  <div className="vd-recent__actions">
+          {/* Search bar 48px */}
+          <div className="vd-home__search-row">
+            <div className="vd-home__smart-search-box">
+              <span className="vd-home__smart-search-icon" aria-hidden="true">
+                <Search size={16} strokeWidth={2} />
+              </span>
+              <input
+                type="search"
+                className="vd-home__smart-search-input"
+                placeholder="Tìm kiếm tài liệu, công văn, bảng tính... (Lọc nhanh theo tên hoặc đường dẫn)"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                aria-label="Tìm kiếm tài liệu"
+              />
+              {query ? (
+                <button
+                  type="button"
+                  className="vd-home__search-clear"
+                  onClick={() => setQuery("")}
+                  title="Xóa tìm kiếm"
+                >
+                  ×
+                </button>
+              ) : null}
+            </div>
+          </div>
+
+          {/* Feature badges as small pills below search */}
+          <div className="vd-home__hero-pills">
+            <span className="vd-home__hero-pill">Miễn phí 100%</span>
+            <span className="vd-home__hero-pill">Không quảng cáo</span>
+            <span className="vd-home__hero-pill">Không cần mạng</span>
+            <span className="vd-home__hero-pill">Dữ liệu nằm trên máy bạn</span>
+          </div>
+        </header>
+
+        {drafts.length > 0 ? (
+          <section
+            className="vd-home__section vd-drafts"
+            aria-labelledby="vd-drafts-heading"
+          >
+            <div className="vd-home__section-head">
+              <h2 id="vd-drafts-heading">Bản nháp chưa lưu</h2>
+              <span className="vd-home__count">{drafts.length} bản</span>
+            </div>
+            <ul className="vd-draft-list">
+              {drafts.map((draft) => (
+                <li className="vd-draft" key={draft.id}>
+                  <span
+                    className={`vd-recent__badge is-${draft.kind}`}
+                    aria-hidden="true"
+                  >
+                    {APPS[draft.kind].glyph}
+                  </span>
+                  <span className="vd-draft__info">
+                    <span className="vd-draft__name">{draft.name}</span>
+                    <span className="vd-draft__meta">
+                      <span>{APPS[draft.kind].label}</span>
+                      <span>·</span>
+                      <span>{draft.path ?? "chưa lưu vào đĩa"}</span>
+                      <span>·</span>
+                      <span>{formatRelativeTime(draft.updatedAt)}</span>
+                    </span>
+                  </span>
+                  <span className="vd-draft__actions">
                     <button
                       type="button"
-                      className={`vd-icon${entry.pinned ? " is-active" : ""}`}
-                      title={entry.pinned ? "Bỏ ghim" : "Ghim lên đầu"}
-                      aria-pressed={entry.pinned}
-                      onClick={() => onTogglePin(entry)}
+                      className="vd-button"
+                      onClick={() => onRestoreDraft?.(draft)}
                     >
-                      {entry.pinned ? "★" : "☆"}
+                      Khôi phục
                     </button>
                     <button
                       type="button"
                       className="vd-icon"
-                      title="Xoá khỏi danh sách (không xoá tệp)"
-                      onClick={() => onRemove(entry)}
+                      title="Xoá bản nháp"
+                      aria-label={`Xoá bản nháp ${draft.name}`}
+                      onClick={() => onDiscardDraft?.(draft)}
                     >
                       ×
                     </button>
-                  </div>
+                  </span>
                 </li>
-              );
-            })}
-          </ul>
-        )}
-
-        {recents.length > 0 && !loading ? (
-          <div className="vd-recents__footer">
-            <span className="vd-recents__hint">
-              <span className="vd-recents__hint-dot" aria-hidden="true" />
-              Lưu trữ cục bộ an toàn trên máy · Chuẩn bảo mật nội bộ
-            </span>
-            <button type="button" className="vd-link vd-recents__clear-btn" onClick={onClearAll}>
-              Xoá lịch sử gần đây
-            </button>
-          </div>
+              ))}
+            </ul>
+          </section>
         ) : null}
-      </section>
 
-      <section className="vd-home__section vd-home__templates-section" aria-labelledby="vd-templates-heading">
-        <div className="vd-home__section-head">
-          <div className="vd-home__section-title-wrap">
-            <h2 id="vd-templates-heading">Mẫu tài liệu chuẩn Việt</h2>
-            <span className="vd-home__count">{filteredTemplates.length} / {HOME_TEMPLATES.length} mẫu</span>
+        {/* CREATE NEW SECTION (3 cards in a row, equal visual weight, 64x64 icon, title, 2-line desc, format tags) */}
+        <section className="vd-home__section" aria-labelledby="vd-create-heading">
+          <div className="vd-home__section-head">
+            <h2 id="vd-create-heading">Tạo mới</h2>
+            <span className="vd-home__count">{HOME_CARDS.length} định dạng</span>
           </div>
 
-          <div className="vd-templates__tabs" role="tablist" aria-label="Lọc mẫu tài liệu">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={templateFilter === "all"}
-              className={`vd-templates__tab${templateFilter === "all" ? " is-active" : ""}`}
-              onClick={() => setTemplateFilter("all")}
-            >
-              Tất cả
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={templateFilter === "writer"}
-              className={`vd-templates__tab is-writer${templateFilter === "writer" ? " is-active" : ""}`}
-              onClick={() => setTemplateFilter("writer")}
-            >
-              Văn bản ({HOME_TEMPLATES.filter((t) => t.appId === "writer").length})
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={templateFilter === "sheets"}
-              className={`vd-templates__tab is-sheets${templateFilter === "sheets" ? " is-active" : ""}`}
-              onClick={() => setTemplateFilter("sheets")}
-            >
-              Bảng tính ({HOME_TEMPLATES.filter((t) => t.appId === "sheets").length})
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={templateFilter === "slides"}
-              className={`vd-templates__tab is-slides${templateFilter === "slides" ? " is-active" : ""}`}
-              onClick={() => setTemplateFilter("slides")}
-            >
-              Trình chiếu ({HOME_TEMPLATES.filter((t) => t.appId === "slides").length})
-            </button>
-          </div>
-
-          <div className="vd-templates__nav-actions">
-            <button
-              type="button"
-              className="vd-templates__nav-btn"
-              onClick={() => scrollTemplates("left")}
-              title="Cuộn sang trái"
-              aria-label="Cuộn mẫu tài liệu sang trái"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              className="vd-templates__nav-btn"
-              onClick={() => scrollTemplates("right")}
-              title="Cuộn sang phải"
-              aria-label="Cuộn mẫu tài liệu sang phải"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <polyline points="9 18 15 12 9 6" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        <div className="vd-templates-carousel-wrap">
-          <div className="vd-templates-grid is-carousel" ref={carouselRef}>
-            {filteredTemplates.map((tpl) => (
+          <div className="vd-cards">
+            {HOME_CARDS.map((card) => (
               <button
                 type="button"
-                key={tpl.id}
-                className={`vd-template-card is-${tpl.appId}`}
-                onClick={() => onCreate(tpl.appId, tpl.getContent(), tpl.documentName)}
-                title={`${tpl.title} — ${tpl.description}`}
+                key={card.kind}
+                className={`vd-card is-${card.kind}`}
+                onClick={() => onCreate(card.kind)}
               >
-                {/* Khung xem trước trực quan (Paper / Slide Thumbnail Preview) */}
-                <div className={`vd-template-card__preview is-${tpl.appId}`} aria-hidden="true">
-                  {tpl.appId === "writer" ? (
-                    <div className="vd-template-preview__paper">
-                      <div className="vd-template-preview__line is-header" />
-                      <div className="vd-template-preview__subline" />
-                      <div className="vd-template-preview__divider" />
-                      <div className="vd-template-preview__line is-title" />
-                      <div className="vd-template-preview__body">
-                        <div className="vd-template-preview__line" />
-                        <div className="vd-template-preview__line is-short" />
-                        <div className="vd-template-preview__line" />
-                      </div>
-                      <div className="vd-template-preview__seal" />
-                    </div>
-                  ) : tpl.appId === "sheets" ? (
-                    <div className="vd-template-preview__paper is-sheet">
-                      <div className="vd-template-preview__sheet-header" />
-                      <div className="vd-template-preview__sheet-grid">
-                        <span /><span /><span />
-                        <span /><span /><span />
-                        <span /><span /><span />
-                        <span className="is-total" /><span className="is-total" /><span className="is-total" />
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="vd-template-preview__slide">
-                      <div className="vd-template-preview__slide-header" />
-                      <div className="vd-template-preview__slide-body">
-                        <div className="vd-template-preview__slide-card is-primary" />
-                        <div className="vd-template-preview__slide-card is-secondary" />
-                      </div>
-                    </div>
-                  )}
+                <div className="vd-card__icon-box" aria-hidden="true">
+                  <span className="vd-card__glyph">
+                    {APPS[card.kind].glyph}
+                  </span>
                 </div>
-
-                <div className="vd-template-card__info">
-                  <div className="vd-template-card__header">
-                    <span className={`vd-template-card__badge is-${tpl.appId}`}>
-                      {APPS[tpl.appId].glyph} {tpl.badge}
-                    </span>
-                    <span className="vd-template-card__app">{APPS[tpl.appId].label}</span>
+                <div className="vd-card__content">
+                  <strong className="vd-card__title">{card.title}</strong>
+                  <p className="vd-card__desc">{card.description}</p>
+                  <div className="vd-card__format-tags">
+                    {card.kind === "writer" ? (
+                      <>
+                        <span className="vd-format-tag">.vdx</span>
+                        <span className="vd-format-tag">.docx</span>
+                        <span className="vd-format-tag">.odt</span>
+                        <span className="vd-format-tag">.pdf</span>
+                      </>
+                    ) : card.kind === "sheets" ? (
+                      <>
+                        <span className="vd-format-tag">.vdx</span>
+                        <span className="vd-format-tag">.xlsx</span>
+                        <span className="vd-format-tag">.ods</span>
+                        <span className="vd-format-tag">.csv</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="vd-format-tag">.vdx</span>
+                        <span className="vd-format-tag">.pptx</span>
+                        <span className="vd-format-tag">.odp</span>
+                        <span className="vd-format-tag">16:9</span>
+                      </>
+                    )}
                   </div>
-                  <strong className="vd-template-card__title">{tpl.title}</strong>
-                  <p className="vd-template-card__desc">{tpl.description}</p>
                 </div>
               </button>
             ))}
           </div>
+        </section>
+
+        {/* RECENT FILES (Table view with name, type, modified date, size; empty state with large illustration + CTA) */}
+        <section
+          className="vd-home__section"
+          id="vd-recents"
+          aria-labelledby="vd-recent-heading"
+        >
+          <div className="vd-home__section-head">
+            <h2 id="vd-recent-heading">Gần đây</h2>
+            <span className="vd-home__count">
+              {recents.length} tệp{pinnedCount > 0 ? ` · ${pinnedCount} đã ghim` : ""}
+            </span>
+
+            <div className="vd-home__section-actions">
+              <div className="vd-home__view-toggle" role="group" aria-label="Kiểu hiển thị danh sách">
+                <button
+                  type="button"
+                  className={`vd-home__view-btn${viewMode === "list" ? " is-active" : ""}`}
+                  onClick={() => setViewMode("list")}
+                  title="Dạng bảng danh sách"
+                  aria-label="Xem dạng bảng danh sách"
+                >
+                  <List size={16} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className={`vd-home__view-btn${viewMode === "grid" ? " is-active" : ""}`}
+                  onClick={() => setViewMode("grid")}
+                  title="Dạng lưới thẻ"
+                  aria-label="Xem dạng lưới thẻ"
+                >
+                  <LayoutGrid size={16} aria-hidden="true" />
+                </button>
+              </div>
+              <button type="button" className="vd-button is-primary" onClick={onOpenFile}>
+                Mở tệp…
+              </button>
+            </div>
+          </div>
+
+          {recents.length > 0 && (
+            <div className="vd-home__filter-bar" role="tablist" aria-label="Bộ lọc tệp gần đây">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={filter === "all"}
+                className={`vd-home__filter-btn${filter === "all" ? " is-active" : ""}`}
+                onClick={() => setFilter("all")}
+              >
+                Tất cả ({recents.length})
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={filter === "pinned"}
+                className={`vd-home__filter-btn${filter === "pinned" ? " is-active" : ""}`}
+                onClick={() => setFilter("pinned")}
+              >
+                Đã ghim ({pinnedCount})
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={filter === "writer"}
+                className={`vd-home__filter-btn${filter === "writer" ? " is-active" : ""}`}
+                onClick={() => setFilter("writer")}
+              >
+                Văn bản ({docStats.writer})
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={filter === "sheets"}
+                className={`vd-home__filter-btn${filter === "sheets" ? " is-active" : ""}`}
+                onClick={() => setFilter("sheets")}
+              >
+                Bảng tính ({docStats.sheets})
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={filter === "slides"}
+                className={`vd-home__filter-btn${filter === "slides" ? " is-active" : ""}`}
+                onClick={() => setFilter("slides")}
+              >
+                Trình chiếu ({docStats.slides})
+              </button>
+            </div>
+          )}
+
+          {error ? <p className="vd-home__error">Không đọc được lịch sử: {error}</p> : null}
+
+          {loading ? (
+            <p className="vd-home__placeholder">Đang tải danh sách…</p>
+          ) : filtered.length === 0 ? (
+            <div className="vd-home__empty-state">
+              <div className="vd-home__empty-illustration" aria-hidden="true">
+                <svg width="88" height="88" viewBox="0 0 88 88" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="14" y="24" width="60" height="46" rx="8" fill="#f1f5f9" stroke="#cbd5e1" strokeWidth="2" />
+                  <path d="M14 34C14 28.4772 18.4772 24 24 24H36L42 30H64C69.5228 30 74 34.4772 74 40V62C74 67.5228 69.5228 72 64 72H24C18.4772 72 14 67.5228 14 62V34Z" fill="#ffffff" stroke="#1a56db" strokeWidth="2" />
+                  <line x1="28" y1="46" x2="52" y2="46" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" />
+                  <line x1="28" y1="54" x2="44" y2="54" stroke="#cbd5e1" strokeWidth="2" strokeLinecap="round" />
+                  <circle cx="58" cy="20" r="4" fill="#059669" opacity="0.6" />
+                  <circle cx="70" cy="28" r="2.5" fill="#dc2626" opacity="0.5" />
+                </svg>
+              </div>
+              <h3 className="vd-home__empty-title">
+                {recents.length === 0
+                  ? "Chưa có tệp nào"
+                  : "Không có tệp nào khớp với từ khoá"}
+              </h3>
+              <p className="vd-home__empty-desc">
+                {recents.length === 0
+                  ? "Tài liệu bạn mở hoặc tạo mới sẽ xuất hiện tại đây để bạn tiếp tục công việc nhanh chóng."
+                  : "Hãy thử kiểm tra lại từ khoá tìm kiếm hoặc chọn bộ lọc khác."}
+              </p>
+              {recents.length === 0 ? (
+                <button
+                  type="button"
+                  className="vd-button is-primary vd-home__empty-cta"
+                  onClick={onOpenFile}
+                >
+                  Mở tệp từ máy…
+                </button>
+              ) : null}
+            </div>
+          ) : viewMode === "list" ? (
+            /* Table view with name, type, modified date, size */
+            <div className="vd-recent-table-wrap">
+              <table className="vd-recent-table" aria-label="Bảng tệp gần đây">
+                <thead>
+                  <tr>
+                    <th scope="col" className="col-name">Tên tệp</th>
+                    <th scope="col" className="col-type">Loại</th>
+                    <th scope="col" className="col-date">Ngày sửa</th>
+                    <th scope="col" className="col-size">Kích thước</th>
+                    <th scope="col" className="col-actions"><span className="vd-visually-hidden">Thao tác</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((entry) => {
+                    const kind = entry.kind === "unknown" ? kindFromFileName(entry.name) : entry.kind;
+                    const meta = appDisplay(kind);
+                    const size = formatFileSize(entry.size);
+                    const missing = entry.path !== null && !entry.exists;
+                    return (
+                      <tr key={entry.id} className={`vd-recent-row is-${kind}${entry.pinned ? " is-pinned" : ""}`}>
+                        <td className="col-name">
+                          <button
+                            type="button"
+                            className="vd-recent__open-link"
+                            onClick={() => onOpenRecent(entry)}
+                          >
+                            <span className={`vd-recent__badge is-${kind}`} aria-hidden="true">
+                              {meta.glyph}
+                            </span>
+                            <span className="vd-recent__name-wrap">
+                              <strong className="vd-recent__name">{entry.name}</strong>
+                              <span className="vd-recent__path" title={entry.path ?? "Chưa lưu vào đĩa"}>
+                                {entry.path ?? "Chưa lưu vào đĩa"}
+                              </span>
+                              {missing ? <span className="vd-recent__missing">không tìm thấy</span> : null}
+                            </span>
+                          </button>
+                        </td>
+                        <td className="col-type">
+                          <span className={`vd-recent-type-pill is-${kind}`}>
+                            {meta.label}
+                          </span>
+                        </td>
+                        <td className="col-date">
+                          <span className="vd-recent-date">{formatRelativeTime(entry.openedAt)}</span>
+                        </td>
+                        <td className="col-size">
+                          <span className="vd-recent-size">{size || "—"}</span>
+                        </td>
+                        <td className="col-actions">
+                          <div className="vd-recent__actions">
+                            <button
+                              type="button"
+                              className={`vd-icon${entry.pinned ? " is-active" : ""}`}
+                              title={entry.pinned ? "Bỏ ghim" : "Ghim lên đầu"}
+                              aria-pressed={entry.pinned}
+                              onClick={() => onTogglePin(entry)}
+                            >
+                              {entry.pinned ? "★" : "☆"}
+                            </button>
+                            <button
+                              type="button"
+                              className="vd-icon"
+                              title="Xoá khỏi danh sách (không xoá tệp)"
+                              onClick={() => onRemove(entry)}
+                            >
+                              ×
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <ul className="vd-recents vd-recents--grid">
+              {filtered.map((entry) => {
+                const kind =
+                  entry.kind === "unknown"
+                    ? kindFromFileName(entry.name)
+                    : entry.kind;
+                const meta = appDisplay(kind);
+                const size = formatFileSize(entry.size);
+                const missing = entry.path !== null && !entry.exists;
+                return (
+                  <li
+                    className={`vd-recent-card is-${kind}${entry.pinned ? " is-pinned" : ""}`}
+                    key={entry.id}
+                  >
+                    <button
+                      type="button"
+                      className="vd-recent-card__body"
+                      onClick={() => onOpenRecent(entry)}
+                    >
+                      <div className={`vd-recent-card__banner is-${kind}`}>
+                        <span className={`vd-recent__badge is-${kind}`} aria-hidden="true">
+                          {meta.glyph}
+                        </span>
+                        <span className="vd-recent-card__kind-tag">{meta.label}</span>
+                      </div>
+                      <div className="vd-recent-card__info">
+                        <strong className="vd-recent__name vd-recent-card__title" title={entry.name}>
+                          {entry.name}
+                        </strong>
+                        <span className="vd-recent-card__path" title={entry.path ?? "Chưa lưu vào đĩa"}>
+                          {entry.path ?? "Chưa lưu vào đĩa"}
+                        </span>
+                        <div className="vd-recent-card__footer">
+                          <span>{formatRelativeTime(entry.openedAt)}</span>
+                          {size ? <span>· {size}</span> : null}
+                          {missing ? <span className="vd-recent__missing">không tìm thấy</span> : null}
+                        </div>
+                      </div>
+                    </button>
+                    <div className="vd-recent-card__actions">
+                      <button
+                        type="button"
+                        className={`vd-icon${entry.pinned ? " is-active" : ""}`}
+                        title={entry.pinned ? "Bỏ ghim" : "Ghim lên đầu"}
+                        aria-pressed={entry.pinned}
+                        onClick={() => onTogglePin(entry)}
+                      >
+                        {entry.pinned ? "★" : "☆"}
+                      </button>
+                      <button
+                        type="button"
+                        className="vd-icon"
+                        title="Xoá khỏi danh sách (không xoá tệp)"
+                        onClick={() => onRemove(entry)}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          {recents.length > 0 && !loading ? (
+            <div className="vd-recents__footer">
+              <span className="vd-recents__hint">
+                <span className="vd-recents__hint-dot" aria-hidden="true" />
+                Lưu trữ an toàn trên máy bạn · Chuẩn bảo mật nội bộ
+              </span>
+              <button type="button" className="vd-link vd-recents__clear-btn" onClick={onClearAll}>
+                Xoá lịch sử gần đây
+              </button>
+            </div>
+          ) : null}
+        </section>
+
+        {/* TEMPLATES (4 cards per row max, larger thumbnails 160x120px, full title visible, category tabs) */}
+        <section className="vd-home__section vd-home__templates-section" aria-labelledby="vd-templates-heading">
+          <div className="vd-home__section-head">
+            <div className="vd-home__section-title-wrap">
+              <h2 id="vd-templates-heading">Mẫu tài liệu chuẩn Việt</h2>
+              <span className="vd-home__count">{filteredTemplates.length} mẫu</span>
+            </div>
+
+            <div className="vd-templates__tabs" role="tablist" aria-label="Lọc mẫu tài liệu">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={templateFilter === "all"}
+                className={`vd-templates__tab${templateFilter === "all" ? " is-active" : ""}`}
+                onClick={() => setTemplateFilter("all")}
+              >
+                Tất cả
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={templateFilter === "writer"}
+                className={`vd-templates__tab is-writer${templateFilter === "writer" ? " is-active" : ""}`}
+                onClick={() => setTemplateFilter("writer")}
+              >
+                Văn bản ({HOME_TEMPLATES.filter((t) => t.appId === "writer").length})
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={templateFilter === "sheets"}
+                className={`vd-templates__tab is-sheets${templateFilter === "sheets" ? " is-active" : ""}`}
+                onClick={() => setTemplateFilter("sheets")}
+              >
+                Bảng tính ({HOME_TEMPLATES.filter((t) => t.appId === "sheets").length})
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={templateFilter === "slides"}
+                className={`vd-templates__tab is-slides${templateFilter === "slides" ? " is-active" : ""}`}
+                onClick={() => setTemplateFilter("slides")}
+              >
+                Trình chiếu ({HOME_TEMPLATES.filter((t) => t.appId === "slides").length})
+              </button>
+            </div>
+          </div>
+
+          <div className="vd-templates-grid-wrap">
+            <div className="vd-templates-grid">
+              {filteredTemplates.map((tpl) => (
+                <button
+                  type="button"
+                  key={tpl.id}
+                  className={`vd-template-card is-${tpl.appId}`}
+                  onClick={() => onCreate(tpl.appId, tpl.getContent(), tpl.documentName)}
+                  title={`${tpl.title} — ${tpl.description}`}
+                >
+                  {/* Larger Thumbnail Preview (160x120px) */}
+                  <div className={`vd-template-card__preview is-${tpl.appId}`} aria-hidden="true">
+                    {tpl.appId === "writer" ? (
+                      <div className="vd-template-preview__paper">
+                        <div className="vd-template-preview__line is-header" />
+                        <div className="vd-template-preview__subline" />
+                        <div className="vd-template-preview__divider" />
+                        <div className="vd-template-preview__line is-title" />
+                        <div className="vd-template-preview__body">
+                          <div className="vd-template-preview__line" />
+                          <div className="vd-template-preview__line is-short" />
+                          <div className="vd-template-preview__line" />
+                        </div>
+                        <div className="vd-template-preview__seal" />
+                      </div>
+                    ) : tpl.appId === "sheets" ? (
+                      <div className="vd-template-preview__paper is-sheet">
+                        <div className="vd-template-preview__sheet-header" />
+                        <div className="vd-template-preview__sheet-grid">
+                          <span /><span /><span />
+                          <span /><span /><span />
+                          <span /><span /><span />
+                          <span className="is-total" /><span className="is-total" /><span className="is-total" />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="vd-template-preview__slide">
+                        <div className="vd-template-preview__slide-header" />
+                        <div className="vd-template-preview__slide-body">
+                          <div className="vd-template-preview__slide-card is-primary" />
+                          <div className="vd-template-preview__slide-card is-secondary" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="vd-template-card__info">
+                    <div className="vd-template-card__header">
+                      <span className={`vd-template-card__badge is-${tpl.appId}`}>
+                        {APPS[tpl.appId].glyph} {tpl.badge}
+                      </span>
+                      <span className="vd-template-card__app">{APPS[tpl.appId].label}</span>
+                    </div>
+                    {/* Full title visible, no truncation */}
+                    <strong className="vd-template-card__title">{tpl.title}</strong>
+                    <p className="vd-template-card__desc">{tpl.description}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ECOSYSTEM SHOWCASE BANNER - Tích hợp Biểu trưng & Logo chuẩn nhận diện */}
+        <div className="vd-home__ecosystem-banner">
+          <div className="vd-home__ecosystem-left">
+            <img
+              src="/vietdesk-app-icon.png"
+              alt="Biểu trưng VietDesk"
+              className="vd-home__ecosystem-icon"
+              width={48}
+              height={48}
+            />
+            <div className="vd-home__ecosystem-text">
+              <img
+                src="/vietdesk-wordmark-banner.png"
+                alt="VietDesk - Bộ ứng dụng văn phòng Việt"
+                className="vd-home__ecosystem-wordmark-img"
+                height={26}
+              />
+              <p className="vd-home__ecosystem-desc">
+                Bộ ứng dụng văn phòng tiếng Việt độc lập · Bảo mật dữ liệu nội bộ trên máy · Chuẩn thể thức NĐ 30/2020
+              </p>
+            </div>
+          </div>
+          <div className="vd-home__ecosystem-badges">
+            <span className="vd-ecosystem-tag is-writer">Writer · Soạn thảo</span>
+            <span className="vd-ecosystem-tag is-sheets">Sheets · Bảng tính</span>
+            <span className="vd-ecosystem-tag is-slides">Slides · Trình chiếu</span>
+          </div>
         </div>
-      </section>
       </div>
     </div>
   );

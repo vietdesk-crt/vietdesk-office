@@ -12,7 +12,7 @@
   --line: #eadfd2;
   --radius: 14px;
   --shadow: 0 10px 30px rgba(85, 29, 24, 0.08);
-  --font: "Be Vietnam Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font: "Be Vietnam Pro", system-ui, "Segoe UI", Roboto, sans-serif;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }

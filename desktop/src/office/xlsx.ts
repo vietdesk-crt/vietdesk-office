@@ -1,5 +1,5 @@
 /**
- * Chuyển `.xlsx` (Excel / Google Sheets / LibreOffice Calc) sang nội dung
+ * Chuyển `.xlsx` (chuẩn OpenXML SpreadsheetML) sang nội dung
  * Sheets `{ cells: { A1: "..." } }`.
  *
  * Sheets của VietDesk hiện chỉ có một vùng ô phẳng nên chỉ đọc **trang tính

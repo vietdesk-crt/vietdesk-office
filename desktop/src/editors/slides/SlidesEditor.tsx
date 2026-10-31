@@ -24,6 +24,10 @@ export interface SlidesEditorProps {
   initialSlides?: Slide[];
   /** Gọi sau mỗi thay đổi để vỏ ứng dụng đánh dấu "chưa lưu" và tự lưu. */
   onChange?: (slides: Slide[]) => void;
+  title?: string;
+  documentPath?: string | null;
+  saveStatus?: string;
+  dirty?: boolean;
 }
 
 const LAYOUT_LABELS: Record<SlideLayout, string> = {
@@ -402,10 +406,19 @@ function PresentationOutro({
  * Chưa có transition, ảnh nền, và đối tượng tự do trên canvas — những phần đó
  * cần mô hình dữ liệu riêng và sẽ do lõi OOXML định nghĩa.
  */
-export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
+export function SlidesEditor({
+  initialSlides,
+  onChange,
+  title,
+  documentPath,
+  saveStatus,
+  dirty,
+}: SlidesEditorProps) {
   const initial = initialSlides ?? createDefaultSlides();
   const [slides, setSlides] = useState<Slide[]>(initial);
   const [selectedId, setSelectedId] = useState(initial[0]?.id ?? "");
+  const [draggedSlideId, setDraggedSlideId] = useState<string | null>(null);
+  const [dragOverSlideId, setDragOverSlideId] = useState<string | null>(null);
   const [presenting, setPresenting] = useState(false);
   const [presentIndex, setPresentIndex] = useState(0);
   const [showNotes, setShowNotes] = useState(false);
@@ -528,6 +541,48 @@ export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
     const next = [...slides];
     [next[index], next[target]] = [next[target], next[index]];
     commit(next);
+  };
+
+  const handleDragStart = (id: string, e: React.DragEvent) => {
+    setDraggedSlideId(id);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", id);
+  };
+
+  const handleDragOver = (id: string, e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOverSlideId !== id) {
+      setDragOverSlideId(id);
+    }
+  };
+
+  const handleDragLeave = (id: string) => {
+    if (dragOverSlideId === id) {
+      setDragOverSlideId(null);
+    }
+  };
+
+  const handleDrop = (targetId: string, e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOverSlideId(null);
+    const sourceId = draggedSlideId || e.dataTransfer.getData("text/plain");
+    if (!sourceId || sourceId === targetId) return;
+
+    const sourceIndex = slides.findIndex((s) => s.id === sourceId);
+    const targetIndex = slides.findIndex((s) => s.id === targetId);
+    if (sourceIndex === -1 || targetIndex === -1) return;
+
+    const next = [...slides];
+    const [moved] = next.splice(sourceIndex, 1);
+    next.splice(targetIndex, 0, moved);
+    commit(next, sourceId);
+    setDraggedSlideId(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedSlideId(null);
+    setDragOverSlideId(null);
   };
 
   const exitFullscreen = () => {
@@ -670,19 +725,30 @@ export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
   return (
     <div className="vd-slides">
       <aside className="vd-slides__list" aria-label="Danh sách slide">
-        {slides.map((slide, index) => (
-          <div
-            key={slide.id}
-            className={`vd-slides__thumb${
-              slide.id === selected?.id ? " is-selected" : ""
-            }`}
-          >
-            <button
-              type="button"
-              className="vd-slides__thumb-main"
-              onClick={() => setSelectedId(slide.id)}
-              aria-current={slide.id === selected?.id}
+        {slides.map((slide, index) => {
+          const isDragging = draggedSlideId === slide.id;
+          const isDragOver = dragOverSlideId === slide.id;
+          return (
+            <div
+              key={slide.id}
+              draggable
+              onDragStart={(e) => handleDragStart(slide.id, e)}
+              onDragOver={(e) => handleDragOver(slide.id, e)}
+              onDragLeave={() => handleDragLeave(slide.id)}
+              onDrop={(e) => handleDrop(slide.id, e)}
+              onDragEnd={handleDragEnd}
+              className={`vd-slides__thumb${
+                slide.id === selected?.id ? " is-selected" : ""
+              }${isDragging ? " is-dragging" : ""}${
+                isDragOver ? " is-drag-over" : ""
+              }`}
             >
+              <button
+                type="button"
+                className="vd-slides__thumb-main"
+                onClick={() => setSelectedId(slide.id)}
+                aria-current={slide.id === selected?.id}
+              >
               <span
                 className={`vd-slides__thumb-frame${
                   slide.background ? " has-background" : ""
@@ -740,7 +806,8 @@ export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
               </button>
             </div>
           </div>
-        ))}
+          );
+        })}
         <button type="button" className="vd-slides__add" onClick={addSlide}>
           + Thêm slide
         </button>
@@ -829,7 +896,7 @@ export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
                   type="button"
                   className={`vd-button${slideViewMode === "grid" ? " is-active" : ""}`}
                   onClick={() => setSlideViewMode((m) => (m === "grid" ? "filmstrip" : "grid"))}
-                  title="Chuyển chế độ xem lưới toàn bộ slide (Google Slides Grid View)"
+                  title="Chuyển chế độ xem lưới toàn bộ slide (Xem lưới)"
                 >
                   <span>{slideViewMode === "grid" ? "Xem đơn" : "Xem lưới"}</span>
                 </button>
@@ -1092,9 +1159,25 @@ export function SlidesEditor({ initialSlides, onChange }: SlidesEditorProps) {
           </>
         ) : null}
         <div className="vd-slides__status">
-          <span>
-            Slide {selectedIndex + 1}/{slides.length}
-          </span>
+          <div className="vd-slides__status-left">
+            {saveStatus ? (
+              <span
+                className={`vd-slides__status-save${dirty ? " is-dirty" : " is-clean"}`}
+                title={dirty ? "Có thay đổi chưa lưu" : "Tài liệu đã được lưu"}
+              >
+                <span className="vd-status-dot" />
+                {saveStatus}
+              </span>
+            ) : null}
+            {title ? (
+              <span className="vd-slides__status-title" title={documentPath ?? title}>
+                {title}
+              </span>
+            ) : null}
+            <span>
+              Slide {selectedIndex + 1}/{slides.length}
+            </span>
+          </div>
           <span className="vd-slides__hint">
             F5 — trình chiếu · ←/→ — chuyển slide · Esc — thoát
           </span>

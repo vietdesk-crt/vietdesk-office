@@ -60,7 +60,7 @@ export function isVietDeskDocument(fileName: string): boolean {
   return fileName.toLowerCase().endsWith(`.${DOCUMENT_EXTENSION}`);
 }
 
-/** Tên tệp gợi ý khi lưu, đã bỏ ký tự cấm của Windows/macOS/Linux. */
+/** Tên tệp gợi ý khi lưu, đã bỏ ký tự cấm của hệ điều hành. */
 export function documentFileName(title: string): string {
   const trimmed = title.trim();
   if (isVietDeskDocument(trimmed)) {
@@ -73,10 +73,10 @@ export function documentFileName(title: string): string {
   return `${safe || "Tài liệu"}.${DOCUMENT_EXTENSION}`;
 }
 
-/** Bỏ đuôi `.vdx` để hiển thị tên tài liệu. */
+/** Bỏ đuôi tệp (.vdx, .docx, .xlsx, .pptx…) để hiển thị tên tài liệu. */
 export function documentTitleFromFileName(fileName: string): string {
   const base = fileName.split(/[\\/]/).pop() ?? fileName;
-  return base.replace(/\.vdx$/i, "");
+  return base.replace(/\.(vdx|docx?|odt|xlsx|xls|ods|csv|pptx|ppt|odp)$/i, "");
 }
 
 export function createDocumentEnvelope<Content>(

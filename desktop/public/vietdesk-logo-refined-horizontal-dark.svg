@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 160" width="100%" height="100%">
+  <defs>
+    <!-- Refined Lacquer Red Gradient for Dark Theme -->
+    <linearGradient id="refRedDark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E2544B"/>
+      <stop offset="60%" stop-color="#BA332B"/>
+      <stop offset="100%" stop-color="#94221D"/>
+    </linearGradient>
+
+    <!-- Refined Warm Honey Gold for Dark Theme -->
+    <linearGradient id="refGoldDark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FCE1A8"/>
+      <stop offset="50%" stop-color="#DDA046"/>
+      <stop offset="100%" stop-color="#B2782A"/>
+    </linearGradient>
+
+    <filter id="refHzShadowDark" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#E2544B" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- Left Icon Glyph (Dark Ribbon Scaled Down) -->
+  <g transform="translate(85, 80) scale(0.38)" filter="url(#refHzShadowDark)">
+    <!-- Left Wing -->
+    <path d="M -135,-140 C -120,-140 -85,-110 -65,-50 C -45,10 -25,95 0,135 C -25,115 -75,30 -105,-40 C -125,-85 -145,-125 -135,-140 Z" 
+          fill="url(#refRedDark)"/>
+    <path d="M -135,-140 C -105,-152 -60,-130 -40,-75 C -22,-25 -10,65 0,135 C -15,80 -38,-15 -70,-75 C -92,-115 -120,-136 -135,-140 Z" 
+          fill="#C73E36" opacity="0.9"/>
+    <!-- Right Wing -->
+    <path d="M 0,135 C 20,85 55,-5 95,-75 C 122,-120 148,-140 135,-140 C 120,-140 95,-115 70,-65 C 40,-5 15,75 0,135 Z" 
+          fill="url(#refGoldDark)"/>
+    <!-- Star -->
+    <g transform="translate(75, -135) scale(0.72)">
+      <polygon points="0,-28 8.2,-8.5 26.6,-8.5 11.8,2.1 17.5,22.6 0,9.9 -17.5,22.6 -11.8,2.1 -26.6,-8.5 -8.2,-8.5" fill="#FCE1A8"/>
+    </g>
+    <circle cx="0" cy="135" r="5" fill="#FCE1A8"/>
+  </g>
+
+  <!-- Typography for Dark Background -->
+  <!-- "Viet" in Warm Luminous Red, "Desk" in Clean Ivory White -->
+  <text x="165" y="93" font-family="'Be Vietnam Pro', -apple-system, sans-serif" font-size="62" font-weight="900" fill="url(#refRedDark)" letter-spacing="-1">Viet<tspan fill="#F8F6F0" font-weight="700">Desk</tspan></text>
+
+  <!-- Tagline in warm light silver/sand -->
+  <text x="168" y="124" font-family="'Be Vietnam Pro', sans-serif" font-size="13" font-weight="700" fill="#BDB7AF" letter-spacing="3.2">BỘ ỨNG DỤNG VĂN PHÒNG VIỆT</text>
+
+  <!-- Suite Accents -->
+  <g transform="translate(565, 80)">
+    <circle cx="0" cy="0" r="5" fill="#E2544B"/>
+    <circle cx="20" cy="0" r="5" fill="#4ADE80"/>
+    <circle cx="40" cy="0" r="5" fill="#FBBF24"/>
+  </g>
+  <text x="565" y="103" font-family="'Be Vietnam Pro', sans-serif" font-size="10" font-weight="600" fill="#9C958C" letter-spacing="1">WRITER · SHEETS · SLIDES</text>
+</svg>

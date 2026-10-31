@@ -988,3 +988,82 @@ export function autoFrameLayoutFromAST(blocks: ASTBlock[], documentTitle?: strin
   const slides = slideGroups.map((group) => layoutSlideBlocks(group));
   return { slides };
 }
+
+/**
+ * Giai đoạn 1: Semantic Chunker OOP
+ */
+export class SemanticChunker {
+  chunk(blocks: ASTBlock[], documentTitle: string = "Tài liệu"): ASTBlock[][] {
+    return chunkASTBlocks(blocks, documentTitle);
+  }
+}
+
+/**
+ * Giai đoạn 2: Spatial Budgeter OOP
+ */
+export class SpatialBudgeter {
+  readonly usableWidth = USABLE_WIDTH;
+  readonly usableHeight = USABLE_HEIGHT;
+  readonly totalBudget = TOTAL_AREA_BUDGET;
+
+  estimate(block: ASTBlock): number {
+    return estimateBlockArea(block);
+  }
+
+  totalArea(blocks: ASTBlock[]): number {
+    return blocks.reduce((sum, b) => sum + this.estimate(b), 0);
+  }
+
+  isOverBudget(blocks: ASTBlock[]): boolean {
+    return this.totalArea(blocks) > TOTAL_AREA_BUDGET * AREA_SPLIT_THRESHOLD;
+  }
+}
+
+/**
+ * Giai đoạn 3: CSP Layout Solver OOP
+ */
+export class CSPSolver {
+  solve(blocks: ASTBlock[]): AutoFrameLayoutResult {
+    return layoutSlideBlocks(blocks);
+  }
+}
+
+/**
+ * Giai đoạn 4: Typographic Binary Search Font Fitter OOP
+ */
+export class BinarySearchFontFitter {
+  fit(
+    text: string,
+    targetBox: { width: number; height: number },
+    minFont: number = 16,
+    maxFont: number = 48,
+    lineHeightRatio: number = 1.35
+  ): number {
+    return binarySearchFontSize(text, targetBox, minFont, maxFont, lineHeightRatio);
+  }
+}
+
+/**
+ * Động cơ Dàn trang Tự động 16:9 Hợp nhất (AutoFramingEngine OOP)
+ */
+export class AutoFramingEngine {
+  constructor(
+    public readonly chunker: SemanticChunker = new SemanticChunker(),
+    public readonly budgeter: SpatialBudgeter = new SpatialBudgeter(),
+    public readonly solver: CSPSolver = new CSPSolver(),
+    public readonly fontFitter: BinarySearchFontFitter = new BinarySearchFontFitter(),
+  ) {}
+
+  generateDeckFromMarkdown(markdown: string, title?: string): AutoFrameDeck {
+    return autoFrameLayoutFromMarkdown(markdown, title);
+  }
+
+  generateDeckFromAST(blocks: ASTBlock[], title?: string): AutoFrameDeck {
+    return autoFrameLayoutFromAST(blocks, title);
+  }
+
+  layoutSlide(blocks: ASTBlock[]): AutoFrameLayoutResult {
+    return this.solver.solve(blocks);
+  }
+}
+

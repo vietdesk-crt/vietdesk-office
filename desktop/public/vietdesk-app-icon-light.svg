@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Soft Warm Cinnabar to Terracotta Gradient -->
+    <linearGradient id="softRed" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#C24138"/>
+      <stop offset="50%" stop-color="#A52A24"/>
+      <stop offset="100%" stop-color="#801C17"/>
+    </linearGradient>
+
+    <!-- Warm Antique Brass & Honey Gold Gradient -->
+    <linearGradient id="warmHoneyGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E9BC6E"/>
+      <stop offset="60%" stop-color="#D49A42"/>
+      <stop offset="100%" stop-color="#B2782A"/>
+    </linearGradient>
+
+    <!-- Translucent Overlay for Intersecting Folds -->
+    <linearGradient id="goldSheen" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FCE1A8" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#D49A42" stop-opacity="0.8"/>
+    </linearGradient>
+
+    <filter id="naturalShadow" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="#3A1714" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+
+  <!-- Clean Off-White / Warm Canvas Paper Background -->
+  <rect width="512" height="512" rx="100" fill="#F8F6F0"/>
+  <rect width="510" height="510" x="1" y="1" rx="99" fill="none" stroke="#E5DEC9" stroke-width="1.5"/>
+
+  <!-- Main Harmonious Ribbon Group -->
+  <g filter="url(#naturalShadow)" transform="translate(256, 260)">
+    
+    <!-- Left Stem: Lacquer Calligraphic Wing (Đỏ Son Mài Mềm Mại) -->
+    <!-- Flows down smoothly from top-left into the apex base -->
+    <path d="M -135,-140 C -120,-140 -85,-110 -65,-50 C -45,10 -25,95 0,135 C -25,115 -75,30 -105,-40 C -125,-85 -145,-125 -135,-140 Z" 
+          fill="url(#softRed)"/>
+    
+    <!-- Left Accompanying Feather Curve (Tạo cảm giác cánh chim Lạc thanh thoát) -->
+    <path d="M -135,-140 C -105,-152 -60,-130 -40,-75 C -22,-25 -10,65 0,135 C -15,80 -38,-15 -70,-75 C -92,-115 -120,-136 -135,-140 Z" 
+          fill="#B8362F" opacity="0.85"/>
+
+    <!-- Right Stem: Flowing Document Pages / Golden Wing (Vàng Mật Ong Dịu Mắt) -->
+    <!-- Spreads up and outward in an elegant, uplifting arc -->
+    <path d="M 0,135 C 20,85 55,-5 95,-75 C 122,-120 148,-140 135,-140 C 120,-140 95,-115 70,-65 C 40,-5 15,75 0,135 Z" 
+          fill="url(#warmHoneyGold)"/>
+
+    <!-- Right Primary Sheet (Trang giấy mở rộng đại diện cho Văn phòng hiện đại) -->
+    <path d="M 0,135 C 26,75 75,-25 125,-100 C 145,-130 160,-132 152,-125 C 130,-105 85,-10 32,80 C 15,108 5,125 0,135 Z" 
+          fill="url(#goldSheen)"/>
+
+    <!-- Harmonious Five-Pointed Star: Warm Champagne Tint -->
+    <g transform="translate(75, -135) scale(0.72)">
+      <polygon points="0,-28 8.2,-8.5 26.6,-8.5 11.8,2.1 17.5,22.6 0,9.9 -17.5,22.6 -11.8,2.1 -26.6,-8.5 -8.2,-8.5"
+               fill="#D49A42"/>
+      <polygon points="0,-28 0,9.9 17.5,22.6" fill="#FEE7B3" opacity="0.45"/>
+    </g>
+
+    <!-- Base Intersection: A refined soft jewel dot connecting Red & Gold -->
+    <circle cx="0" cy="135" r="5" fill="#D49A42"/>
+  </g>
+</svg>

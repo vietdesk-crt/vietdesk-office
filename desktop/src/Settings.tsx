@@ -8,15 +8,12 @@ import {
   Info,
   Languages,
   Loader2,
-  Monitor,
-  Moon,
   Palette,
   RefreshCw,
   Sun,
   Trash2,
 } from "lucide-react";
-import { VietDeskLogo } from "./Logo";
-import { systemPrefersDark, type ThemePreference } from "./settings";
+import { type ThemePreference } from "./settings";
 
 export interface SettingsProps {
   themePreference: ThemePreference;
@@ -47,20 +44,8 @@ const THEME_OPTIONS: Array<{
   {
     value: "light",
     label: "Sáng",
-    description: "Nền sáng, rõ nét.",
+    description: "Nền sáng ấm, rõ nét, tối ưu cho môi trường văn phòng thuần Việt.",
     icon: Sun,
-  },
-  {
-    value: "dark",
-    label: "Tối",
-    description: "Dịu mắt khi thiếu sáng.",
-    icon: Moon,
-  },
-  {
-    value: "system",
-    label: "Theo hệ thống",
-    description: "Tự đổi theo máy của bạn.",
-    icon: Monitor,
   },
 ];
 
@@ -111,12 +96,6 @@ export function Settings({
           pinnedCount > 0 ? `, trong đó ${pinnedCount} tệp đã ghim` : ""
         }. Khi vượt mức, tệp lâu nhất sẽ tự ẩn.`;
 
-  const logoTheme =
-    themePreference === "dark" ||
-    (themePreference === "system" && systemPrefersDark())
-      ? "dark"
-      : "light";
-
   return (
     <div className="vd-settings">
       <div className="vd-settings__inner">
@@ -139,8 +118,7 @@ export function Settings({
             Giao diện
           </h2>
           <p className="vd-settings__panel-desc">
-            Chọn cách ứng dụng hiển thị. “Theo hệ thống” sẽ tự đổi khi bạn bật
-            chế độ tối của máy.
+            Ứng dụng sử dụng chuẩn giao diện Sáng tối ưu cho môi trường văn phòng tiếng Việt.
           </p>
 
           <div
@@ -335,15 +313,25 @@ export function Settings({
           </h2>
 
           <div className="vd-settings__about-card">
-            <VietDeskLogo
-              size={40}
-              theme={logoTheme}
-              aria-hidden="true"
+            <img
+              src="/vietdesk-app-icon.png"
+              alt="VietDesk App Icon"
+              className="vd-settings__app-icon"
+              width={56}
+              height={56}
             />
-            <div>
+            <div className="vd-settings__about-brand">
+              <div className="vd-settings__wordmark-stage">
+                <img
+                  src="/vietdesk-wordmark-banner.png"
+                  alt="VietDesk - Bộ ứng dụng văn phòng Việt"
+                  className="vd-settings__wordmark-img"
+                  height={32}
+                />
+              </div>
               <span className="vd-settings__app-name">VietDesk Office</span>
               <span className="vd-settings__app-meta">
-                Phiên bản {APP_VERSION} · Bộ ứng dụng văn phòng tiếng Việt
+                Phiên bản {APP_VERSION} · Bộ ứng dụng văn phòng tiếng Việt thuần khiết
               </span>
             </div>
           </div>

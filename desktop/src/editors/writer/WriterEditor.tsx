@@ -119,6 +119,7 @@ import {
   tableKeymap,
   toggleList,
   toggleTaskList,
+  transformVietnamese,
   writerKeymap,
 } from "./commands";
 import type { CaseMode } from "./commands";
@@ -197,7 +198,7 @@ interface RulerPreview {
   firstLineIndent: number;
 }
 
-/** Tên tệp an toàn cho Windows/macOS (bỏ ký tự cấm). */
+/** Tên tệp an toàn cho hệ thống tệp (bỏ ký tự cấm). */
 function sanitizeFileName(name: string): string {
   return name.replace(/[\\/:*?"<>|]+/g, "-").trim() || "tai-lieu";
 }
@@ -213,6 +214,10 @@ export interface WriterEditorProps {
   title?: string;
   /** Đường dẫn tệp `.vdx` trên đĩa — để giải đường dẫn ảnh `assets/...`. */
   documentPath?: string | null;
+  /** Trạng thái lưu (đã lưu / có thay đổi chưa lưu...) */
+  saveStatus?: string;
+  /** Tài liệu có thay đổi chưa lưu */
+  dirty?: boolean;
 }
 
 function buildDoc(text: string): PMNode {
@@ -489,6 +494,8 @@ export function WriterEditor({
   onChange,
   title,
   documentPath,
+  saveStatus,
+  dirty: propDirty,
 }: WriterEditorProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -580,6 +587,8 @@ export function WriterEditor({
   const [focusMode, setFocusMode] = useState(false);
   const [ribbonTab, setRibbonTab] = useState<"home" | "insert" | "layout" | "review" | "view">("home");
   const [pagelessMode, setPagelessMode] = useState(false);
+  const [showRuler, setShowRuler] = useState(true);
+  const [zoom, setZoom] = useState<number>(100);
   /** Tay kéo đang hoạt động trên thước kẻ (null khi không kéo). */
   const [rulerDrag, setRulerDrag] = useState<RulerDragKind | null>(null);
   /** Giá trị xem trước khi kéo — áp dụng thật khi thả tay. */
@@ -797,7 +806,12 @@ export function WriterEditor({
     ((activeMargins.left + activeFirstLineIndent * INDENT_STEP_MM) /
       A4_WIDTH_MM) *
     100;
+  const isLandscape = pageSetup.orientation === "landscape";
+  const pageWidth = isLandscape ? "297mm" : "210mm";
+  const pageMinHeight = isLandscape ? "210mm" : "297mm";
   const pageStyle = {
+    width: pagelessMode ? undefined : pageWidth,
+    minHeight: pagelessMode ? undefined : pageMinHeight,
     "--vd-page-margin-top": `${activeMargins.top}mm`,
     "--vd-page-margin-right": `${activeMargins.right}mm`,
     "--vd-page-margin-bottom": `${activeMargins.bottom}mm`,
@@ -1911,10 +1925,7 @@ export function WriterEditor({
               role="tab"
               aria-selected={ribbonTab === "insert"}
               className={`vd-writer__tab-btn${ribbonTab === "insert" ? " is-active" : ""}`}
-              onClick={() => {
-                setRibbonTab("insert");
-                setTemplatePickerOpen(true);
-              }}
+              onClick={() => setRibbonTab("insert")}
             >
               Chèn & Biểu mẫu
             </button>
@@ -1923,10 +1934,7 @@ export function WriterEditor({
               role="tab"
               aria-selected={ribbonTab === "layout"}
               className={`vd-writer__tab-btn${ribbonTab === "layout" ? " is-active" : ""}`}
-              onClick={() => {
-                setRibbonTab("layout");
-                setPagePanelOpen(true);
-              }}
+              onClick={() => setRibbonTab("layout")}
             >
               Bố cục trang
             </button>
@@ -1935,10 +1943,7 @@ export function WriterEditor({
               role="tab"
               aria-selected={ribbonTab === "review"}
               className={`vd-writer__tab-btn${ribbonTab === "review" ? " is-active" : ""}`}
-              onClick={() => {
-                setRibbonTab("review");
-                setCommentsOpen(true);
-              }}
+              onClick={() => setRibbonTab("review")}
             >
               Kiểm duyệt
             </button>
@@ -1947,10 +1952,7 @@ export function WriterEditor({
               role="tab"
               aria-selected={ribbonTab === "view"}
               className={`vd-writer__tab-btn${ribbonTab === "view" ? " is-active" : ""}`}
-              onClick={() => {
-                setRibbonTab("view");
-                setOutlineOpen(true);
-              }}
+              onClick={() => setRibbonTab("view")}
             >
               Hiển thị
             </button>
@@ -1961,7 +1963,7 @@ export function WriterEditor({
               type="button"
               className={`vd-writer__toggle-btn${pagelessMode ? " is-active" : ""}`}
               onClick={() => setPagelessMode((prev) => !prev)}
-              title={pagelessMode ? "Chuyển về Chế độ Trang in chuẩn A4" : "Chuyển sang Chế độ Không ngắt trang (Google Docs Pageless Mode)"}
+              title={pagelessMode ? "Chuyển về Chế độ Trang in chuẩn A4" : "Chuyển sang Chế độ Không ngắt trang liên tục"}
             >
               <span>{pagelessMode ? "Trang in A4" : "Không ngắt trang"}</span>
             </button>
@@ -1985,645 +1987,965 @@ export function WriterEditor({
           </div>
         </div>
         <div className="vd-writer__toolbar-strip">
-          <div className="vd-writer__tgroup vd-writer__tgroup--rail">
-            <div className="vd-writer__tgroup-line vd-writer__tgroup-line--stack">
-              <ToolbarButton
-                label="Hoàn tác (Ctrl+Z)"
-                onClick={run(undo)}
-                disabled={!canUndo}
-              >
-                <Undo2 size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Làm lại (Ctrl+Y)"
-                onClick={run(redo)}
-                disabled={!canRedo}
-              >
-                <Redo2 size={17} aria-hidden="true" />
-              </ToolbarButton>
-            </div>
-            <span className="vd-writer__tgroup-caption">Hoàn tác</span>
-          </div>
-
-          <div className="vd-writer__tgroup">
-            <div className="vd-writer__tgroup-line">
-              <ToolbarButton
-                label="Dán (Ctrl+V)"
-                onClick={() => void pasteFromClipboard()}
-              >
-                <ClipboardPaste size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Cắt (Ctrl+X)"
-                onClick={() => runClipboard("cut")}
-              >
-                <Scissors size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Chép (Ctrl+C)"
-                onClick={() => runClipboard("copy")}
-              >
-                <Copy size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Chép định dạng — bấm lần nữa để dán định dạng vào vùng chọn"
-                active={painterArmed}
-                onClick={toggleFormatPainter}
-              >
-                <Paintbrush size={17} aria-hidden="true" />
-              </ToolbarButton>
-            </div>
-            <div className="vd-writer__tgroup-line">
-              <ToolbarButton
-                label="Dán không định dạng (Ctrl+Shift+V)"
-                onClick={() => void pastePlainText()}
-              >
-                <ClipboardType size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Xóa nội dung đang chọn"
-                disabled={!state || state.selection.empty}
-                onClick={run(deleteSelection)}
-              >
-                <Eraser size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Chép toàn bộ văn bản"
-                onClick={() => void copyAllText()}
-              >
-                <ClipboardCopy size={17} aria-hidden="true" />
-              </ToolbarButton>
-            </div>
-            <span className="vd-writer__tgroup-caption">Bảng tạm</span>
-          </div>
-
-          <div className="vd-writer__tgroup">
-            <div className="vd-writer__tgroup-line">
-              <select
-                className="vd-writer__select vd-writer__select--family"
-                value={fontFamily}
-                aria-label="Kiểu chữ"
-                title="Kiểu chữ"
-                onChange={(event) =>
-                  run(
-                    event.target.value
-                      ? setMarkAttr(writerSchema.marks.fontFamily, {
-                          family: event.target.value,
-                        })
-                      : removeMarkType(writerSchema.marks.fontFamily),
-                  )()
-                }
-              >
-                <option value="">Mặc định</option>
-                {FONT_FAMILIES.map((font) => (
-                  <option key={font.label} value={font.value}>
-                    {font.label}
-                  </option>
-                ))}
-                {fontFamily &&
-                !FONT_FAMILIES.some((font) => font.value === fontFamily) ? (
-                  <option value={fontFamily}>{fontFamily}</option>
-                ) : null}
-              </select>
-
-              <select
-                className="vd-writer__select vd-writer__select--size"
-                value={fontSize}
-                aria-label="Cỡ chữ"
-                title="Cỡ chữ"
-                onChange={(event) =>
-                  run(
-                    event.target.value
-                      ? setMarkAttr(writerSchema.marks.fontSize, {
-                          size: event.target.value,
-                        })
-                      : removeMarkType(writerSchema.marks.fontSize),
-                  )()
-                }
-              >
-                <option value="">Mặc định</option>
-                {FONT_SIZES.map((size) => (
-                  <option key={size} value={size}>
-                    {size}
-                  </option>
-                ))}
-                {fontSize && !FONT_SIZES.includes(fontSize) ? (
-                  <option value={fontSize}>{fontSize}</option>
-                ) : null}
-              </select>
-
-              <ToolbarButton label="Tăng cỡ chữ" onClick={bumpFontSize(1)}>
-                <AArrowUp size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton label="Giảm cỡ chữ" onClick={bumpFontSize(-1)}>
-                <AArrowDown size={17} aria-hidden="true" />
-              </ToolbarButton>
-
-              <span className="vd-writer__color" title="Màu chữ">
-                <span
-                  className="vd-writer__color-swatch"
-                  style={{ color: textColor }}
-                  aria-hidden="true"
+          {/* TAB 1: TRANG CHỦ */}
+          <div className="vd-writer__tab-panel" hidden={ribbonTab !== "home"}>
+            <div className="vd-writer__tgroup vd-writer__tgroup--rail">
+              <div className="vd-writer__tgroup-line vd-writer__tgroup-line--stack">
+                <ToolbarButton
+                  label="Hoàn tác (Ctrl+Z)"
+                  onClick={run(undo)}
+                  disabled={!canUndo}
                 >
-                  A
+                  <Undo2 size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Làm lại (Ctrl+Y)"
+                  onClick={run(redo)}
+                  disabled={!canRedo}
+                >
+                  <Redo2 size={17} aria-hidden="true" />
+                </ToolbarButton>
+              </div>
+              <span className="vd-writer__tgroup-caption">Hoàn tác</span>
+            </div>
+
+            <div className="vd-writer__tgroup">
+              <div className="vd-writer__tgroup-line">
+                <ToolbarButton
+                  label="Dán (Ctrl+V)"
+                  onClick={() => void pasteFromClipboard()}
+                >
+                  <ClipboardPaste size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Cắt (Ctrl+X)"
+                  onClick={() => runClipboard("cut")}
+                >
+                  <Scissors size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Chép (Ctrl+C)"
+                  onClick={() => runClipboard("copy")}
+                >
+                  <Copy size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Chép định dạng — bấm lần nữa để dán định dạng vào vùng chọn"
+                  active={painterArmed}
+                  onClick={toggleFormatPainter}
+                >
+                  <Paintbrush size={17} aria-hidden="true" />
+                </ToolbarButton>
+              </div>
+              <div className="vd-writer__tgroup-line">
+                <ToolbarButton
+                  label="Dán không định dạng (Ctrl+Shift+V)"
+                  onClick={() => void pastePlainText()}
+                >
+                  <ClipboardType size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Xóa nội dung đang chọn"
+                  disabled={!state || state.selection.empty}
+                  onClick={run(deleteSelection)}
+                >
+                  <Eraser size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Chép toàn bộ văn bản"
+                  onClick={() => void copyAllText()}
+                >
+                  <ClipboardCopy size={17} aria-hidden="true" />
+                </ToolbarButton>
+              </div>
+              <span className="vd-writer__tgroup-caption">Bảng tạm</span>
+            </div>
+
+            <div className="vd-writer__tgroup">
+              <div className="vd-writer__tgroup-line">
+                <select
+                  className="vd-writer__select vd-writer__select--family"
+                  value={fontFamily}
+                  aria-label="Kiểu chữ"
+                  title="Kiểu chữ"
+                  onChange={(event) =>
+                    run(
+                      event.target.value
+                        ? setMarkAttr(writerSchema.marks.fontFamily, {
+                            family: event.target.value,
+                          })
+                        : removeMarkType(writerSchema.marks.fontFamily),
+                    )()
+                  }
+                >
+                  <option value="">Mặc định</option>
+                  {FONT_FAMILIES.map((font) => (
+                    <option key={font.label} value={font.value}>
+                      {font.label}
+                    </option>
+                  ))}
+                  {fontFamily &&
+                  !FONT_FAMILIES.some((font) => font.value === fontFamily) ? (
+                    <option value={fontFamily}>{fontFamily}</option>
+                  ) : null}
+                </select>
+
+                <select
+                  className="vd-writer__select vd-writer__select--size"
+                  value={fontSize}
+                  aria-label="Cỡ chữ"
+                  title="Cỡ chữ"
+                  onChange={(event) =>
+                    run(
+                      event.target.value
+                        ? setMarkAttr(writerSchema.marks.fontSize, {
+                            size: event.target.value,
+                          })
+                        : removeMarkType(writerSchema.marks.fontSize),
+                    )()
+                  }
+                >
+                  <option value="">Mặc định</option>
+                  {FONT_SIZES.map((size) => (
+                    <option key={size} value={size}>
+                      {size}
+                    </option>
+                  ))}
+                  {fontSize && !FONT_SIZES.includes(fontSize) ? (
+                    <option value={fontSize}>{fontSize}</option>
+                  ) : null}
+                </select>
+
+                <ToolbarButton label="Tăng cỡ chữ" onClick={bumpFontSize(1)}>
+                  <AArrowUp size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton label="Giảm cỡ chữ" onClick={bumpFontSize(-1)}>
+                  <AArrowDown size={17} aria-hidden="true" />
+                </ToolbarButton>
+
+                <span className="vd-writer__color" title="Màu chữ">
+                  <span
+                    className="vd-writer__color-swatch"
+                    style={{ color: textColor }}
+                    aria-hidden="true"
+                  >
+                    A
+                  </span>
+                  <input
+                    type="color"
+                    value={colorInputValue(textColor, DEFAULT_TEXT_COLOR)}
+                    aria-label="Màu chữ"
+                    onChange={(event) =>
+                      run(
+                        setMarkAttr(writerSchema.marks.textColor, {
+                          color: event.target.value,
+                        }),
+                      )()
+                    }
+                  />
                 </span>
-                <input
-                  type="color"
-                  value={colorInputValue(textColor, DEFAULT_TEXT_COLOR)}
-                  aria-label="Màu chữ"
+
+                <span className="vd-writer__color" title="Tô sáng">
+                  <span
+                    className="vd-writer__color-swatch vd-writer__color-swatch--highlight"
+                    style={{ background: highlightColor }}
+                    aria-hidden="true"
+                  />
+                  <input
+                    type="color"
+                    value={colorInputValue(
+                      highlightColor,
+                      DEFAULT_HIGHLIGHT_COLOR,
+                    )}
+                    aria-label="Tô sáng"
+                    onChange={(event) =>
+                      run(
+                        setMarkAttr(writerSchema.marks.highlight, {
+                          color: event.target.value,
+                        }),
+                      )()
+                    }
+                  />
+                </span>
+
+                <ToolbarButton
+                  label="Xóa định dạng"
+                  onClick={run(clearFormatting())}
+                >
+                  <RemoveFormatting size={17} aria-hidden="true" />
+                </ToolbarButton>
+              </div>
+              <div className="vd-writer__tgroup-line">
+                <ToolbarButton
+                  label="Đậm (Ctrl+B)"
+                  active={strongActive}
+                  onClick={run(toggleMark(writerSchema.marks.strong))}
+                >
+                  <Bold size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Nghiêng (Ctrl+I)"
+                  active={emActive}
+                  onClick={run(toggleMark(writerSchema.marks.em))}
+                >
+                  <Italic size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Gạch chân (Ctrl+U)"
+                  active={underlineActive}
+                  onClick={run(toggleMark(writerSchema.marks.underline))}
+                >
+                  <Underline size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Gạch ngang (Ctrl+Shift+X)"
+                  active={strikeActive}
+                  onClick={run(toggleMark(writerSchema.marks.strike))}
+                >
+                  <Strikethrough size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Chỉ số trên (Ctrl+Shift+.)"
+                  active={superscriptActive}
+                  onClick={run(toggleMark(writerSchema.marks.superscript))}
+                >
+                  <Superscript size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Chỉ số dưới (Ctrl+Shift+,)"
+                  active={subscriptActive}
+                  onClick={run(toggleMark(writerSchema.marks.subscript))}
+                >
+                  <Subscript size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <select
+                  className="vd-writer__select vd-writer__select--case"
+                  value=""
+                  aria-label="Đổi chữ hoa/thường"
+                  title="Đổi chữ hoa/thường (Aa)"
+                  onChange={(event) => {
+                    const mode = event.target.value as CaseMode | "";
+                    if (mode) {
+                      run(changeCase(mode))();
+                    }
+                    event.target.value = "";
+                  }}
+                >
+                  <option value="">Aa</option>
+                  <option value="upper">CHỮ HOA</option>
+                  <option value="lower">chữ thường</option>
+                  <option value="sentence">Viết hoa đầu câu</option>
+                  <option value="capitalize">Viết Hoa Mỗi Từ</option>
+                  <option value="toggle">Đảo chữ hoa/thường</option>
+                </select>
+              </div>
+              <span className="vd-writer__tgroup-caption">Phông chữ</span>
+            </div>
+
+            <div className="vd-writer__tgroup">
+              <div className="vd-writer__tgroup-line">
+                <ToolbarButton
+                  label="Danh sách gạch đầu dòng (Ctrl+Shift+8)"
+                  active={bulletActive}
+                  onClick={run(toggleList(writerSchema.nodes.bullet_list))}
+                >
+                  <List size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Danh sách đánh số (Ctrl+Shift+7)"
+                  active={orderedActive}
+                  onClick={run(toggleList(writerSchema.nodes.ordered_list))}
+                >
+                  <ListOrdered size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Danh sách việc cần làm (Ctrl+Shift+9)"
+                  active={taskActive}
+                  onClick={run(toggleTaskList())}
+                >
+                  <ListChecks size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Lùi lề ra (Ctrl+[)"
+                  disabled={currentIndent <= 0}
+                  onClick={run(changeIndent(-1))}
+                >
+                  <IndentDecrease size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Thụt lề vào (Ctrl+])"
+                  disabled={currentIndent >= 6}
+                  onClick={run(changeIndent(1))}
+                >
+                  <IndentIncrease size={17} aria-hidden="true" />
+                </ToolbarButton>
+              </div>
+              <div className="vd-writer__tgroup-line">
+                <ToolbarButton
+                  label="Canh trái (Ctrl+Shift+L)"
+                  active={currentAlign === "left"}
+                  onClick={run(setAlign("left"))}
+                >
+                  <AlignLeft size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Canh giữa (Ctrl+Shift+E)"
+                  active={currentAlign === "center"}
+                  onClick={run(setAlign("center"))}
+                >
+                  <AlignCenter size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Canh phải (Ctrl+Shift+R)"
+                  active={currentAlign === "right"}
+                  onClick={run(setAlign("right"))}
+                >
+                  <AlignRight size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Canh đều (Ctrl+Shift+J)"
+                  active={currentAlign === "justify"}
+                  onClick={run(setAlign("justify"))}
+                >
+                  <AlignJustify size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <select
+                  className="vd-writer__select vd-writer__select--spacing"
+                  value={lineHeight}
+                  aria-label="Giãn dòng"
+                  title="Giãn dòng"
                   onChange={(event) =>
-                    run(
-                      setMarkAttr(writerSchema.marks.textColor, {
-                        color: event.target.value,
-                      }),
-                    )()
+                    run(setLineHeight(event.target.value || null))()
                   }
-                />
-              </span>
-
-              <span className="vd-writer__color" title="Tô sáng">
-                <span
-                  className="vd-writer__color-swatch vd-writer__color-swatch--highlight"
-                  style={{ background: highlightColor }}
-                  aria-hidden="true"
-                />
-                <input
-                  type="color"
-                  value={colorInputValue(
-                    highlightColor,
-                    DEFAULT_HIGHLIGHT_COLOR,
-                  )}
-                  aria-label="Tô sáng"
-                  onChange={(event) =>
-                    run(
-                      setMarkAttr(writerSchema.marks.highlight, {
-                        color: event.target.value,
-                      }),
-                    )()
-                  }
-                />
-              </span>
-
-              <ToolbarButton
-                label="Xóa định dạng"
-                onClick={run(clearFormatting())}
-              >
-                <RemoveFormatting size={17} aria-hidden="true" />
-              </ToolbarButton>
+                >
+                  {LINE_HEIGHTS.map((item) => (
+                    <option key={item.label} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                  {lineHeight &&
+                  !LINE_HEIGHTS.some((item) => item.value === lineHeight) ? (
+                    <option value={lineHeight}>{lineHeight}</option>
+                  ) : null}
+                </select>
+                <ToolbarButton
+                  label="Hiện/ẩn dấu đoạn ¶"
+                  active={showMarks}
+                  onClick={() => {
+                    setShowMarks((value) => !value);
+                    viewRef.current?.focus();
+                  }}
+                >
+                  <Pilcrow size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Sắp xếp đoạn văn A→Z (chọn từ hai đoạn trở lên)"
+                  onClick={run(sortSelectedBlocks())}
+                >
+                  <ArrowDownAZ size={17} aria-hidden="true" />
+                </ToolbarButton>
+              </div>
+              <span className="vd-writer__tgroup-caption">Đoạn văn</span>
             </div>
-            <div className="vd-writer__tgroup-line">
-              <ToolbarButton
-                label="Đậm (Ctrl+B)"
-                active={strongActive}
-                onClick={run(toggleMark(writerSchema.marks.strong))}
-              >
-                <Bold size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Nghiêng (Ctrl+I)"
-                active={emActive}
-                onClick={run(toggleMark(writerSchema.marks.em))}
-              >
-                <Italic size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Gạch chân (Ctrl+U)"
-                active={underlineActive}
-                onClick={run(toggleMark(writerSchema.marks.underline))}
-              >
-                <Underline size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Gạch ngang (Ctrl+Shift+X)"
-                active={strikeActive}
-                onClick={run(toggleMark(writerSchema.marks.strike))}
-              >
-                <Strikethrough size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Chỉ số trên (Ctrl+Shift+.)"
-                active={superscriptActive}
-                onClick={run(toggleMark(writerSchema.marks.superscript))}
-              >
-                <Superscript size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Chỉ số dưới (Ctrl+Shift+,)"
-                active={subscriptActive}
-                onClick={run(toggleMark(writerSchema.marks.subscript))}
-              >
-                <Subscript size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <select
-                className="vd-writer__select vd-writer__select--case"
-                value=""
-                aria-label="Đổi chữ hoa/thường"
-                title="Đổi chữ hoa/thường (Aa)"
-                onChange={(event) => {
-                  const mode = event.target.value as CaseMode | "";
-                  if (mode) {
-                    run(changeCase(mode))();
-                  }
-                  // Select chỉ là bảng chọn hành động: trả về "Aa" để lần sau
-                  // có thể chọn lại cùng một kiểu.
-                  event.target.value = "";
-                }}
-              >
-                <option value="">Aa</option>
-                <option value="upper">CHỮ HOA</option>
-                <option value="lower">chữ thường</option>
-                <option value="sentence">Viết hoa đầu câu</option>
-                <option value="capitalize">Viết Hoa Mỗi Từ</option>
-                <option value="toggle">Đảo chữ hoa/thường</option>
-              </select>
+
+            <div className="vd-writer__tgroup">
+              <div className="vd-writer__tgroup-line">
+                <select
+                  className="vd-writer__select vd-writer__select--block"
+                  value={blockStyle}
+                  aria-label="Kiểu đoạn"
+                  title="Kiểu đoạn"
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    if (value === "paragraph") {
+                      run(setBlock(writerSchema.nodes.paragraph))();
+                      return;
+                    }
+                    const level = Number(value.replace("heading-", ""));
+                    if (Number.isInteger(level) && level >= 1 && level <= 6) {
+                      run(setBlock(writerSchema.nodes.heading, { level }))();
+                    }
+                  }}
+                >
+                  <option value="paragraph">Đoạn văn</option>
+                  {[1, 2, 3, 4, 5, 6].map((level) => (
+                    <option key={level} value={`heading-${level}`}>
+                      Tiêu đề {level}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="vd-writer__tgroup-line">
+                <ToolbarButton
+                  label="Đoạn văn thường"
+                  active={blockStyle === "paragraph"}
+                  onClick={run(setBlock(writerSchema.nodes.paragraph))}
+                >
+                  <Type size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Tiêu đề 1"
+                  active={blockStyle === "heading-1"}
+                  onClick={run(setBlock(writerSchema.nodes.heading, { level: 1 }))}
+                >
+                  <Heading1 size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Tiêu đề 2"
+                  active={blockStyle === "heading-2"}
+                  onClick={run(setBlock(writerSchema.nodes.heading, { level: 2 }))}
+                >
+                  <Heading2 size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Tiêu đề 3"
+                  active={blockStyle === "heading-3"}
+                  onClick={run(setBlock(writerSchema.nodes.heading, { level: 3 }))}
+                >
+                  <Heading3 size={17} aria-hidden="true" />
+                </ToolbarButton>
+              </div>
+              <span className="vd-writer__tgroup-caption">Kiểu</span>
             </div>
-            <span className="vd-writer__tgroup-caption">Phông chữ</span>
+
+            <div className="vd-writer__tgroup">
+              <div className="vd-writer__tgroup-line">
+                <ToolbarButton
+                  label="Tìm trong văn bản (Ctrl+F)"
+                  onClick={() => {
+                    setReplaceMode(false);
+                    setSearchOpen(true);
+                  }}
+                >
+                  <Search size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Tìm và thay thế (Ctrl+H)"
+                  onClick={() => {
+                    setReplaceMode(true);
+                    setSearchOpen(true);
+                  }}
+                >
+                  <Replace size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Chọn tất cả (Ctrl+A)"
+                  onClick={run(selectAll)}
+                >
+                  <SquareDashed size={17} aria-hidden="true" />
+                </ToolbarButton>
+              </div>
+              <span className="vd-writer__tgroup-caption">Chỉnh sửa</span>
+            </div>
+
+            <div className="vd-writer__tgroup">
+              <div className="vd-writer__tgroup-line">
+                <ToolbarButton
+                  label="Chèn ngày tháng"
+                  active={insertPanel === "date"}
+                  onClick={() =>
+                    setInsertPanel((open) => (open === "date" ? null : "date"))
+                  }
+                >
+                  <CalendarDays size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Chèn ký hiệu"
+                  active={insertPanel === "symbol"}
+                  onClick={() =>
+                    setInsertPanel((open) =>
+                      open === "symbol" ? null : "symbol",
+                    )
+                  }
+                >
+                  <Sigma size={17} aria-hidden="true" />
+                </ToolbarButton>
+              </div>
+              <div className="vd-writer__tgroup-line">
+                <ToolbarButton
+                  label="Xuất Word (.docx)"
+                  onClick={() => void exportWordNow()}
+                  disabled={exportBusy}
+                >
+                  <FileType size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Xuất văn bản (.txt)"
+                  onClick={() => void exportTextNow()}
+                  disabled={exportBusy}
+                >
+                  <FileText size={17} aria-hidden="true" />
+                </ToolbarButton>
+              </div>
+              <span className="vd-writer__tgroup-caption">Tiện ích</span>
+            </div>
           </div>
 
-          <div className="vd-writer__tgroup">
-            <div className="vd-writer__tgroup-line">
-              <ToolbarButton
-                label="Danh sách gạch đầu dòng (Ctrl+Shift+8)"
-                active={bulletActive}
-                onClick={run(toggleList(writerSchema.nodes.bullet_list))}
-              >
-                <List size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Danh sách đánh số (Ctrl+Shift+7)"
-                active={orderedActive}
-                onClick={run(toggleList(writerSchema.nodes.ordered_list))}
-              >
-                <ListOrdered size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Danh sách việc cần làm (Ctrl+Shift+9)"
-                active={taskActive}
-                onClick={run(toggleTaskList())}
-              >
-                <ListChecks size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Lùi lề ra (Ctrl+[)"
-                disabled={currentIndent <= 0}
-                onClick={run(changeIndent(-1))}
-              >
-                <IndentDecrease size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Thụt lề vào (Ctrl+])"
-                disabled={currentIndent >= 6}
-                onClick={run(changeIndent(1))}
-              >
-                <IndentIncrease size={17} aria-hidden="true" />
-              </ToolbarButton>
+          {/* TAB 2: CHÈN & BIỂU MẪU */}
+          <div className="vd-writer__tab-panel" hidden={ribbonTab !== "insert"}>
+            <div className="vd-writer__tgroup">
+              <div className="vd-writer__tgroup-line">
+                <ToolbarButton
+                  label="Chèn bảng"
+                  onClick={() => {
+                    setTableSize(null);
+                    setTablePickerOpen((open) => !open);
+                  }}
+                >
+                  <Table size={17} aria-hidden="true" />
+                </ToolbarButton>
+              </div>
+              <span className="vd-writer__tgroup-caption">Bảng biểu</span>
             </div>
-            <div className="vd-writer__tgroup-line">
-              <ToolbarButton
-                label="Canh trái (Ctrl+Shift+L)"
-                active={currentAlign === "left"}
-                onClick={run(setAlign("left"))}
-              >
-                <AlignLeft size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Canh giữa (Ctrl+Shift+E)"
-                active={currentAlign === "center"}
-                onClick={run(setAlign("center"))}
-              >
-                <AlignCenter size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Canh phải (Ctrl+Shift+R)"
-                active={currentAlign === "right"}
-                onClick={run(setAlign("right"))}
-              >
-                <AlignRight size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Canh đều (Ctrl+Shift+J)"
-                active={currentAlign === "justify"}
-                onClick={run(setAlign("justify"))}
-              >
-                <AlignJustify size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <select
-                className="vd-writer__select vd-writer__select--spacing"
-                value={lineHeight}
-                aria-label="Giãn dòng"
-                title="Giãn dòng"
-                onChange={(event) =>
-                  run(setLineHeight(event.target.value || null))()
-                }
-              >
-                {LINE_HEIGHTS.map((item) => (
-                  <option key={item.label} value={item.value}>
-                    {item.label}
-                  </option>
-                ))}
-                {lineHeight &&
-                !LINE_HEIGHTS.some((item) => item.value === lineHeight) ? (
-                  <option value={lineHeight}>{lineHeight}</option>
-                ) : null}
-              </select>
-              <ToolbarButton
-                label="Hiện/ẩn dấu đoạn ¶"
-                active={showMarks}
-                onClick={() => {
-                  setShowMarks((value) => !value);
-                  viewRef.current?.focus();
-                }}
-              >
-                <Pilcrow size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Sắp xếp đoạn văn A→Z (chọn từ hai đoạn trở lên)"
-                onClick={run(sortSelectedBlocks())}
-              >
-                <ArrowDownAZ size={17} aria-hidden="true" />
-              </ToolbarButton>
-            </div>
-            <span className="vd-writer__tgroup-caption">Đoạn văn</span>
-          </div>
 
-          <div className="vd-writer__tgroup">
-            <div className="vd-writer__tgroup-line">
-              <select
-                className="vd-writer__select vd-writer__select--block"
-                value={blockStyle}
-                aria-label="Kiểu đoạn"
-                title="Kiểu đoạn"
-                onChange={(event) => {
-                  const value = event.target.value;
-                  if (value === "paragraph") {
-                    run(setBlock(writerSchema.nodes.paragraph))();
-                    return;
+            <div className="vd-writer__tgroup">
+              <div className="vd-writer__tgroup-line">
+                <ToolbarButton
+                  label="Chèn ảnh"
+                  onClick={() => void handleInsertImage()}
+                >
+                  <Image size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton label="Chèn liên kết" onClick={openLinkBar}>
+                  <Link2 size={17} aria-hidden="true" />
+                </ToolbarButton>
+              </div>
+              <span className="vd-writer__tgroup-caption">Phương tiện</span>
+            </div>
+
+            <div className="vd-writer__tgroup">
+              <div className="vd-writer__tgroup-line">
+                <ToolbarButton
+                  label="Ngắt trang"
+                  onClick={run(insertPageBreak())}
+                >
+                  <SeparatorHorizontal size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Chèn đường kẻ ngang"
+                  onClick={run(insertHorizontalRule())}
+                >
+                  <Minus size={17} aria-hidden="true" />
+                </ToolbarButton>
+              </div>
+              <span className="vd-writer__tgroup-caption">Trang & Ngắt</span>
+            </div>
+
+            <div className="vd-writer__tgroup">
+              <div className="vd-writer__tgroup-line">
+                <ToolbarButton
+                  label="Chèn ngày tháng"
+                  active={insertPanel === "date"}
+                  onClick={() =>
+                    setInsertPanel((open) => (open === "date" ? null : "date"))
                   }
-                  const level = Number(value.replace("heading-", ""));
-                  if (Number.isInteger(level) && level >= 1 && level <= 6) {
-                    run(setBlock(writerSchema.nodes.heading, { level }))();
+                >
+                  <CalendarDays size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Chèn ký hiệu"
+                  active={insertPanel === "symbol"}
+                  onClick={() =>
+                    setInsertPanel((open) =>
+                      open === "symbol" ? null : "symbol",
+                    )
                   }
-                }}
-              >
-                <option value="paragraph">Đoạn văn</option>
-                {[1, 2, 3, 4, 5, 6].map((level) => (
-                  <option key={level} value={`heading-${level}`}>
-                    Tiêu đề {level}
-                  </option>
-                ))}
-              </select>
+                >
+                  <Sigma size={17} aria-hidden="true" />
+                </ToolbarButton>
+              </div>
+              <span className="vd-writer__tgroup-caption">Ký hiệu & Ngày</span>
             </div>
-            <div className="vd-writer__tgroup-line">
-              <ToolbarButton
-                label="Đoạn văn thường"
-                active={blockStyle === "paragraph"}
-                onClick={run(setBlock(writerSchema.nodes.paragraph))}
-              >
-                <Type size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Tiêu đề 1"
-                active={blockStyle === "heading-1"}
-                onClick={run(setBlock(writerSchema.nodes.heading, { level: 1 }))}
-              >
-                <Heading1 size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Tiêu đề 2"
-                active={blockStyle === "heading-2"}
-                onClick={run(setBlock(writerSchema.nodes.heading, { level: 2 }))}
-              >
-                <Heading2 size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Tiêu đề 3"
-                active={blockStyle === "heading-3"}
-                onClick={run(setBlock(writerSchema.nodes.heading, { level: 3 }))}
-              >
-                <Heading3 size={17} aria-hidden="true" />
-              </ToolbarButton>
+
+            <div className="vd-writer__tgroup">
+              <div className="vd-writer__tgroup-line">
+                <ToolbarButton
+                  label="Biểu mẫu chuẩn Nghị định 30"
+                  active={templatePickerOpen}
+                  onClick={() => setTemplatePickerOpen((open) => !open)}
+                >
+                  <FileText size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Chèn trường biểu mẫu (OFORM)"
+                  active={insertPanel === "form"}
+                  onClick={() =>
+                    setInsertPanel((open) => (open === "form" ? null : "form"))
+                  }
+                >
+                  <SquareDashed size={17} aria-hidden="true" />
+                </ToolbarButton>
+              </div>
+              <span className="vd-writer__tgroup-caption">Biểu mẫu</span>
             </div>
-            <span className="vd-writer__tgroup-caption">Kiểu</span>
           </div>
 
-          <div className="vd-writer__tgroup">
-            <div className="vd-writer__tgroup-line">
-              <ToolbarButton
-                label="Biểu mẫu chuẩn Nghị định 30"
-                active={templatePickerOpen}
-                onClick={() => setTemplatePickerOpen((open) => !open)}
-              >
-                <FileText size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Chèn bảng"
-                onClick={() => {
-                  setTableSize(null);
-                  setTablePickerOpen((open) => !open);
-                }}
-              >
-                <Table size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton label="Chèn liên kết" onClick={openLinkBar}>
-                <Link2 size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Chèn ảnh"
-                onClick={() => void handleInsertImage()}
-              >
-                <Image size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Ngắt trang"
-                onClick={run(insertPageBreak())}
-              >
-                <SeparatorHorizontal size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Chèn đường kẻ ngang"
-                onClick={run(insertHorizontalRule())}
-              >
-                <Minus size={17} aria-hidden="true" />
-              </ToolbarButton>
+          {/* TAB 3: BỐ CỤC TRANG */}
+          <div className="vd-writer__tab-panel" hidden={ribbonTab !== "layout"}>
+            <div className="vd-writer__tgroup">
+              <div className="vd-writer__tgroup-line">
+                <button
+                  type="button"
+                  className="vd-writer__nd30-btn"
+                  onClick={applyNd30Layout}
+                  title="Chuẩn hóa toàn bộ trang văn bản theo Nghị định 30/2020/NĐ-CP (Lề 20-20-30-15mm, Khổ A4, Đánh số trang chuẩn)"
+                >
+                  <FileCheck size={16} aria-hidden="true" />
+                  <span>Chuẩn hóa NĐ 30</span>
+                </button>
+              </div>
+              <span className="vd-writer__tgroup-caption">Thể thức chuẩn</span>
             </div>
-            <div className="vd-writer__tgroup-line">
-              <ToolbarButton
-                label="Chèn ngày tháng"
-                active={insertPanel === "date"}
-                onClick={() =>
-                  setInsertPanel((open) => (open === "date" ? null : "date"))
-                }
-              >
-                <CalendarDays size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Chèn ký hiệu"
-                active={insertPanel === "symbol"}
-                onClick={() =>
-                  setInsertPanel((open) =>
-                    open === "symbol" ? null : "symbol",
-                  )
-                }
-              >
-                <Sigma size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Hiện/ẩn số trang"
-                active={pageSetup.showPageNumbers}
-                onClick={() =>
-                  updatePageSetup({
-                    ...pageSetup,
-                    showPageNumbers: !pageSetup.showPageNumbers,
-                  })
-                }
-              >
-                <Hash size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Chèn trường biểu mẫu (OFORM)"
-                active={insertPanel === "form"}
-                onClick={() =>
-                  setInsertPanel((open) => (open === "form" ? null : "form"))
-                }
-              >
-                <SquareDashed size={17} aria-hidden="true" />
-              </ToolbarButton>
+
+            <div className="vd-writer__tgroup">
+              <div className="vd-writer__tgroup-line">
+                <select
+                  className="vd-writer__select"
+                  value={
+                    pageSetup.margins?.top === 20 &&
+                    pageSetup.margins?.bottom === 20 &&
+                    pageSetup.margins?.left === 30 &&
+                    pageSetup.margins?.right === 15
+                      ? "nd30"
+                      : "custom"
+                  }
+                  onChange={(e) => {
+                    if (e.target.value === "nd30") {
+                      updatePageSetup({
+                        ...pageSetup,
+                        margins: { top: 20, bottom: 20, left: 30, right: 15 },
+                      });
+                    } else if (e.target.value === "standard") {
+                      updatePageSetup({
+                        ...pageSetup,
+                        margins: { top: 25.4, bottom: 25.4, left: 25.4, right: 25.4 },
+                      });
+                    } else if (e.target.value === "narrow") {
+                      updatePageSetup({
+                        ...pageSetup,
+                        margins: { top: 12.7, bottom: 12.7, left: 12.7, right: 12.7 },
+                      });
+                    } else if (e.target.value === "wide") {
+                      updatePageSetup({
+                        ...pageSetup,
+                        margins: { top: 25.4, bottom: 25.4, left: 38.1, right: 38.1 },
+                      });
+                    }
+                  }}
+                  title="Thiết lập lề trang nhanh"
+                  aria-label="Căn lề trang"
+                >
+                  <option value="nd30">Lề chuẩn NĐ 30 (20-20-30-15 mm)</option>
+                  <option value="standard">Tiêu chuẩn (25.4 mm)</option>
+                  <option value="narrow">Lề hẹp (12.7 mm)</option>
+                  <option value="wide">Lề rộng (25.4 - 38.1 mm)</option>
+                  <option value="custom">Tùy biến...</option>
+                </select>
+                <ToolbarButton
+                  label="Tùy chỉnh lề chi tiết"
+                  active={pagePanelOpen}
+                  onClick={() => setPagePanelOpen((v) => !v)}
+                >
+                  <PanelTop size={17} aria-hidden="true" />
+                </ToolbarButton>
+              </div>
+              <span className="vd-writer__tgroup-caption">Lề trang</span>
             </div>
-            <span className="vd-writer__tgroup-caption">Chèn</span>
+
+            <div className="vd-writer__tgroup">
+              <div className="vd-writer__tgroup-line">
+                <select
+                  className="vd-writer__select"
+                  value={pageSetup.orientation ?? "portrait"}
+                  onChange={(e) =>
+                    updatePageSetup({
+                      ...pageSetup,
+                      orientation: e.target.value as "portrait" | "landscape",
+                    })
+                  }
+                  title="Hướng trang"
+                  aria-label="Hướng trang"
+                >
+                  <option value="portrait">Trang đứng (Portrait)</option>
+                  <option value="landscape">Trang ngang (Landscape)</option>
+                </select>
+                <select
+                  className="vd-writer__select"
+                  value={pageSetup.paperSize ?? "a4"}
+                  onChange={(e) =>
+                    updatePageSetup({
+                      ...pageSetup,
+                      paperSize: e.target.value as "a4" | "letter" | "legal",
+                    })
+                  }
+                  title="Khổ giấy"
+                  aria-label="Khổ giấy"
+                >
+                  <option value="a4">Khổ A4 (210 × 297 mm)</option>
+                  <option value="letter">Letter (8.5 × 11 in)</option>
+                  <option value="legal">Legal (8.5 × 14 in)</option>
+                </select>
+              </div>
+              <span className="vd-writer__tgroup-caption">Khổ giấy</span>
+            </div>
+
+            <div className="vd-writer__tgroup">
+              <div className="vd-writer__tgroup-line">
+                <ToolbarButton
+                  label="Lùi lề ra (Ctrl+[)"
+                  disabled={currentIndent <= 0}
+                  onClick={run(changeIndent(-1))}
+                >
+                  <IndentDecrease size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Thụt lề vào (Ctrl+])"
+                  disabled={currentIndent >= 6}
+                  onClick={run(changeIndent(1))}
+                >
+                  <IndentIncrease size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <select
+                  className="vd-writer__select"
+                  value=""
+                  onChange={(e) => {
+                    const mm = Number(e.target.value);
+                    if (!isNaN(mm)) run(setFirstLineIndent(mm))();
+                    e.target.value = "";
+                  }}
+                  title="Thụt dòng đầu tiên (First Line Indent)"
+                  aria-label="Thụt dòng đầu"
+                >
+                  <option value="">Thụt dòng đầu...</option>
+                  <option value="0">Không thụt dòng (0 mm)</option>
+                  <option value="10">Thụt 10 mm</option>
+                  <option value="12.7">Thụt chuẩn NĐ 30 (12.7 mm)</option>
+                  <option value="15">Thụt 15 mm</option>
+                </select>
+              </div>
+              <span className="vd-writer__tgroup-caption">Thụt lề</span>
+            </div>
+
+            <div className="vd-writer__tgroup">
+              <div className="vd-writer__tgroup-line">
+                <ToolbarButton
+                  label="Đầu trang và chân trang"
+                  active={pagePanelOpen}
+                  onClick={() => setPagePanelOpen((value) => !value)}
+                >
+                  <PanelTop size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Hiện/ẩn số trang"
+                  active={pageSetup.showPageNumbers}
+                  onClick={() =>
+                    updatePageSetup({
+                      ...pageSetup,
+                      showPageNumbers: !pageSetup.showPageNumbers,
+                    })
+                  }
+                >
+                  <Hash size={17} aria-hidden="true" />
+                </ToolbarButton>
+              </div>
+              <span className="vd-writer__tgroup-caption">Đầu & Chân trang</span>
+            </div>
           </div>
 
-          <div className="vd-writer__tgroup">
-            <div className="vd-writer__tgroup-line">
-              <ToolbarButton
-                label="Tìm trong văn bản (Ctrl+F)"
-                onClick={() => {
-                  setReplaceMode(false);
-                  setSearchOpen(true);
-                }}
-              >
-                <Search size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Tìm và thay thế (Ctrl+H)"
-                onClick={() => {
-                  setReplaceMode(true);
-                  setSearchOpen(true);
-                }}
-              >
-                <Replace size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Chọn tất cả (Ctrl+A)"
-                onClick={run(selectAll)}
-              >
-                <SquareDashed size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Bảng điều hướng cấu trúc tài liệu"
-                active={outlineOpen}
-                onClick={() => setOutlineOpen((value) => !value)}
-              >
-                <ListTree size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Đầu trang và chân trang"
-                active={pagePanelOpen}
-                onClick={() => setPagePanelOpen((value) => !value)}
-              >
-                <PanelTop size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Theo dõi thay đổi"
-                active={trackChangesOn}
-                onClick={toggleTrackChangesMode}
-              >
-                <GitCompareArrows size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Bình luận"
-                active={commentsOpen}
-                onClick={startComment}
-              >
-                <MessageSquarePlus size={17} aria-hidden="true" />
-              </ToolbarButton>
+          {/* TAB 4: KIỂM DUYỆT */}
+          <div className="vd-writer__tab-panel" hidden={ribbonTab !== "review"}>
+            <div className="vd-writer__tgroup">
+              <div className="vd-writer__tgroup-line">
+                <ToolbarButton
+                  label="Theo dõi thay đổi"
+                  active={trackChangesOn}
+                  onClick={toggleTrackChangesMode}
+                >
+                  <GitCompareArrows size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Chấp nhận thay đổi tại con trỏ"
+                  disabled={changeList.length === 0 || !currentChange}
+                  onClick={() => resolveCurrentChange(true)}
+                >
+                  <Check size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Bác bỏ thay đổi tại con trỏ"
+                  disabled={changeList.length === 0 || !currentChange}
+                  onClick={() => resolveCurrentChange(false)}
+                >
+                  <X size={17} aria-hidden="true" />
+                </ToolbarButton>
+              </div>
+              <div className="vd-writer__tgroup-line">
+                <ToolbarButton
+                  label="Chấp nhận mọi thay đổi"
+                  disabled={changeList.length === 0}
+                  onClick={acceptAll}
+                >
+                  <CheckCheck size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Bác bỏ mọi thay đổi"
+                  disabled={changeList.length === 0}
+                  onClick={rejectAll}
+                >
+                  <Undo2 size={17} aria-hidden="true" />
+                </ToolbarButton>
+              </div>
+              <span className="vd-writer__tgroup-caption">Theo dõi thay đổi</span>
             </div>
-            <div className="vd-writer__tgroup-line">
-              <ToolbarButton
-                label="Thống kê tài liệu"
-                active={statsOpen}
-                onClick={() => setStatsOpen((value) => !value)}
-              >
-                <ChartColumn size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Bảng bình luận"
-                active={commentsOpen}
-                onClick={() => setCommentsOpen((value) => !value)}
-              >
-                <MessageSquare size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Chấp nhận thay đổi tại con trỏ"
-                disabled={changeList.length === 0 || !currentChange}
-                onClick={() => resolveCurrentChange(true)}
-              >
-                <Check size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Bác bỏ thay đổi tại con trỏ"
-                disabled={changeList.length === 0 || !currentChange}
-                onClick={() => resolveCurrentChange(false)}
-              >
-                <X size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Chấp nhận mọi thay đổi"
-                disabled={changeList.length === 0}
-                onClick={acceptAll}
-              >
-                <CheckCheck size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Bác bỏ mọi thay đổi"
-                disabled={changeList.length === 0}
-                onClick={rejectAll}
-              >
-                <Undo2 size={17} aria-hidden="true" />
-              </ToolbarButton>
+
+            <div className="vd-writer__tgroup">
+              <div className="vd-writer__tgroup-line">
+                <ToolbarButton
+                  label="Bình luận"
+                  active={commentsOpen}
+                  onClick={startComment}
+                >
+                  <MessageSquarePlus size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Bảng bình luận"
+                  active={commentsOpen}
+                  onClick={() => setCommentsOpen((value) => !value)}
+                >
+                  <MessageSquare size={17} aria-hidden="true" />
+                </ToolbarButton>
+              </div>
+              <span className="vd-writer__tgroup-caption">Bình luận</span>
             </div>
-            <span className="vd-writer__tgroup-caption">Duyệt</span>
+
+            <div className="vd-writer__tgroup">
+              <div className="vd-writer__tgroup-line">
+                <ToolbarButton
+                  label="Thống kê tài liệu"
+                  active={statsOpen}
+                  onClick={() => setStatsOpen((value) => !value)}
+                >
+                  <ChartColumn size={17} aria-hidden="true" />
+                </ToolbarButton>
+              </div>
+              <span className="vd-writer__tgroup-caption">Thống kê</span>
+            </div>
+
+            <div className="vd-writer__tgroup">
+              <div className="vd-writer__tgroup-line">
+                <ToolbarButton
+                  label="Chuẩn hóa toàn bộ văn bản sang NFC"
+                  onClick={run(transformVietnamese("nfc"))}
+                >
+                  <span>NFC</span>
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Bỏ thanh điệu tiếng Việt"
+                  onClick={run(transformVietnamese("strip-tones"))}
+                >
+                  <span>Bỏ thanh</span>
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Bỏ toàn bộ dấu tiếng Việt"
+                  onClick={run(transformVietnamese("remove-diacritics"))}
+                >
+                  <span>Bỏ dấu</span>
+                </ToolbarButton>
+              </div>
+              <span className="vd-writer__tgroup-caption">Tiếng Việt</span>
+            </div>
           </div>
 
-          <div className="vd-writer__tgroup vd-writer__tgroup--end">
-            <div className="vd-writer__tgroup-line">
-              <ToolbarButton label="In (Ctrl+P)" onClick={printNow}>
-                <Printer size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Xuất PDF (tệp, không qua máy in)"
-                onClick={() => void exportPdfNow()}
-                disabled={exportBusy}
-              >
-                <FileDown size={17} aria-hidden="true" />
-              </ToolbarButton>
+          {/* TAB 5: HIỂN THỊ */}
+          <div className="vd-writer__tab-panel" hidden={ribbonTab !== "view"}>
+            <div className="vd-writer__tgroup">
+              <div className="vd-writer__tgroup-line">
+                <ToolbarButton
+                  label={pagelessMode ? "Chuyển về Trang in chuẩn A4" : "Chuyển sang Chế độ Không ngắt trang"}
+                  active={pagelessMode}
+                  onClick={() => setPagelessMode((prev) => !prev)}
+                >
+                  <SeparatorHorizontal size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label={focusMode ? "Thoát chế độ tập trung" : "Chế độ tập trung (Focus Mode)"}
+                  active={focusMode}
+                  onClick={() => setFocusMode((f) => !f)}
+                >
+                  <SquareDashed size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label={readOnly ? "Mở khóa chỉnh sửa" : "Khóa chỉnh sửa (Chế độ đọc)"}
+                  active={readOnly}
+                  onClick={() => setReadOnly((r) => !r)}
+                >
+                  <FileText size={17} aria-hidden="true" />
+                </ToolbarButton>
+              </div>
+              <span className="vd-writer__tgroup-caption">Chế độ xem</span>
             </div>
-            <div className="vd-writer__tgroup-line">
-              <ToolbarButton
-                label="Xuất Word (.docx)"
-                onClick={() => void exportWordNow()}
-                disabled={exportBusy}
-              >
-                <FileType size={17} aria-hidden="true" />
-              </ToolbarButton>
-              <ToolbarButton
-                label="Xuất văn bản (.txt)"
-                onClick={() => void exportTextNow()}
-                disabled={exportBusy}
-              >
-                <FileText size={17} aria-hidden="true" />
-              </ToolbarButton>
+
+            <div className="vd-writer__tgroup">
+              <div className="vd-writer__tgroup-line">
+                <ToolbarButton
+                  label="Bảng điều hướng cấu trúc tài liệu"
+                  active={outlineOpen}
+                  onClick={() => setOutlineOpen((value) => !value)}
+                >
+                  <ListTree size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Hiện/ẩn thước kẻ căn lề tài liệu"
+                  active={showRuler && !pagelessMode}
+                  disabled={pagelessMode}
+                  onClick={() => setShowRuler((prev) => !prev)}
+                >
+                  <PanelTop size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Hiện/ẩn dấu đoạn ¶"
+                  active={showMarks}
+                  onClick={() => {
+                    setShowMarks((value) => !value);
+                    viewRef.current?.focus();
+                  }}
+                >
+                  <Pilcrow size={17} aria-hidden="true" />
+                </ToolbarButton>
+              </div>
+              <span className="vd-writer__tgroup-caption">Hiển thị</span>
             </div>
-            <span className="vd-writer__tgroup-caption">In và xuất</span>
+
+            <div className="vd-writer__tgroup vd-writer__tgroup--end">
+              <div className="vd-writer__tgroup-line">
+                <ToolbarButton label="In (Ctrl+P)" onClick={printNow}>
+                  <Printer size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Xuất PDF (tệp, không qua máy in)"
+                  onClick={() => void exportPdfNow()}
+                  disabled={exportBusy}
+                >
+                  <FileDown size={17} aria-hidden="true" />
+                </ToolbarButton>
+              </div>
+              <div className="vd-writer__tgroup-line">
+                <ToolbarButton
+                  label="Xuất Word (.docx)"
+                  onClick={() => void exportWordNow()}
+                  disabled={exportBusy}
+                >
+                  <FileType size={17} aria-hidden="true" />
+                </ToolbarButton>
+                <ToolbarButton
+                  label="Xuất văn bản (.txt)"
+                  onClick={() => void exportTextNow()}
+                  disabled={exportBusy}
+                >
+                  <FileText size={17} aria-hidden="true" />
+                </ToolbarButton>
+              </div>
+              <span className="vd-writer__tgroup-caption">In và xuất</span>
+            </div>
           </div>
         </div>
 
@@ -3206,7 +3528,7 @@ export function WriterEditor({
 
       <div className={`vd-writer__body${pagelessMode ? " is-pageless" : ""}`}>
         <div className="vd-writer__main">
-          {!pagelessMode && (
+          {showRuler && !pagelessMode && (
             <div className="vd-writer__ruler" aria-label="Thước kẻ căn lề tài liệu">
               <div
                 ref={rulerTrackRef}
@@ -3308,7 +3630,10 @@ export function WriterEditor({
               </div>
             </div>
           )}
-          <div className={`vd-writer__viewport${pagelessMode ? " is-pageless" : ""}`}>
+          <div
+            className={`vd-writer__viewport${pagelessMode ? " is-pageless" : ""}`}
+            style={{ zoom: zoom !== 100 ? `${zoom}%` : undefined }}
+          >
             <div
               className={`vd-writer__page${pagelessMode ? " is-pageless" : ""}`}
               style={pageStyle}
@@ -3484,6 +3809,20 @@ export function WriterEditor({
 
       <div className="vd-writer__status">
         <div className="vd-writer__status-left">
+          {saveStatus ? (
+            <span
+              className={`vd-writer__status-save${propDirty ? " is-dirty" : " is-clean"}`}
+              title={propDirty ? "Có thay đổi chưa lưu" : "Tài liệu đã được lưu"}
+            >
+              <span className="vd-status-dot" />
+              {saveStatus}
+            </span>
+          ) : null}
+          {documentPath ? (
+            <span className="vd-writer__status-path" title={documentPath}>
+              {fileNameFromPath(documentPath)}
+            </span>
+          ) : null}
           <span>
             {stats.words} từ · {stats.characters} ký tự · {stats.paragraphs} đoạn
           </span>
@@ -3511,6 +3850,48 @@ export function WriterEditor({
           <span>
             A4 · Lề NĐ30 · Trang {pagination.page}/{pagination.total}
           </span>
+          <div className="vd-writer__zoom-control" title="Thu phóng trang soạn thảo">
+            <button
+              type="button"
+              className="vd-writer__zoom-btn"
+              onClick={() => setZoom((z) => Math.max(50, z - 10))}
+              title="Thu nhỏ (-10%)"
+              aria-label="Thu nhỏ"
+            >
+              -
+            </button>
+            <input
+              type="range"
+              min={50}
+              max={200}
+              step={5}
+              value={zoom}
+              onChange={(e) => setZoom(Number(e.target.value))}
+              className="vd-writer__zoom-slider"
+              title={`Thu phóng: ${zoom}%`}
+              aria-label="Thanh trượt thu phóng"
+            />
+            <span className="vd-writer__zoom-val">{zoom}%</span>
+            <button
+              type="button"
+              className="vd-writer__zoom-btn"
+              onClick={() => setZoom((z) => Math.min(200, z + 10))}
+              title="Phóng to (+10%)"
+              aria-label="Phóng to"
+            >
+              +
+            </button>
+            {zoom !== 100 && (
+              <button
+                type="button"
+                className="vd-writer__zoom-reset"
+                onClick={() => setZoom(100)}
+                title="Về 100%"
+              >
+                100%
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

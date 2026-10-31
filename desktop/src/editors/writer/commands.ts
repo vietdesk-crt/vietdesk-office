@@ -32,6 +32,7 @@ import {
 } from "./schema";
 import type { Alignment } from "./schema";
 import { preservedMarks } from "./changes";
+import { removeDiacritics, stripTones } from "@vietdesk/vietnamese";
 
 /** Mark đang bật tại vị trí chọn (hoặc trong stored marks). */
 export function markActive(state: EditorState, type: MarkType): boolean {
@@ -461,6 +462,56 @@ export function changeCase(mode: CaseMode): Command {
       return false;
     }
 
+    const transaction = state.tr;
+    for (const range of ranges.reverse()) {
+      transaction.replaceWith(
+        range.from,
+        range.to,
+        writerSchema.text(range.text, range.node.marks),
+      );
+    }
+    dispatch(transaction);
+    return true;
+  };
+}
+
+export type VietnameseMode = "nfc" | "strip-tones" | "remove-diacritics";
+
+/**
+ * Chuẩn hóa tiếng Việt cho vùng chọn (hoặc toàn bộ văn bản nếu chưa chọn gì):
+ *  - "nfc": chuẩn hóa Unicode dựng sẵn NFC.
+ *  - "strip-tones": loại bỏ thanh điệu (giữ nguyên ă, â, đ, ê, ô, ơ, ư).
+ *  - "remove-diacritics": loại bỏ toàn bộ dấu tiếng Việt thành chữ không dấu.
+ */
+export function transformVietnamese(mode: VietnameseMode): Command {
+  return (state, dispatch) => {
+    const { from, to, empty } = state.selection;
+    const targetFrom = empty ? 0 : from;
+    const targetTo = empty ? state.doc.content.size : to;
+    if (!dispatch) return true;
+
+    const ranges: { from: number; to: number; text: string; node: PMNode }[] = [];
+    state.doc.nodesBetween(targetFrom, targetTo, (node, pos) => {
+      if (!node.isText || !node.text) return true;
+      const start = Math.max(pos, targetFrom);
+      const end = Math.min(pos + node.nodeSize, targetTo);
+      if (end <= start) return true;
+      const text = node.text.slice(start - pos, end - pos);
+      let next = text;
+      if (mode === "nfc") {
+        next = text.normalize("NFC");
+      } else if (mode === "strip-tones") {
+        next = stripTones(text);
+      } else if (mode === "remove-diacritics") {
+        next = removeDiacritics(text);
+      }
+      if (next !== text) {
+        ranges.push({ from: start, to: end, text: next, node });
+      }
+      return true;
+    });
+
+    if (ranges.length === 0) return false;
     const transaction = state.tr;
     for (const range of ranges.reverse()) {
       transaction.replaceWith(

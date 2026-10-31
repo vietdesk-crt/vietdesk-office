@@ -34,25 +34,40 @@ import type {
 } from "@vietdesk/ipc-contract";
 import { AppRail } from "@vietdesk/ui";
 import type { RailItem } from "@vietdesk/ui";
-import { House, Languages, Moon, RefreshCw, Save, Sun } from "lucide-react";
+import {
+  HelpCircle,
+  House,
+  Languages,
+  RefreshCw,
+  Save,
+  Search,
+  Settings as SettingsIcon,
+  User,
+  X,
+} from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { APP_IDS, APPS, appForKind } from "./apps";
 import type { AppId } from "./apps";
 import { bytesToBase64 } from "./export/binary";
 import { isWordDocumentPath, writerDocxBytes } from "./export/docx";
-import { downloadTextFile } from "./download";
+import {
+  isCsvDocumentPath,
+  isExcelDocumentPath,
+  sheetsCsvText,
+  sheetsXlsxBytes,
+} from "./export/xlsx";
+import { isPowerPointDocumentPath, slidesPptxBytes } from "./export/pptx";
+import { downloadBinaryFile, downloadTextFile } from "./download";
 import { draftId, readDrafts, removeDraft, saveDraft } from "./drafts";
 import type { Draft } from "./drafts";
 import { fileNameFromPath } from "./format";
 import { Home } from "./Home";
-import { VietDeskLogo } from "./Logo";
 import { convertOfficeFile, isOfficeDocument } from "./office";
 import { Settings } from "./Settings";
 import type { ThemePreference } from "./settings";
 import {
   readAutosaveEnabled,
   readThemePreference,
-  systemPrefersDark,
   writeAutosaveEnabled,
   writeThemePreference,
 } from "./settings";
@@ -83,7 +98,10 @@ const APP_RAIL_ITEMS: RailItem[] = APP_IDS.map((id) => ({
 const RAIL_ITEMS: RailItem[] = [
   { id: "home", label: "Trang chủ", glyph: "⌂" },
   ...APP_RAIL_ITEMS,
-  { id: "settings", label: "Cài đặt", glyph: "⚙", separatorBefore: true },
+];
+
+const BOTTOM_RAIL_ITEMS: RailItem[] = [
+  { id: "settings", label: "Cài đặt", glyph: "⚙" },
 ];
 
 type ToolAction = "compose" | "tones" | "diacritics";
@@ -117,6 +135,14 @@ function formatSavedTime(timestamp: number): string {
   }).format(new Date(timestamp));
 }
 
+function formatSaveStatus(doc: DocState): string {
+  if (!doc.loaded) return "chưa đọc được nội dung";
+  if (doc.dirty) return "có thay đổi chưa lưu";
+  if (doc.savedAt !== null) return `đã lưu ${formatSavedTime(doc.savedAt)}`;
+  if (doc.path) return "đã mở";
+  return "chưa lưu";
+}
+
 function emptyDocument(kind: AppId, now: number): DocState {
   return {
     name: APPS[kind].defaultName,
@@ -146,8 +172,8 @@ export function App() {
   const [themePreference, setThemePreference] = useState<ThemePreference>(
     () => readThemePreference(),
   );
-  const [systemDark, setSystemDark] = useState<boolean>(() => systemPrefersDark());
-  const theme = themePreference === "system" ? (systemDark ? "dark" : "light") : themePreference;
+  const theme = "light";
+  const [sidebarExpanded, setSidebarExpanded] = useState(false);
 
   const [view, setView] = useState<View>("home");
   const [docs, setDocs] = useState<Record<AppId, DocState>>(emptyDocs);
@@ -169,6 +195,9 @@ export function App() {
   const [sample, setSample] = useState("Nguye\u0302\u0303n Vie\u0302\u0323t");
   const [result, setResult] = useState("");
   const [busy, setBusy] = useState(false);
+
+  const [helpOpen, setHelpOpen] = useState(false);
+  const toolsMenuRef = useRef<HTMLDivElement>(null);
 
   /** Tự lưu sau khi ngừng gõ — tắt/bật được từ nút trên header. */
   const [autosaveEnabled, setAutosaveEnabled] = useState(() =>
@@ -215,28 +244,12 @@ export function App() {
   }, [notice]);
 
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-  }, [theme]);
+    document.documentElement.setAttribute("data-theme", "light");
+  }, []);
 
   useEffect(() => {
     writeThemePreference(themePreference);
   }, [themePreference]);
-
-  useEffect(() => {
-    if (typeof window.matchMedia !== "function") {
-      return;
-    }
-    const query = window.matchMedia("(prefers-color-scheme: dark)");
-    const handleChange = (event: MediaQueryListEvent) => {
-      setSystemDark(event.matches);
-    };
-    query.addEventListener("change", handleChange);
-    return () => query.removeEventListener("change", handleChange);
-  }, []);
-
-  const toggleTheme = useCallback(() => {
-    setThemePreference(theme === "dark" ? "light" : "dark");
-  }, [theme]);
 
   const [recentLimit, setRecentLimit] = useState<number>(() => readRecentLimit());
   const [storePath, setStorePath] = useState<string | null>(null);
@@ -603,13 +616,11 @@ export function App() {
   );
 
   /**
-   * Lưu tài liệu.
-   *
-   * - Đã có tệp `.vdx`: ghi .vdx (bản gốc đầy đủ).
-   * - Tệp Word do APP tự lưu: ghi lại .docx (Word/Google Docs mở trực tiếp).
-   * - Tệp Word/Excel/PPT gốc chèn từ phía khác: KHÔNG bao giờ ghi đè — buộc
-   *   chọn tệp mới (mặc định .docx khi là Writer).
-   * - Chưa có tệp: hộp thoại lưu, mặc định đề nghị .docx.
+   * Lưu tài liệu theo chuẩn OpenXML hoặc .vdx:
+   * - Writer: Tài liệu văn bản (.docx) hoặc .vdx.
+   * - Sheets: Bảng tính (.xlsx), CSV (.csv) hoặc .vdx.
+   * - Slides: Bản trình chiếu (.pptx) hoặc .vdx.
+   * - Web fallback: Tải trực tiếp tệp chuẩn tương ứng (.docx/.xlsx/.pptx).
    */
   const saveDocument = useCallback(
     async (kind: AppId, options?: { saveAs?: boolean }) => {
@@ -623,37 +634,61 @@ export function App() {
       const text = serializeDocument(buildEnvelope(kind, doc, now));
 
       let path = options?.saveAs ? null : doc.path;
-      if (
-        path &&
-        !isVietDeskDocument(path) &&
-        !(isWordDocumentPath(path) && savedPathsRef.current.has(path))
-      ) {
-        // Tệp Word gốc chưa từng do ứng dụng lưu — giữ nguyên, chọn tệp khác.
+      const isOfficeSaved =
+        path !== null &&
+        savedPathsRef.current.has(path) &&
+        (isWordDocumentPath(path) ||
+          isExcelDocumentPath(path) ||
+          isCsvDocumentPath(path) ||
+          isPowerPointDocumentPath(path));
+
+      if (path && !isVietDeskDocument(path) && !isOfficeSaved) {
+        // Tệp văn phòng gốc chưa từng do ứng dụng lưu — giữ nguyên, chọn tệp khác.
         path = null;
       }
       let renamed = false;
 
       if (!path) {
         if (!hasNativeCore()) {
-          downloadTextFile(documentFileName(doc.name), text);
+          // Trình duyệt / Web fallback: Tải trực tiếp định dạng chuẩn (.docx, .xlsx, .pptx)
+          if (kind === "writer") {
+            const docx = writerDocxBytes(doc.content, doc.name);
+            downloadBinaryFile(
+              `${doc.name}.docx`,
+              docx,
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            );
+            notify(`Đã lưu và tải tệp “${doc.name}.docx”.`);
+          } else if (kind === "sheets") {
+            const xlsx = sheetsXlsxBytes(doc.content, doc.name);
+            downloadBinaryFile(
+              `${doc.name}.xlsx`,
+              xlsx,
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            );
+            notify(`Đã lưu và tải tệp “${doc.name}.xlsx”.`);
+          } else if (kind === "slides") {
+            const pptx = slidesPptxBytes(doc.content, doc.name);
+            downloadBinaryFile(
+              `${doc.name}.pptx`,
+              pptx,
+              "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            );
+            notify(`Đã lưu và tải tệp “${doc.name}.pptx”.`);
+          } else {
+            downloadTextFile(documentFileName(doc.name), text);
+            notify("Đã tải tệp .vdx xuống máy.");
+          }
+
           setDocs((previous) => ({
             ...previous,
             [kind]: { ...previous[kind], dirty: false, savedAt: now },
           }));
-          notify(
-            "Đã tải tệp .vdx xuống máy (bản web không ghi được vào thư mục).",
-          );
           return;
         }
-        const picked = await pickSavePath(documentFileName(doc.name));
+
+        const picked = await pickSavePath(doc.name, kind);
         if (!picked) {
-          return;
-        }
-        if (isWordDocumentPath(picked) && kind !== "writer") {
-          notify(
-            "Định dạng .docx chỉ dành cho Writer; hãy chọn .vdx để lưu sheet/slide.",
-            "error",
-          );
           return;
         }
         path = picked;
@@ -666,6 +701,18 @@ export function App() {
             path,
             bytesToBase64(writerDocxBytes(doc.content, doc.name)),
           );
+        } else if (isExcelDocumentPath(path)) {
+          await writeDocumentBinary(
+            path,
+            bytesToBase64(sheetsXlsxBytes(doc.content, doc.name)),
+          );
+        } else if (isCsvDocumentPath(path)) {
+          await writeDocumentFile(path, sheetsCsvText(doc.content));
+        } else if (isPowerPointDocumentPath(path)) {
+          await writeDocumentBinary(
+            path,
+            bytesToBase64(slidesPptxBytes(doc.content, doc.name)),
+          );
         } else {
           await writeDocumentFile(path, text);
         }
@@ -673,9 +720,8 @@ export function App() {
         notify(`Không lưu được tệp: ${errorText(error)}`, "error");
         return;
       }
-      if (isWordDocumentPath(path)) {
-        savedPathsRef.current.add(path);
-      }
+
+      savedPathsRef.current.add(path);
 
       const name = renamed
         ? documentTitleFromFileName(fileNameFromPath(path))
@@ -697,7 +743,7 @@ export function App() {
 
   /**
    * Tự lưu sau 1,5 giây ngừng gõ.
-   * - Tệp `.vdx` đã có đường dẫn: ghi thẳng vào tệp.
+   * - Tệp đã có đường dẫn: ghi thẳng vào tệp (.docx, .xlsx, .pptx, .csv, .vdx).
    * - Còn lại: lưu bản nháp vào localStorage để khôi phục sau khi tắt ứng dụng.
    */
   const autosave = useCallback(
@@ -709,28 +755,44 @@ export function App() {
       const now = Date.now();
       const text = serializeDocument(buildEnvelope(kind, doc, now));
 
-      const wordPath =
-        doc.path && isWordDocumentPath(doc.path) && kind === "writer"
-          ? doc.path
-          : null;
-      const writesWord =
-        wordPath !== null &&
+      const filePath = doc.path;
+      const isWord = filePath && isWordDocumentPath(filePath) && kind === "writer";
+      const isExcel = filePath && isExcelDocumentPath(filePath) && kind === "sheets";
+      const isCsv = filePath && isCsvDocumentPath(filePath) && kind === "sheets";
+      const isPptx = filePath && isPowerPointDocumentPath(filePath) && kind === "slides";
+      const isOffice = isWord || isExcel || isCsv || isPptx;
+
+      const writesOffice =
+        filePath !== null &&
+        isOffice &&
         hasNativeCore() &&
-        savedPathsRef.current.has(wordPath);
+        savedPathsRef.current.has(filePath);
 
       if (
-        doc.path &&
-        (isVietDeskDocument(doc.path) || writesWord) &&
+        filePath &&
+        (isVietDeskDocument(filePath) || writesOffice) &&
         hasNativeCore()
       ) {
         try {
-          if (writesWord && wordPath) {
+          if (isWord) {
             await writeDocumentBinary(
-              wordPath,
+              filePath,
               bytesToBase64(writerDocxBytes(doc.content, doc.name)),
             );
+          } else if (isExcel) {
+            await writeDocumentBinary(
+              filePath,
+              bytesToBase64(sheetsXlsxBytes(doc.content, doc.name)),
+            );
+          } else if (isCsv) {
+            await writeDocumentFile(filePath, sheetsCsvText(doc.content));
+          } else if (isPptx) {
+            await writeDocumentBinary(
+              filePath,
+              bytesToBase64(slidesPptxBytes(doc.content, doc.name)),
+            );
           } else {
-            await writeDocumentFile(doc.path, text);
+            await writeDocumentFile(filePath, text);
           }
         } catch (error) {
           notify(`Tự lưu thất bại: ${errorText(error)}`, "error");
@@ -875,7 +937,6 @@ export function App() {
   );
 
   const activeApp = view === "home" || view === "settings" ? null : view;
-  const activeDoc = activeApp ? docs[activeApp] : null;
 
   /** Đóng một tab; nếu là tab đang mở thì về trang chủ (tài liệu còn giữ dở). */
   const closeTab = (kind: AppId) => {
@@ -898,6 +959,23 @@ export function App() {
     window.addEventListener("mousedown", close);
     return () => window.removeEventListener("mousedown", close);
   }, [plusOpen]);
+
+  /** Đóng menu công cụ tiếng Việt khi bấm ra ngoài. */
+  useEffect(() => {
+    if (!toolsOpen) {
+      return;
+    }
+    const close = (event: MouseEvent) => {
+      if (
+        toolsMenuRef.current &&
+        !toolsMenuRef.current.contains(event.target as Node)
+      ) {
+        setToolsOpen(false);
+      }
+    };
+    window.addEventListener("mousedown", close);
+    return () => window.removeEventListener("mousedown", close);
+  }, [toolsOpen]);
 
   /** Thanh tab tài liệu đang mở — nằm trên header, kiểu tab trình duyệt. */
   const tabsBar =
@@ -1010,10 +1088,19 @@ export function App() {
       <header className="vd-app__header" data-tauri-drag-region>
         <div className="vd-brand" data-tauri-drag-region>
           <span className="vd-brand__mark" aria-hidden="true">
-            <VietDeskLogo size={20} theme={theme} />
+            <img
+              src="/vietdesk-app-icon.png"
+              alt="VietDesk"
+              width={24}
+              height={24}
+              className="vd-brand__app-icon"
+            />
           </span>
-          <span className="vd-brand__name">VietDesk</span>
-          <span className="vd-brand__enterprise-badge">Enterprise</span>
+          <span className="vd-brand__name">
+            <span className="vd-brand__name-viet">Viet</span>
+            <span className="vd-brand__name-desk">Desk</span>
+          </span>
+          <span className="vd-brand__version-badge">v0.1</span>
         </div>
 
         <button
@@ -1079,7 +1166,46 @@ export function App() {
         </div>
 
         {activeApp ? (
-          <div className="vd-actions" role="group" aria-label="Tệp">
+          <div className="vd-app__tellme-search" role="search" title="Tìm kiếm lệnh, tính năng hoặc trợ giúp (Alt+Q)">
+            <Search size={14} className="vd-app__tellme-icon" aria-hidden="true" />
+            <input
+              type="search"
+              className="vd-app__tellme-input"
+              placeholder="Tìm kiếm tính năng, lệnh... (Alt+Q)"
+              aria-label="Tìm kiếm lệnh và tính năng"
+            />
+          </div>
+        ) : null}
+
+        {activeApp ? (
+          <div className="vd-actions" role="group" aria-label="Tệp" ref={toolsMenuRef}>
+            <button
+              type="button"
+              className={`vd-actions__btn vd-actions__autosave-btn${autosaveEnabled ? " is-active" : ""}`}
+              onClick={() => setAutosaveEnabled((enabled) => !enabled)}
+              aria-pressed={autosaveEnabled}
+              title={
+                autosaveEnabled
+                  ? "Tự lưu: ĐANG BẬT (tự động lưu khi ngừng gõ)"
+                  : "Tự lưu: ĐANG TẮT — nhấn để bật tự lưu"
+              }
+              aria-label="Bật/tắt tự lưu"
+            >
+              <RefreshCw size={13} strokeWidth={2} aria-hidden="true" />
+              <span className="vd-actions__autosave-text">
+                {autosaveEnabled ? "Tự lưu: BẬT" : "Tự lưu: TẮT"}
+              </span>
+            </button>
+            <button
+              type="button"
+              className="vd-actions__btn"
+              onClick={() => void saveDocument(activeApp)}
+              disabled={!docs[activeApp].loaded}
+              title="Lưu tài liệu (Ctrl+S) — lưu định dạng chuẩn (.docx / .xlsx / .pptx / .vdx)"
+              aria-label="Lưu tài liệu"
+            >
+              <Save size={15} strokeWidth={2} aria-hidden="true" />
+            </button>
             <button
               type="button"
               className={`vd-actions__btn${toolsOpen ? " is-active" : ""}`}
@@ -1088,64 +1214,117 @@ export function App() {
               title="Công cụ tiếng Việt — chuẩn hóa Unicode, bỏ dấu (chạy qua lõi C++)"
               aria-label="Công cụ tiếng Việt"
             >
-              <Languages size={16} strokeWidth={2} aria-hidden="true" />
+              <Languages size={15} strokeWidth={2} aria-hidden="true" />
             </button>
-            <button
-              type="button"
-              className={`vd-actions__btn${autosaveEnabled ? " is-active" : ""}`}
-              onClick={() => setAutosaveEnabled((enabled) => !enabled)}
-              aria-pressed={autosaveEnabled}
-              title={
-                autosaveEnabled
-                  ? "Tự lưu đang bật — nhấn để tắt (chỉ còn lưu tay Ctrl+S)"
-                  : "Tự lưu đang tắt — nhấn để lưu tự động sau 1,5 giây ngừng gõ"
-              }
-              aria-label="Bật/tắt tự lưu"
-            >
-              <RefreshCw size={16} strokeWidth={2} aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              className="vd-actions__btn"
-              onClick={() => void saveDocument(activeApp)}
-              disabled={!docs[activeApp].loaded}
-              title="Lưu tài liệu (Ctrl+S) — .vdx giữ nguyên; chưa có tệp thì lưu sang Word (.docx)"
-              aria-label="Lưu tài liệu"
-            >
-              <Save size={16} strokeWidth={2} aria-hidden="true" />
-            </button>
+            {toolsOpen ? (
+              <div className="vd-tools vd-tools--popover" aria-label="Công cụ tiếng Việt">
+                <div className="vd-tools__head">
+                  <h2>Công cụ tiếng Việt</h2>
+                  <button
+                    type="button"
+                    className="vd-tools__close"
+                    onClick={() => setToolsOpen(false)}
+                    aria-label="Đóng"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                <p className="vd-tools__hint">
+                  Chuẩn hóa toàn bộ văn bản sang NFC, bỏ thanh điệu, hoặc bỏ dấu (lõi C++ tăng tốc).
+                </p>
+
+                <div className="vd-tools__actions">
+                  {(Object.keys(TOOL_LABELS) as ToolAction[]).map((action) => (
+                    <button
+                      type="button"
+                      key={action}
+                      disabled={busy}
+                      onClick={() => void runTool(action)}
+                    >
+                      {TOOL_LABELS[action]}
+                    </button>
+                  ))}
+                </div>
+
+                <label className="vd-tools__label" htmlFor="vd-sample">
+                  Chuỗi đầu vào
+                </label>
+                <textarea
+                  id="vd-sample"
+                  value={sample}
+                  onChange={(event) => setSample(event.target.value)}
+                  rows={2}
+                  spellCheck={false}
+                />
+
+                <label className="vd-tools__label" htmlFor="vd-result">
+                  Kết quả
+                </label>
+                <output id="vd-result" className="vd-tools__result">
+                  {result || "—"}
+                </output>
+
+                <dl className="vd-tools__meta">
+                  <dt>Runtime</dt>
+                  <dd>{core?.runtime ?? "chưa rõ"}</dd>
+                  <dt>Phiên bản lõi</dt>
+                  <dd>{core?.version ?? "chưa rõ"}</dd>
+                </dl>
+              </div>
+            ) : null}
           </div>
         ) : null}
 
-        <button
-          type="button"
-          className="vd-theme-toggle"
-          onClick={toggleTheme}
-          title={theme === "dark" ? "Chuyển sang giao diện Sáng" : "Chuyển sang giao diện Tối"}
-          aria-label="Chuyển chế độ sáng / tối"
-        >
-          {theme === "dark" ? (
-            <Sun size={16} strokeWidth={2} aria-hidden="true" />
-          ) : (
-            <Moon size={16} strokeWidth={2} aria-hidden="true" />
-          )}
-          <span className="vd-theme-toggle__text">{theme === "dark" ? "Sáng" : "Tối"}</span>
-        </button>
+        <div className="vd-header-controls">
+          <button
+            type="button"
+            className="vd-header-btn"
+            onClick={() => setHelpOpen(true)}
+            title="Phím tắt & Trợ giúp"
+            aria-label="Phím tắt và trợ giúp"
+          >
+            <HelpCircle size={15} strokeWidth={2} aria-hidden="true" />
+            <span>Trợ giúp</span>
+          </button>
 
-        <div className="vd-core" title={coreError ?? "Trạng thái lõi xử lý"}>
-          <span
-            className={`vd-core__dot${
-              core?.runtime === "c++" ? " is-native" : " is-browser"
-            }`}
-            aria-hidden="true"
-          />
-          {coreError
-            ? "Lõi: lỗi kết nối"
-            : core
-              ? core.runtime === "c++"
-                ? `Lõi C++ ${core.version}`
-                : "Bản web (fallback)"
-              : "Đang kiểm tra lõi…"}
+          <button
+            type="button"
+            className={`vd-header-btn${view === "settings" ? " is-active" : ""}`}
+            onClick={() => setView("settings")}
+            title="Cài đặt hệ thống"
+            aria-label="Cài đặt"
+          >
+            <SettingsIcon size={15} strokeWidth={2} aria-hidden="true" />
+            <span>Cài đặt</span>
+          </button>
+
+          <button
+            type="button"
+            className="vd-header-btn vd-header-btn--user"
+            title="Tài khoản cá nhân"
+            aria-label="Tài khoản người dùng"
+          >
+            <User size={15} strokeWidth={2} aria-hidden="true" />
+            <span>Cá nhân</span>
+          </button>
+
+
+          <div className="vd-core" title={coreError ?? "Trạng thái lõi xử lý"}>
+            <span
+              className={`vd-core__dot${
+                core?.runtime === "c++" ? " is-native" : " is-browser"
+              }`}
+              aria-hidden="true"
+            />
+            {coreError
+              ? "Lõi: lỗi kết nối"
+              : core
+                ? core.runtime === "c++"
+                  ? `Lõi C++ ${core.version}`
+                  : "Bản web (fallback)"
+                : "Đang kiểm tra lõi…"}
+          </div>
         </div>
       </header>
 
@@ -1153,7 +1332,10 @@ export function App() {
         {view === "home" || view === "settings" ? (
           <AppRail
             items={RAIL_ITEMS}
+            bottomItems={BOTTOM_RAIL_ITEMS}
             active={view}
+            expanded={sidebarExpanded}
+            onToggleExpand={() => setSidebarExpanded((v) => !v)}
             onSelect={(id) => {
               if (id === "home") {
                 setView("home");
@@ -1170,7 +1352,12 @@ export function App() {
                   : [...previous, id as AppId],
               );
             }}
-            footer={<span className="vd-rail__version">v0.1</span>}
+            footer={
+              <>
+                <div className="vd-rail__separator" />
+                <span className="vd-rail__version">v0.1</span>
+              </>
+            }
           />
         ) : null}
 
@@ -1252,72 +1439,15 @@ export function App() {
                 hidden={view !== kind}
               >
                 {APPS[kind].renderEditor({
-                  document: docs[kind],
+                  document: {
+                    ...docs[kind],
+                    saveStatus: formatSaveStatus(docs[kind]),
+                  },
                   onChange: (content) => handleContentChange(kind, content),
                 })}
               </div>
             ))
           )}
-
-          {toolsOpen ? (
-            <aside className="vd-tools" aria-label="Công cụ tiếng Việt">
-              <div className="vd-tools__head">
-                <h2>Công cụ tiếng Việt</h2>
-                <button
-                  type="button"
-                  className="vd-tools__close"
-                  onClick={() => setToolsOpen(false)}
-                  aria-label="Đóng"
-                >
-                  ×
-                </button>
-              </div>
-
-              <p className="vd-tools__hint">
-                Chuỗi bên dưới đang ở dạng tách dấu (NFD). Bấm “Chuẩn hóa NFC” để
-                ghép thành ký tự dựng sẵn — do lõi C++ thực hiện khi chạy trong
-                Tauri.
-              </p>
-
-              <label className="vd-tools__label" htmlFor="vd-sample">
-                Chuỗi đầu vào
-              </label>
-              <textarea
-                id="vd-sample"
-                value={sample}
-                onChange={(event) => setSample(event.target.value)}
-                rows={3}
-                spellCheck={false}
-              />
-
-              <div className="vd-tools__actions">
-                {(Object.keys(TOOL_LABELS) as ToolAction[]).map((action) => (
-                  <button
-                    type="button"
-                    key={action}
-                    disabled={busy}
-                    onClick={() => void runTool(action)}
-                  >
-                    {TOOL_LABELS[action]}
-                  </button>
-                ))}
-              </div>
-
-              <label className="vd-tools__label" htmlFor="vd-result">
-                Kết quả
-              </label>
-              <output id="vd-result" className="vd-tools__result">
-                {result || "—"}
-              </output>
-
-              <dl className="vd-tools__meta">
-                <dt>Runtime</dt>
-                <dd>{core?.runtime ?? "chưa rõ"}</dd>
-                <dt>Phiên bản lõi</dt>
-                <dd>{core?.version ?? "chưa rõ"}</dd>
-              </dl>
-            </aside>
-          ) : null}
         </div>
       </div>
 
@@ -1334,29 +1464,83 @@ export function App() {
         </div>
       ) : null}
 
-      <footer className="vd-app__status">
-        <span>
-          {activeApp && activeDoc ? (
-            <>
-              {APPS[activeApp].label} ·{" "}
-              {!activeDoc.loaded
-                ? "chưa đọc được nội dung"
-                : activeDoc.dirty
-                  ? "có thay đổi chưa lưu"
-                  : activeDoc.savedAt !== null
-                    ? `đã lưu ${formatSavedTime(activeDoc.savedAt)}`
-                    : activeDoc.path
-                      ? "đã mở"
-                      : "chưa lưu"}
-            </>
-          ) : view === "settings" ? (
-            "Cài đặt · tuỳ chọn lưu trên máy này"
-          ) : (
-            "Trang chủ · chọn một ứng dụng để bắt đầu"
-          )}
-        </span>
-        <span>{recents.length} tệp gần đây</span>
-      </footer>
+      {view === "home" || view === "settings" ? (
+        <footer className="vd-app__status">
+          <span>
+            {view === "settings"
+              ? "Cài đặt · tuỳ chọn lưu trên máy này"
+              : "Trang chủ · chọn một ứng dụng để bắt đầu"}
+          </span>
+          <span>{recents.length} tệp gần đây</span>
+        </footer>
+      ) : null}
+
+      {helpOpen ? (
+        <div
+          className="vd-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="vd-help-title"
+          onClick={() => setHelpOpen(false)}
+        >
+          <div
+            className="vd-modal-content vd-help-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="vd-modal-header">
+              <h2 id="vd-help-title" className="vd-modal-title">
+                Phím tắt & Chuẩn thể thức VietDesk
+              </h2>
+              <button
+                type="button"
+                className="vd-icon"
+                onClick={() => setHelpOpen(false)}
+                aria-label="Đóng"
+              >
+                <X size={16} aria-hidden="true" />
+              </button>
+            </div>
+            <div className="vd-modal-body">
+              <div className="vd-help-section">
+                <h3>Phím tắt tài liệu chung</h3>
+                <div className="vd-help-grid">
+                  <div className="vd-help-row"><kbd>Ctrl + S</kbd><span>Lưu tài liệu (.vdx / .docx)</span></div>
+                  <div className="vd-help-row"><kbd>Ctrl + Shift + S</kbd><span>Lưu dưới dạng… (Save As)</span></div>
+                  <div className="vd-help-row"><kbd>Ctrl + O</kbd><span>Mở tệp từ máy tính</span></div>
+                  <div className="vd-help-row"><kbd>Ctrl + P</kbd><span>In ấn hoặc xuất PDF</span></div>
+                  <div className="vd-help-row"><kbd>Ctrl + Z / Y</kbd><span>Hoàn tác / Làm lại</span></div>
+                  <div className="vd-help-row"><kbd>Ctrl + B / I / U</kbd><span>Đậm / Nghiêng / Gạch chân</span></div>
+                  <div className="vd-help-row"><kbd>Ctrl + F / H</kbd><span>Tìm kiếm / Thay thế</span></div>
+                </div>
+              </div>
+              <div className="vd-help-section">
+                <h3>Phím tắt theo ứng dụng</h3>
+                <div className="vd-help-grid">
+                  <div className="vd-help-row"><kbd>F5</kbd><span>Bắt đầu trình chiếu (Slides)</span></div>
+                  <div className="vd-help-row"><kbd>Esc</kbd><span>Thoát trình chiếu / Thoát hộp thoại</span></div>
+                  <div className="vd-help-row"><kbd>Enter / Tab</kbd><span>Di chuyển ô trong bảng tính (Sheets)</span></div>
+                  <div className="vd-help-row"><kbd>Ctrl + Shift + C</kbd><span>Chuẩn hóa văn bản Unicode NFC</span></div>
+                </div>
+              </div>
+              <div className="vd-help-section">
+                <h3>Chuẩn văn bản hành chính Nghị định 30/2020/NĐ-CP</h3>
+                <p className="vd-help-note">
+                  Khổ giấy A4 · Lề chuẩn: Trên 20-25mm, Dưới 20-25mm, Trái 30-35mm, Phải 15-20mm · Phông chữ Times New Roman Unicode NFC · Đánh số trang chân trang góc phải.
+                </p>
+              </div>
+            </div>
+            <div className="vd-modal-footer">
+              <button
+                type="button"
+                className="vd-button is-primary"
+                onClick={() => setHelpOpen(false)}
+              >
+                Đã hiểu
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

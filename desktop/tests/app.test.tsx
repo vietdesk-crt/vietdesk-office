@@ -140,7 +140,7 @@ describe("vỏ ứng dụng", () => {
     expect(container.querySelector(".vd-tools")).not.toBeNull();
   });
 
-  it("mở Cài đặt và đổi chế độ màu", async () => {
+  it("mở Cài đặt và kiểm tra giao diện sáng", async () => {
     const settingsItem = buttonByText(".vd-rail__item", "Cài đặt");
     expect(settingsItem).toBeDefined();
 
@@ -154,22 +154,22 @@ describe("vỏ ứng dụng", () => {
     expect(container.textContent).toContain("Tệp gần đây");
     expect(container.textContent).toContain("Tiếng Việt");
 
-    const darkButton = Array.from(
+    const lightButton = Array.from(
       container.querySelectorAll<HTMLButtonElement>(".vd-theme-option"),
     ).find(
       (button) =>
         button.querySelector(".vd-theme-option__label")?.textContent?.trim() ===
-        "Tối",
+        "Sáng",
     );
-    expect(darkButton).toBeDefined();
+    expect(lightButton).toBeDefined();
 
     await act(async () => {
-      darkButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      lightButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     await flush();
 
-    expect(document.documentElement.getAttribute("data-theme")).toBe("dark");
-    expect(localStorage.getItem("vietdesk-theme")).toBe("dark");
+    expect(document.documentElement.getAttribute("data-theme")).toBe("light");
+    expect(localStorage.getItem("vietdesk-theme")).toBe("light");
   });
 
   it("đổi số tệp gần đây tối đa trong Cài đặt", async () => {

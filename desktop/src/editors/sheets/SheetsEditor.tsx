@@ -49,6 +49,10 @@ export interface SheetsEditorProps {
   initialStyles?: CellStyleMap;
   /** Gọi sau mỗi lần sửa ô để vỏ ứng dụng đánh dấu "chưa lưu" và tự lưu. */
   onChange?: (payload: SheetsEditorPayload | CellMap) => void;
+  title?: string;
+  documentPath?: string | null;
+  saveStatus?: string;
+  dirty?: boolean;
 }
 
 function formatDisplayValue(
@@ -92,6 +96,10 @@ export function SheetsEditor({
   initialCells,
   initialStyles,
   onChange,
+  title,
+  documentPath,
+  saveStatus,
+  dirty,
 }: SheetsEditorProps) {
   const [cells, setCells] = useState<CellMap>(() => initialCells ?? {});
   const [styles, setStyles] = useState<CellStyleMap>(() => initialStyles ?? {});
@@ -124,6 +132,11 @@ export function SheetsEditor({
 
   const onChangeRef = useRef(onChange);
   const [selected, setSelected] = useState({ row: 0, column: 0 });
+  const [selectionEnd, setSelectionEnd] = useState<{ row: number; column: number } | null>(null);
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [colWidths, setColWidths] = useState<Record<number, number>>({});
+  const resizingRef = useRef<{ col: number; startX: number; startWidth: number } | null>(null);
+
   const [isEditingInline, setIsEditingInline] = useState(false);
   const [formulaDropdownOpen, setFormulaDropdownOpen] = useState(false);
   const [ribbonTab, setRibbonTab] = useState<"home" | "formulas" | "data">("home");
@@ -131,7 +144,7 @@ export function SheetsEditor({
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const [zebraStripes, setZebraStripes] = useState(false);
 
-  // Quản lý nhiều trang tính (Chuẩn Google Sheets Multi-Sheet Tabs)
+  // Quản lý nhiều trang tính (Multi-Sheet Tabs)
   const [sheetsList, setSheetsList] = useState<Array<{ id: string; name: string }>>([
     { id: "sheet1", name: "Trang tính 1" },
   ]);
@@ -174,7 +187,7 @@ export function SheetsEditor({
   const selectedStyle = styles[selectedId] ?? {};
   const selectedResult = computed[selectedId];
 
-  // Tính thống kê tự động cho cột đang chọn (chuẩn Excel 365 / Google Sheets)
+  // Tính thống kê tự động cho cột đang chọn
   const columnStats = useMemo(() => {
     const numbers: number[] = [];
     for (let r = 0; r < rowCount; r++) {
@@ -204,6 +217,103 @@ export function SheetsEditor({
       colLabel: columnLabel(selected.column),
     };
   }, [rowCount, selected.column, computed]);
+
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      setIsSelecting(false);
+    };
+    window.addEventListener("mouseup", handleGlobalMouseUp);
+    return () => window.removeEventListener("mouseup", handleGlobalMouseUp);
+  }, []);
+
+  const startColResize = useCallback(
+    (col: number, e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const currentWidth = colWidths[col] ?? 90;
+      resizingRef.current = { col, startX: e.clientX, startWidth: currentWidth };
+
+      const onMouseMove = (moveEvent: MouseEvent) => {
+        if (!resizingRef.current) return;
+        const delta = moveEvent.clientX - resizingRef.current.startX;
+        const nextWidth = Math.max(50, Math.min(600, resizingRef.current.startWidth + delta));
+        setColWidths((prev) => ({
+          ...prev,
+          [resizingRef.current!.col]: nextWidth,
+        }));
+      };
+
+      const onMouseUp = () => {
+        resizingRef.current = null;
+        window.removeEventListener("mousemove", onMouseMove);
+        window.removeEventListener("mouseup", onMouseUp);
+      };
+
+      window.addEventListener("mousemove", onMouseMove);
+      window.addEventListener("mouseup", onMouseUp);
+    },
+    [colWidths],
+  );
+
+  const range = useMemo(() => {
+    if (!selectionEnd) return null;
+    if (selectionEnd.row === selected.row && selectionEnd.column === selected.column) return null;
+    return {
+      minRow: Math.min(selected.row, selectionEnd.row),
+      maxRow: Math.max(selected.row, selectionEnd.row),
+      minCol: Math.min(selected.column, selectionEnd.column),
+      maxCol: Math.max(selected.column, selectionEnd.column),
+    };
+  }, [selected, selectionEnd]);
+
+  // Thống kê vùng chọn (Range Stats: Sum, Average, Count, Min, Max)
+  const rangeStats = useMemo(() => {
+    if (!range) return null;
+    const { minRow, maxRow, minCol, maxCol } = range;
+    const startLabel = cellId(minRow, minCol);
+    const endLabel = cellId(maxRow, maxCol);
+    const rangeLabel = `${startLabel}:${endLabel}`;
+
+    const numbers: number[] = [];
+    let filledCount = 0;
+    const totalCells = (maxRow - minRow + 1) * (maxCol - minCol + 1);
+
+    for (let r = minRow; r <= maxRow; r++) {
+      for (let c = minCol; c <= maxCol; c++) {
+        const id = cellId(r, c);
+        const res = computed[id];
+        if (cells[id] && cells[id].trim() !== "") {
+          filledCount++;
+        }
+        if (
+          res &&
+          res.numeric !== null &&
+          res.numeric !== undefined &&
+          !isNaN(res.numeric)
+        ) {
+          numbers.push(res.numeric);
+        }
+      }
+    }
+
+    const hasNumbers = numbers.length > 0;
+    const sum = hasNumbers ? numbers.reduce((a, b) => a + b, 0) : 0;
+    const avg = hasNumbers ? sum / numbers.length : 0;
+    const min = hasNumbers ? Math.min(...numbers) : 0;
+    const max = hasNumbers ? Math.max(...numbers) : 0;
+
+    return {
+      rangeLabel,
+      totalCells,
+      filledCount,
+      count: hasNumbers ? numbers.length : filledCount,
+      hasNumbers,
+      sum,
+      avg,
+      min,
+      max,
+    };
+  }, [range, computed, cells]);
 
   const emitChange = useCallback(
     (nextCells: CellMap, nextStyles: CellStyleMap) => {
@@ -732,7 +842,7 @@ export function SheetsEditor({
               <button
                 type="button"
                 className={`vd-sheets__tbtn${zebraStripes ? " is-active" : ""}`}
-                title="Tô màu xen kẽ các hàng (Alternating colors kiểu Google Sheets)"
+                title="Tô màu xen kẽ các hàng (Alternating colors)"
                 onClick={() => setZebraStripes((z) => !z)}
               >
                 <span className="vd-sheets__glyph">▦</span>
@@ -805,94 +915,141 @@ export function SheetsEditor({
           <thead>
             <tr>
               <th className="vd-sheets__corner" scope="col" />
-              {Array.from({ length: colCount }, (_, column) => (
-                <th
-                  scope="col"
-                  key={column}
-                  className={selected.column === column ? "is-col-active" : undefined}
-                >
-                  {columnLabel(column)}
-                </th>
-              ))}
+              {Array.from({ length: colCount }, (_, column) => {
+                const width = colWidths[column] ?? 90;
+                const isColActive =
+                  selected.column === column ||
+                  (range !== null && column >= range.minCol && column <= range.maxCol);
+                return (
+                  <th
+                    scope="col"
+                    key={column}
+                    className={isColActive ? "is-col-active" : undefined}
+                    style={{ width, minWidth: width, maxWidth: width }}
+                  >
+                    <span className="vd-sheets__col-label">{columnLabel(column)}</span>
+                    <div
+                      className="vd-sheets__col-resizer"
+                      onMouseDown={(e) => startColResize(column, e)}
+                      title="Kéo để điều chỉnh độ rộng cột"
+                    />
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
-            {Array.from({ length: rowCount }, (_, row) => (
-              <tr key={row}>
-                <th
-                  scope="row"
-                  className={selected.row === row ? "is-row-active" : undefined}
-                >
-                  {row + 1}
-                </th>
-                {Array.from({ length: colCount }, (_, column) => {
-                  const id = cellId(row, column);
-                  const result = computed[id];
-                  const style = styles[id];
-                  const isSelected =
-                    selected.row === row && selected.column === column;
+            {Array.from({ length: rowCount }, (_, row) => {
+              const isRowActive =
+                selected.row === row ||
+                (range !== null && row >= range.minRow && row <= range.maxRow);
+              return (
+                <tr key={row}>
+                  <th
+                    scope="row"
+                    className={isRowActive ? "is-row-active" : undefined}
+                  >
+                    {row + 1}
+                  </th>
+                  {Array.from({ length: colCount }, (_, column) => {
+                    const id = cellId(row, column);
+                    const result = computed[id];
+                    const style = styles[id];
+                    const isSelected =
+                      selected.row === row && selected.column === column;
 
-                  const displayText = formatDisplayValue(
-                    result?.numeric,
-                    result?.display ?? "",
-                    style,
-                  );
+                    const inRange = range
+                      ? row >= range.minRow &&
+                        row <= range.maxRow &&
+                        column >= range.minCol &&
+                        column <= range.maxCol
+                      : false;
 
-                  const cellClass = [
-                    isSelected ? "is-selected" : "",
-                    result?.error ? "is-error" : "",
-                    result?.numeric !== null && result?.numeric !== undefined
-                      ? "is-numeric"
-                      : "",
-                    style?.bold ? "is-bold" : "",
-                    style?.italic ? "is-italic" : "",
-                    style?.align ? `align-${style.align}` : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" ");
+                    const isRangeTop = inRange && range ? row === range.minRow : false;
+                    const isRangeBottom = inRange && range ? row === range.maxRow : false;
+                    const isRangeLeft = inRange && range ? column === range.minCol : false;
+                    const isRangeRight = inRange && range ? column === range.maxCol : false;
 
-                  return (
-                    <td
-                      key={id}
-                      className={cellClass}
-                      onClick={() => {
-                        setSelected({ row, column });
-                        setIsEditingInline(false);
-                      }}
-                      onDoubleClick={() => {
-                        setSelected({ row, column });
-                        setIsEditingInline(true);
-                      }}
-                      title={result?.error ?? undefined}
-                    >
-                      {isSelected && isEditingInline ? (
-                        <input
-                          ref={inlineInputRef}
-                          className="vd-sheets__inline-input"
-                          value={rawValue}
-                          onChange={(e) => updateSelectedCell(e.target.value)}
-                          onBlur={() => setIsEditingInline(false)}
-                          onKeyDown={handleKeyDown}
-                        />
-                      ) : (
-                        displayText
-                      )}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
+                    const width = colWidths[column] ?? 90;
+
+                    const displayText = formatDisplayValue(
+                      result?.numeric,
+                      result?.display ?? "",
+                      style,
+                    );
+
+                    const cellClass = [
+                      isSelected ? "is-selected" : "",
+                      inRange ? "is-in-range" : "",
+                      isRangeTop ? "is-range-top" : "",
+                      isRangeBottom ? "is-range-bottom" : "",
+                      isRangeLeft ? "is-range-left" : "",
+                      isRangeRight ? "is-range-right" : "",
+                      result?.error ? "is-error" : "",
+                      result?.numeric !== null && result?.numeric !== undefined
+                        ? "is-numeric"
+                        : "",
+                      style?.bold ? "is-bold" : "",
+                      style?.italic ? "is-italic" : "",
+                      style?.align ? `align-${style.align}` : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ");
+
+                    return (
+                      <td
+                        key={id}
+                        className={cellClass}
+                        style={{ width, minWidth: width, maxWidth: width }}
+                        onMouseDown={(e) => {
+                          if (e.button === 0) {
+                            setSelected({ row, column });
+                            setSelectionEnd(null);
+                            setIsSelecting(true);
+                            setIsEditingInline(false);
+                          }
+                        }}
+                        onMouseEnter={() => {
+                          if (isSelecting) {
+                            setSelectionEnd({ row, column });
+                          }
+                        }}
+                        onDoubleClick={() => {
+                          setSelected({ row, column });
+                          setSelectionEnd(null);
+                          setIsEditingInline(true);
+                        }}
+                        title={result?.error ?? undefined}
+                      >
+                        {isSelected && isEditingInline ? (
+                          <input
+                            ref={inlineInputRef}
+                            className="vd-sheets__inline-input"
+                            value={rawValue}
+                            onChange={(e) => updateSelectedCell(e.target.value)}
+                            onBlur={() => setIsEditingInline(false)}
+                            onKeyDown={handleKeyDown}
+                          />
+                        ) : (
+                          displayText
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
 
-      {/* --- Thanh chuyển đổi trang tính (Google Sheets Multi-Sheet Tab Bar) --- */}
+      {/* --- Thanh chuyển đổi trang tính (Multi-Sheet Tab Bar) --- */}
       <div className="vd-sheets__tabbar" role="tablist" aria-label="Danh sách trang tính">
         <button
           type="button"
           className="vd-sheets__add-sheet-btn"
           onClick={addSheet}
-          title="Thêm trang tính mới (Chuẩn Google Sheets)"
+          title="Thêm trang tính mới"
           aria-label="Thêm trang tính"
         >
           +
@@ -916,8 +1073,53 @@ export function SheetsEditor({
       {/* --- Thanh trạng thái (Status Bar) --- */}
       <div className="vd-sheets__status">
         <div className="vd-sheets__status-left">
+          {saveStatus ? (
+            <span
+              className={`vd-sheets__status-save${dirty ? " is-dirty" : " is-clean"}`}
+              title={dirty ? "Có thay đổi chưa lưu" : "Tài liệu đã được lưu"}
+            >
+              <span className="vd-status-dot" />
+              {saveStatus}
+            </span>
+          ) : null}
+          {title ? (
+            <span className="vd-sheets__status-title" title={documentPath ?? title}>
+              {title}
+            </span>
+          ) : null}
           <span>
-            {selectedResult?.error ? (
+            {rangeStats ? (
+              <span
+                className="vd-sheets__range-stats"
+                title={`Thống kê vùng chọn ${rangeStats.rangeLabel}`}
+              >
+                <span className="vd-sheets__stat-badge">{rangeStats.rangeLabel}</span>
+                <span className="vd-sheets__stat-item">
+                  Đếm: <strong>{rangeStats.count}</strong>
+                </span>
+                {rangeStats.hasNumbers ? (
+                  <>
+                    <span className="vd-sheets__stat-item">
+                      Tổng: <strong>{rangeStats.sum.toLocaleString("vi-VN")}</strong>
+                    </span>
+                    <span className="vd-sheets__stat-item">
+                      TB:{" "}
+                      <strong>
+                        {rangeStats.avg.toLocaleString("vi-VN", {
+                          maximumFractionDigits: 2,
+                        })}
+                      </strong>
+                    </span>
+                    <span className="vd-sheets__stat-item">
+                      Min: <strong>{rangeStats.min}</strong>
+                    </span>
+                    <span className="vd-sheets__stat-item">
+                      Max: <strong>{rangeStats.max}</strong>
+                    </span>
+                  </>
+                ) : null}
+              </span>
+            ) : selectedResult?.error ? (
               <span className="vd-sheets__status-error">
                 Lỗi: {selectedResult.error}
               </span>
@@ -933,7 +1135,7 @@ export function SheetsEditor({
               "Ô trống hoặc văn bản"
             )}
           </span>
-          {columnStats ? (
+          {!rangeStats && columnStats ? (
             <span
               className="vd-sheets__column-stats"
               title={`Thống kê cột ${columnStats.colLabel} (chuẩn thống kê bảng tính tự động)`}

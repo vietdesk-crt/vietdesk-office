@@ -1,6 +1,5 @@
 /**
- * Chuyển định dạng OpenDocument (.odt/.ods/.odp) — LibreOffice và "Tải xuống
- * ODT" từ Google Docs — sang mô hình nội bộ.
+ * Chuyển định dạng chuẩn mở OpenDocument (.odt/.ods/.odp) sang mô hình nội bộ.
  *
  * ODF dùng namespace `text:`/`table:`/`draw:`. Chỉ đọc phần văn bản: tiêu đề
  * (text:h), đoạn (text:p), danh sách (text:list), bảng tính (table:table-cell)

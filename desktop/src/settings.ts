@@ -6,44 +6,29 @@
  * tệp cấu hình do Rust quản lý như `recent-files.json`.
  */
 
-export type ThemePreference = "light" | "dark" | "system";
+export type ThemePreference = "light";
 
 const THEME_KEY = "vietdesk-theme";
 
-/** Đọc lựa chọn giao diện; hỗ trợ dữ liệu cũ chỉ có "light"/"dark". */
+/** Đọc lựa chọn giao diện: hệ thống chỉ sử dụng giao diện Sáng chuẩn văn phòng thuần Việt. */
 export function readThemePreference(): ThemePreference {
-  if (typeof localStorage === "undefined") {
-    return "system";
-  }
-  try {
-    const saved = localStorage.getItem(THEME_KEY);
-    if (saved === "light" || saved === "dark" || saved === "system") {
-      return saved;
-    }
-  } catch {
-    // localStorage bị chặn — rơi về "system".
-  }
-  return "system";
+  return "light";
 }
 
-export function writeThemePreference(preference: ThemePreference): void {
+export function writeThemePreference(_preference: ThemePreference): void {
   if (typeof localStorage === "undefined") {
     return;
   }
   try {
-    localStorage.setItem(THEME_KEY, preference);
+    localStorage.setItem(THEME_KEY, "light");
   } catch {
-    // Không lưu được thì vẫn giữ lựa chọn trong phiên hiện tại.
+    // Không lưu được thì bỏ qua.
   }
 }
 
-/** Hệ điều hành đang dùng giao diện tối? (false nếu môi trường không hỗ trợ.) */
+/** Chế độ tối đã được gỡ bỏ khỏi hệ thống, luôn trả về false. */
 export function systemPrefersDark(): boolean {
-  return (
-    typeof window !== "undefined" &&
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(prefers-color-scheme: dark)").matches
-  );
+  return false;
 }
 
 const AUTOSAVE_KEY = "vietdesk-autosave";

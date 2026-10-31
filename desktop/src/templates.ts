@@ -242,7 +242,7 @@ Hệ sinh thái VietDesk Office tiếp tục mở rộng quy mô với các gi�
 ---
 
 ## Định hướng Phát triển Giai đoạn 2026–2030
-VietDesk Office hướng tới việc hoàn thiện nền tảng văn phòng hợp nhất HyperCanvas, xóa bỏ ranh giới giữa 3 ứng dụng riêng lẻ, mang lại trải nghiệm làm việc mượt mà chuẩn macOS và tương thích tối đa với các tiêu chuẩn mở quốc tế ISO/IEC 29500.`;
+VietDesk Office hướng tới việc hoàn thiện nền tảng văn phòng hợp nhất HyperCanvas, xóa bỏ ranh giới giữa 3 ứng dụng riêng lẻ, mang lại trải nghiệm làm việc mượt mà, chuyên nghiệp và tương thích tối đa với các tiêu chuẩn mở quốc tế ISO/IEC 29500.`;
       const deck = autoFrameLayoutFromMarkdown(markdown, "Thuyết trình HC-Office");
       return {
         slides: deck.slides.map((res, i) => slideFromFrameLayout(res, `slide-af-${i + 1}`)),

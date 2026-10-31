@@ -12,6 +12,9 @@ export interface AppDocument {
   content: unknown;
   /** Tăng khi nạp tài liệu khác — dùng làm `key` để remount editor. */
   revision: number;
+  dirty?: boolean;
+  savedAt?: number | null;
+  saveStatus?: string;
 }
 
 export interface EditorRenderOptions {

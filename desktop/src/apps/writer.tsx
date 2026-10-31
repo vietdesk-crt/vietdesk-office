@@ -9,7 +9,7 @@ export const writerApp: AppDescriptor = {
   home: {
     title: "Văn bản",
     description: "Công văn, quyết định, biên bản — chuẩn NĐ30.",
-    formats: "Lưu .vdx / .docx · Xuất PDF",
+    formats: "Lưu .docx / .vdx · Xuất PDF",
   },
   createDefaultContent: createEmptyWriterDocument,
   normalizeContent: normalizeWriterContent,
@@ -18,6 +18,8 @@ export const writerApp: AppDescriptor = {
       initialContent={document.content}
       title={document.name}
       documentPath={document.path}
+      saveStatus={document.saveStatus}
+      dirty={document.dirty}
       onChange={({ doc }) => onChange(doc)}
     />
   ),
